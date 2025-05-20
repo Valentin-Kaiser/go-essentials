@@ -1,29 +1,38 @@
-// The logger package is a simple zerolog wrapper that provides a convenient way to
-// log messages to both the console and a log file or other writers.
-// It uses the lumberjack package for log rotation and file management.
+// Package logger provides a simple and flexible logging utility built around the zerolog library.
+// It offers structured, leveled logging with support for console output, file logging with rotation,
+// and custom output targets.
 //
-// Example usage:
+// This package simplifies logger setup and management by wrapping zerolog and integrating with
+// the lumberjack package for efficient log file rotation.
 //
-// ```go
-// package main
+// Key Features:
+//   - Structured logging using zerolog
+//   - Optional console output with human-readable formatting
+//   - File logging with automatic rotation (size, age, and backup limits)
+//   - Singleton design for easy initialization and global logger access
+//   - Runtime log level adjustments and custom writer support
 //
-// import (
+// Example:
 //
-//	"github.com/Valentin-Kaiser/go-essentials/logger"
-//	"github.com/rs/zerolog"
-//	"github.com/rs/zerolog/log"
+//	package main
 //
-// )
+//	import (
+//		"github.com/Valentin-Kaiser/go-essentials/logger"
+//		"github.com/rs/zerolog"
+//		"github.com/rs/zerolog/log"
+//	)
 //
 //	func main() {
-//		logger.New().WithConsole().WithLogFile().Init("example", zerolog.InfoLevel)
+//		logger.New().
+//			WithConsole().
+//			WithLogFile().
+//			Init("example", zerolog.InfoLevel)
+//
 //		log.Info().Msg("This is an info message")
 //
 //		logger.SetLevel(zerolog.DebugLevel)
 //		log.Debug().Msg("This is a debug message")
 //	}
-//
-// ```
 package logger
 
 import (
