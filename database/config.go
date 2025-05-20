@@ -19,20 +19,28 @@ func (c *Config) Validate() error {
 	if c.Driver == "" {
 		return fmt.Errorf("database driver is required")
 	}
-	if c.Host == "" {
-		return fmt.Errorf("database host is required")
-	}
-	if c.Port == 0 {
-		return fmt.Errorf("database port is required")
-	}
-	if c.User == "" {
-		return fmt.Errorf("database user is required")
-	}
-	if c.Password == "" {
-		return fmt.Errorf("database password is required")
-	}
-	if c.Name == "" {
-		return fmt.Errorf("database name is required")
+
+	switch c.Driver {
+	case "sqlite":
+		if c.Name == "" {
+			return fmt.Errorf("database name (sqlite file) is required")
+		}
+	default:
+		if c.Host == "" {
+			return fmt.Errorf("database host is required")
+		}
+		if c.Port == 0 {
+			return fmt.Errorf("database port is required")
+		}
+		if c.User == "" {
+			return fmt.Errorf("database user is required")
+		}
+		if c.Password == "" {
+			return fmt.Errorf("database password is required")
+		}
+		if c.Name == "" {
+			return fmt.Errorf("database name is required")
+		}
 	}
 	return nil
 }
