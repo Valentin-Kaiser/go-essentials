@@ -1,81 +1,83 @@
-// The config core package provides a way to manage application configuration in Go.
-// It allows you to register configuration structs, read and write configuration files,
-// and watch for changes. The package uses Viper for configuration management and
-// supports YAML format.
+// Package core provides a simple, structured, and extensible way to manage
+// application configuration in Go. It builds upon the Viper library and adds
+// powerful features like validation, dynamic watching, default value registration,
+// environment and flag integration, and structured config registration.
 //
-// Example usage:
+// Key Features:
 //
-// ```go
-// package config
+//   - Register typed configuration structs with default values.
+//   - Parse YAML configuration files and bind fields to CLI flags and environment variables.
+//   - Automatically generate flags based on struct field tags.
+//   - Validate configuration using custom logic (via `Validate()` method).
+//   - Watch configuration files for changes and hot-reload updated values.
+//   - Write current configuration back to disk.
+//   - Automatically fallbacks to default config creation if no file is found.
 //
-// import (
+// All configuration structs must implement the `Config` interface:
 //
-//	"fmt"
-//	"github.com/Valentin-Kaiser/go-essentials/config/core"
-//	"github.com/fsnotify/fsnotify"
+//	type Config interface {
+//	    Validate() error
+//	}
 //
-// )
+// Example:
+//
+//	package config
+//
+//	import (
+//	    "fmt"
+//	    "github.com/Valentin-Kaiser/go-essentials/config/core"
+//	    "github.com/fsnotify/fsnotify"
+//	)
 //
 //	type ServerConfig struct {
-//		Host string `yaml:"host" usage:"The host of the server"`
-//		Port int    `yaml:"port" usage:"The port of the server"`
+//	    Host string `yaml:"host" usage:"The host of the server"`
+//	    Port int    `yaml:"port" usage:"The port of the server"`
 //	}
 //
 //	func (c *ServerConfig) Validate() error {
-//		if c.Host == "" {
-//			return fmt.Errorf("host cannot be empty")
-//		}
-//		if c.Port <= 0 {
-//			return fmt.Errorf("port must be greater than 0")
-//		}
-//		return nil
+//	    if c.Host == "" {
+//	        return fmt.Errorf("host cannot be empty")
+//	    }
+//	    if c.Port <= 0 {
+//	        return fmt.Errorf("port must be greater than 0")
+//	    }
+//	    return nil
 //	}
 //
 //	func Get() *ServerConfig {
-//		c, ok := core.Get().(*ServerConfig)
-//		if !ok {
-//			return &ServerConfig{}
-//		}
-//
-//		return c
+//	    c, ok := core.Get().(*ServerConfig)
+//	    if !ok {
+//	        return &ServerConfig{}
+//	    }
+//	    return c
 //	}
 //
 //	func init() {
-//		config := &ServerConfig{
-//			Host: "localhost", // the assigned valus are used as default values
-//			Port: 8080,
-//		}
+//	    cfg := &ServerConfig{
+//	        Host: "localhost",
+//	        Port: 8080,
+//	    }
 //
-//		err := core.RegisterConfig("server", config)
-//		if err != nil {
-//			fmt.Println("Error registering config:", err)
-//			return
-//		}
+//	    if err := core.RegisterConfig("server", cfg); err != nil {
+//	        fmt.Println("Error registering config:", err)
+//	        return
+//	    }
 //
-//		err = core.Read()
-//		if err != nil {
-//			fmt.Println("Error reading config:", err)
-//			return
-//		}
+//	    if err := core.Read(); err != nil {
+//	        fmt.Println("Error reading config:", err)
+//	        return
+//	    }
 //
-//		core.Watch(func(e fsnotify.Event) {
-//			err = core.Read()
-//			if err != nil {
-//				fmt.Println("Error reading config:", err)
-//				return
-//			}
-//		})
+//	    core.Watch(func(e fsnotify.Event) {
+//	        if err := core.Read(); err != nil {
+//	            fmt.Println("Error reloading config:", err)
+//	        }
+//	    })
 //
-//		fmt.Println("Config:", core.Get())
-//
-//		err = core.Write(config)
-//		if err != nil {
-//			fmt.Println("Error writing config:", err)
-//			return
-//		}
+//	    if err := core.Write(cfg); err != nil {
+//	        fmt.Println("Error writing config:", err)
+//	    }
 //	}
-//
-// ´´´
 package core
 
 import (
