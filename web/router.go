@@ -28,5 +28,5 @@ func (router *Router) Handle(pattern string, handler http.Handler) {
 }
 
 func (router *Router) HandleFunc(pattern string, handlerFunc http.HandlerFunc) {
-	router.Handle(pattern, logRequestFunc(handlerFunc))
+	router.Handle(pattern, handlerFunc)
 }

@@ -102,9 +102,3 @@ func logRequest(next http.Handler) http.Handler {
 			Msg("request")
 	})
 }
-
-func logRequestFunc(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logRequest(next).ServeHTTP(w, r)
-	}
-}
