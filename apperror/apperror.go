@@ -1,5 +1,34 @@
-// The apperror package provides a custom error type that includes a stack trace and additional errors.
-// It is designed to be used in Go applications to handle errors more effectively.
+// Package apperror provides a custom error type that enhances standard Go errors
+// with stack traces and support for additional nested errors.
+//
+// It is designed to improve error handling in Go applications by offering contextual
+// information such as call location and related errors, especially useful for debugging
+// and logging in production environments.
+//
+// Features:
+//   - Attaches a lightweight stack trace to each error
+//   - Supports wrapping and chaining of multiple related errors
+//   - Automatically includes detailed trace and error info when debug mode is enabled
+//   - Implements the standard error interface
+//
+// Usage:
+//
+//	// Create a new application error
+//	err := apperror.NewError("something went wrong")
+//
+//	// Wrap an existing error to capture a new stack trace point
+//	err = apperror.Wrap(err)
+//
+//	// Add related errors for context
+//	err = err.(apperror.Error).AddError(io.EOF)
+//
+//	// Print with trace and nested errors if debug mode is enabled
+//	fmt.Println(err)
+//
+// To enable debug output (stack traces), set `flag.Debug = true` before printing errors.
+//
+// Note: If you're wrapping errors that are already of type `apperror.Error`,
+// prefer `Wrap` over creating a new instance to preserve the trace history.
 package apperror
 
 import (
