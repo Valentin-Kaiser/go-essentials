@@ -59,7 +59,7 @@ func (a *AesCipher) WithPassphrase(passphrase []byte) *AesCipher {
 	return a
 }
 
-// Encrypt uses the Specified Symetric Key to Encrypt the Input string using AES
+// Encrypt uses the specified symmetric key to encrypt the input string using AES
 func (a *AesCipher) Encrypt(plaintext string, out io.Writer) *AesCipher {
 	if a.Error != nil {
 		return a

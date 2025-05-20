@@ -95,7 +95,7 @@ func (l *logger) WithConsole() *logger {
 	return l
 }
 
-// WithFile adds a file writer to the logger outputs.
+// WithLogFile adds a file writer to the logger outputs.
 // It uses the lumberjack package to handle log rotation and file management.
 func (l *logger) WithLogFile() *logger {
 	l.file = &lumberjack.Logger{
