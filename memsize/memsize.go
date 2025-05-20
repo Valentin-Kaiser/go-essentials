@@ -1,3 +1,25 @@
+// Package memsize provides utilities to estimate the memory footprint of Go values
+// without relying on the reflect or unsafe packages for direct memory inspection.
+//
+// It leverages the gob encoding mechanism to serialize values into memory buffers
+// and calculate their approximate in-memory size in bytes.
+//
+// This approach prioritizes safety and portability over raw performance, making it
+// suitable for debugging, profiling, or logging approximate memory usage of
+// application data structures.
+//
+// Features:
+//   - Estimate the size of any Go value in bytes using gob encoding.
+//   - Human-readable byte formatting with SI units (e.g., "1.2 kB").
+//   - Graceful handling of nil pointers, maps, slices, arrays, and channels.
+//
+// Example:
+//
+//	size, err := memsize.SizeOf(myStruct)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println("Memory size:", memsize.ToByteString(size))
 package memsize
 
 import (
