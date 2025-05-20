@@ -1,24 +1,41 @@
-// The version package provides functionality to manage and retrieve version information
-// for a Go application. It includes the Git tag, commit hash, build date, Go version,
-// platform, and a list of modules used in the application. The package also provides
-// functions to parse and compare version tags, validate version information, and
-// retrieve the current version of the application.
+// Package version provides utilities to manage, retrieve, and validate version
+// information of a Go application at runtime.
 //
-// The version information has to be set during the build process using the -ldflags and
-// is populated using the Go runtime and debug packages.
+// This package captures key metadata about the application build, including the
+// Git tag, full and short commit hashes, build date, Go runtime version, target
+// platform, and the list of Go modules used in the build. These values are
+// intended to be set at build time via linker flags (-ldflags), allowing
+// embedding of dynamic version information within the compiled binary.
 //
-// Example usage:
+// The package also includes functions to parse semantic version components
+// (major, minor, patch) from Git tags following the "vX.Y.Z" format, validate
+// version structs, and compare version information between two versions.
 //
-// ´´´Makefile
+// The module list is automatically populated at runtime using debug.BuildInfo
+// (available since Go 1.12+), which extracts module dependencies embedded by the
+// Go build system.
+//
+// Typical usage involves setting the version variables during build with
+// `-ldflags`, for example in a Makefile:
 //
 //	GIT_TAG := $(shell git describe --tags)
 //	GIT_COMMIT := $(shell git rev-parse HEAD)
 //	GIT_SHORT := $(shell git rev-parse --short HEAD)
 //	BUILD_TIME := $(shell date +%FT%T%z)
 //	VERSION_PACKAGE := github.com/Valentin-Kaiser/go-essentials/version
-//	go build -ldflags "-X $(VERSION_PACKAGE).GitTag=$(GIT_TAG) -X $(VERSION_PACKAGE).GitCommit=$(GIT_COMMIT) -X $(VERSION_PACKAGE).GitShort=$(GIT_SHORT) -X $(VERSION_PACKAGE).BuildDate=$(BUILD_TIME) main.go
 //
-// ´´´
+//	go build -ldflags "-X $(VERSION_PACKAGE).GitTag=$(GIT_TAG) \
+//	                 -X $(VERSION_PACKAGE).GitCommit=$(GIT_COMMIT) \
+//	                 -X $(VERSION_PACKAGE).GitShort=$(GIT_SHORT) \
+//	                 -X $(VERSION_PACKAGE).BuildDate=$(BUILD_TIME)" main.go
+//
+// The package defines the Version struct encapsulating all relevant fields,
+// as well as the Module struct to represent individual Go module dependencies.
+//
+// Example:
+//
+//	v := version.GetVersion()
+//	fmt.Printf("App version: %s (commit %s)\n", v.GitTag, v.GitShort)
 package version
 
 import (
