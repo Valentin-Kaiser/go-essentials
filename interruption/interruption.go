@@ -1,6 +1,16 @@
-// Interruption package provides a function to handle panics in the application.
-// defer Handle() should be called at the beginning of the main function or each goroutine
-// to ensure that any panics are caught and logged.
+// Package interruption provides a simple mechanism for recovering from panics
+// in both the main application and concurrently running goroutines.
+//
+// It ensures that unexpected runtime panics do not crash the application silently,
+// by logging detailed error messages and stack traces.
+//
+// Usage:
+// Call `defer interruption.Handle()` at the beginning of the `main` function
+// and in every goroutine to catch and log panics.
+//
+// In debug mode, a full stack trace is logged to aid in debugging.
+// In production mode, only the panic message and caller information are logged
+// to avoid cluttering logs with excessive detail.
 package interruption
 
 import (
