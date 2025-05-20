@@ -69,21 +69,13 @@ func Md5(v any) string {
 // StringToKey32Bytes produces a 32byte slice from the input string using SHA256
 func StringToKey32Bytes(inp string) []byte {
 	hash := sha256.Sum256([]byte(inp))
-	sl := []byte{}
-	for _, b := range hash {
-		sl = append(sl, b)
-	}
-	return sl
+	return hash[:]
 }
 
 // StringToKey32 produces a 32byte slice from the input string using SHA256
 func StringToKey32(inp string) string {
 	hash := sha256.Sum256([]byte(inp))
-	sl := []byte{}
-	for _, b := range hash {
-		sl = append(sl, b)
-	}
-	return hex.EncodeToString(sl)[:32]
+	return hex.EncodeToString(hash[:])[:32]
 }
 
 // GetRandomBytesBase64 Returns the Base64 Encoded Equivalent of calling GetRandomBytes.
