@@ -1,26 +1,33 @@
-// The web package provides a web server with a set of middlewares and handlers
-// It can be used to serve static files, handle web requests, provide api endpoints, and manage websockets
+// Package web provides a configurable HTTP web server with built-in support for
+// common middleware patterns, static file serving, API endpoints, and WebSocket handling.
+//
+// This package offers a singleton Server instance that can be customized through
+// fluent-style methods for setting host, port, headers, middleware, handlers, and WebSocket routes.
+//
+// Features include:
+//   - Serving static files from embedded file systems
+//   - Middleware support including security headers, CORS, gzip compression, and request logging
+//   - Easy registration of HTTP handlers and handler functions
+//   - WebSocket support with connection management and custom handlers
+//   - Graceful shutdown and restart capabilities
 //
 // Example usage:
 //
-// ```go
-// package main
+//	package main
 //
-// import (
+//	import (
+//		"net/http"
+//		"os"
+//		"os/signal"
+//		"syscall"
 //
-//	"net/http"
-//	"os"
-//	"os/signal"
-//	"syscall"
-//
-//	"github.com/Valentin-Kaiser/go-essentials/web"
-//
-// )
+//		"github.com/Valentin-Kaiser/go-essentials/web"
+//	)
 //
 //	func main() {
 //		err := web.Get().
-//			WithPort(8080).
 //			WithHost("localhost").
+//			WithPort(8080).
 //			WithSecurityHeaders().
 //			WithCORSHeaders().
 //			WithGzip().
@@ -30,9 +37,11 @@
 //			panic(err)
 //		}
 //
+//		// Wait for termination signal to gracefully stop the server
 //		sigChan := make(chan os.Signal, 1)
 //		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 //		<-sigChan
+//
 //		err = web.Get().Stop().Error
 //		if err != nil {
 //			panic(err)
@@ -43,8 +52,6 @@
 //		w.Header().Set("Content-Type", "text/plain")
 //		w.Write([]byte("Hello, World!"))
 //	}
-//
-// ```
 package web
 
 import (
