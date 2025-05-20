@@ -95,7 +95,7 @@ func (a *AesCipher) Encrypt(plaintext string, out io.Writer) *AesCipher {
 	return a
 }
 
-// Decrypt uses the Specified Symetric Key to Decrypt the Input string using AES
+// Decrypt uses the specified symmetric key to decrypt the input string using AES
 func (a *AesCipher) Decrypt(ciphertext string, out io.Writer) *AesCipher {
 	cipherBytes, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
