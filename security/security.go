@@ -38,7 +38,7 @@ import (
 )
 
 // GetRandomBytes Generates random Bytes using crypto/rand which is significantly
-// slower than math/rand but cryptographically secure. This Shoule be used whenever
+// slower than math/rand but cryptographically secure. This Should be used whenever
 // cryptographic keys should be generated.
 func GetRandomBytes(size uint) ([]byte, error) {
 	bytes := make([]byte, size)
