@@ -137,13 +137,13 @@ func ParseTagSegment(tag string, n int) int {
 
 	version := strings.TrimPrefix(strings.SplitN(tag, "-", 2)[0], "v")
 	if n > len(strings.Split(version, ".")) {
-		log.Debug().Err(errors.New("index out of range")).Msg("error parsing minor version")
+		log.Debug().Err(errors.New("index out of range")).Msgf("error parsing version segment at index %d", n)
 		return 0
 	}
 
 	v, err := strconv.Atoi(strings.Split(version, ".")[n])
 	if err != nil {
-		log.Debug().Err(err).Msg("error parsing minor version")
+		log.Debug().Err(err).Msgf("error parsing version segment at index %d", n)
 		return 0
 	}
 
