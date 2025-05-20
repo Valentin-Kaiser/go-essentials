@@ -12,6 +12,23 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	securityHeaders = map[string]string{
+		"ETag":                      version.GitCommit,
+		"Cache-Control":             "public, must-revalidate, max-age=86400",
+		"Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+		"X-Content-Type-Options":    "nosniff",
+		"X-Frame-Options":           "DENY",
+		"X-XSS-Protection":          "1; mode=block",
+		"Referrer-Policy":           "no-referrer-when-downgrade",
+	}
+	corsHeaders = map[string]string{
+		"Access-Control-Allow-Origin":  "*",
+		"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+		"Access-Control-Allow-Headers": "Content-Type, Authorization, X-Real-IP",
+	}
+)
+
 // ResponseWriter is a wrapper around http.ResponseWriter that captures the status code
 type ResponseWriter struct {
 	http.ResponseWriter
@@ -44,15 +61,6 @@ func (w *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 // It is used to prevent attacks like XSS, clickjacking, etc.
 func securityHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		securityHeaders := map[string]string{
-			"ETag":                      version.GitCommit,
-			"Cache-Control":             "public, must-revalidate, max-age=86400",
-			"Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-			"X-Content-Type-Options":    "nosniff",
-			"X-Frame-Options":           "DENY",
-			"X-XSS-Protection":          "1; mode=block",
-			"Referrer-Policy":           "no-referrer-when-downgrade",
-		}
 		for key, value := range securityHeaders {
 			w.Header().Set(key, value)
 		}
@@ -65,11 +73,7 @@ func securityHeader(next http.Handler) http.Handler {
 
 func corsHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		corsHeaders := map[string]string{
-			"Access-Control-Allow-Origin":  "*",
-			"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-			"Access-Control-Allow-Headers": "Content-Type, Authorization, X-Real-IP",
-		}
+
 		for key, value := range corsHeaders {
 			w.Header().Set(key, value)
 		}
