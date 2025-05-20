@@ -1,3 +1,25 @@
+// Package security provides cryptographic utilities and PGP encryption/decryption functionality.
+//
+// It offers functions for generating cryptographically secure random bytes and passwords,
+// hashing data using SHA256, MD5, and xxHash algorithms, and deriving keys from strings.
+//
+// The package also includes the PGPCipher struct, which leverages the gopenpgp library
+// to perform PGP encryption and decryption with both public/private key pairs and passphrase-based methods.
+//
+// Key features:
+//   - Secure random byte generation and base64 encoding
+//   - Password generation with customizable character sets
+//   - Hashing functions: SHA256, MD5, and xxHash
+//   - Reading and saving passphrases securely to files
+//   - PGP encryption/decryption with support for:
+//   - Public key encryption
+//   - Private key decryption
+//   - Passphrase-based encryption and decryption
+//   - Key pair generation with user identity and high security settings
+//   - Convenient methods to load keys from files or strings
+//
+// This package is designed for use cases requiring cryptographically secure operations
+// and OpenPGP-compatible message encryption in Go applications.
 package security
 
 import (
