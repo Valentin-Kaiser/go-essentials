@@ -1,24 +1,33 @@
-// The database package provides a simple interface to connect to a database using GORM.
-// It supports SQLite and MySQL/MariaDB databases.
-// It handles connection management, automatic migrations, and versioning.
-// It also provides a way to register custom handlers that will be called when the database connection is established.
+// Package database provides a robust and flexible abstraction over GORM,
+// supporting both SQLite and MySQL/MariaDB as backend databases.
 //
-// Example usage:
+// It offers features such as automatic connection handling, schema migrations,
+// and version tracking. The package also allows registering custom on-connect
+// handlers that are executed once the database connection is successfully established.
 //
-// ```go
-// package main
+// Core features:
 //
-// import (
+//   - Automatic (re)connection with health checks and retry mechanism
+//   - Support for SQLite and MySQL/MariaDB with configurable parameters
+//   - Schema management and automatic migrations
+//   - Versioning support using the go-essentials/version package
+//   - Connection lifecycle management (Connect, Disconnect, AwaitConnection)
+//   - Thread-safe access with `Execute(func(db *gorm.DB) error)` wrapper
+//   - Registering on-connect hooks to perform actions like seeding or setup
 //
-//	"fmt"
-//	"time"
+// Example:
 //
-//	"github.com/Valentin-Kaiser/go-essentials/database"
-//	"github.com/Valentin-Kaiser/go-essentials/flag"
-//	"github.com/Valentin-Kaiser/go-essentials/version"
-//	"gorm.io/gorm"
+//	package main
 //
-// )
+//	import (
+//		"fmt"
+//		"time"
+//
+//		"github.com/Valentin-Kaiser/go-essentials/database"
+//		"github.com/Valentin-Kaiser/go-essentials/flag"
+//		"github.com/Valentin-Kaiser/go-essentials/version"
+//		"gorm.io/gorm"
+//	)
 //
 //	type User struct {
 //		gorm.Model
@@ -35,7 +44,7 @@
 //			GitTag:    "v1.0.0",
 //			GitCommit: "abc123",
 //		}, func(db *gorm.DB) error {
-//			// Perform migration steps here
+//			// Custom migration logic
 //			return nil
 //		})
 //
@@ -47,19 +56,16 @@
 //
 //		database.AwaitConnection()
 //
-//		var version version.Version
+//		var ver version.Version
 //		err := database.Execute(func(db *gorm.DB) error {
-//			return db.First(&version).Error
-//
+//			return db.First(&ver).Error
 //		})
 //		if err != nil {
 //			panic(err)
 //		}
 //
-//		fmt.Println("Version:", version.GitTag, version.GitCommit)
+//		fmt.Println("Version:", ver.GitTag, ver.GitCommit)
 //	}
-//
-// ´´´
 package database
 
 import (
