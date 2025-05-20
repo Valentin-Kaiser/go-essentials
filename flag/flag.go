@@ -1,47 +1,38 @@
-// The flag package provides a simple way to define and parse command-line flags
-// for a Go application. It uses the pflag library to handle the flags and provides
-// a simple API to register and parse flags.
+// Package flag provides a simple API for defining and parsing command-line flags
+// in Go applications. It is built on top of the pflag library and includes support
+// for a set of common default flags.
 //
-// The package defines a set of default flags, including:
-// - `Path`: the default path for the application
-// - `Help`: a flag to print the help page
-// - `Version`: a flag to print the software version
-// - `Debug`: a flag to enable debug mode
+// Default flags:
+//   - `--path`    (string): Sets the application’s default path (default: "./data")
+//   - `--help`    (bool): Displays the help message
+//   - `--version` (bool): Prints the application version
+//   - `--debug`   (bool): Enables debug mode
 //
-// The `Init` function initializes the flags and parses them. It should be called
-// in the main package of the application.
+// The `Init` function parses all registered flags and should be called early,
+// typically in the `main` function of the application. If the `--help` flag is
+// set, it prints usage information and exits.
 //
-// To register a new flag, use the `RegisterFlag` function. This function takes
-// the name of the flag, a pointer to the value to be set, and a usage string.
+// Additional flags can be registered using `RegisterFlag`, which accepts the flag
+// name, a pointer to the variable to populate, and a usage description.
+// Supported types include strings, booleans, integers, unsigned integers, and floats.
 //
-// Example usage:
+// Example:
 //
-// ```go
+//	package main
 //
-//		package main
+//	import (
+//		"fmt"
+//		"github.com/Valentin-Kaiser/go-essentials/flag"
+//	)
 //
-//		import (
-//			"github.com/Valentin-Kaiser/go-essentials/flag"
-//			"fmt"
-//		)
+//	var CustomFlag string
 //
-//	 	var (
-//			// Define a new flag
-//			CustomFlag string
-//		)
+//	func main() {
+//		flag.RegisterFlag("custom", &CustomFlag, "A custom flag for demonstration")
+//		flag.Init()
 //
-//		func main() {
-//			// Register the new flag
-//			flag.RegisterFlag("custom", &CustomFlag, "A custom flag for demonstration")
-//
-//			// Initialize the flags
-//			flag.Init()
-//
-//			// Print the value of the custom flag
-//			fmt.Println("Custom Flag Value:", CustomFlag)
-//		}
-//
-// ´´´
+//		fmt.Println("Custom Flag Value:", CustomFlag)
+//	}
 package flag
 
 import (
