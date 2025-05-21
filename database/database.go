@@ -136,7 +136,7 @@ func Disconnect() {
 
 // AwaitConnection will block until the database is connected
 func AwaitConnection() {
-	for !Connected() {
+	for !connected.Load() {
 		time.Sleep(time.Second)
 	}
 }
