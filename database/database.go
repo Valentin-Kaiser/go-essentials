@@ -234,7 +234,7 @@ func connect(config Config) (*gorm.DB, error) {
 	switch config.Driver {
 	case "sqlite":
 		if _, err := os.Stat(flag.Path); os.IsNotExist(err) {
-			err := os.Mkdir(flag.Path, 0600)
+			err := os.Mkdir(flag.Path, 0755)
 			if err != nil {
 				return nil, err
 			}
