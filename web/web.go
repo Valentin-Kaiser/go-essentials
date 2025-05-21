@@ -109,7 +109,6 @@ func Get() *Server {
 }
 
 // Start starts the web server
-// It will listen on the address specified in the New function
 // All middlewares and handlers that should be registered must be registered before calling this function
 func (s *Server) Start() *Server {
 	defer interruption.Handle()
@@ -154,7 +153,7 @@ func (s *Server) Start() *Server {
 }
 
 // StartAsync starts the web server asynchronously
-// It will listen on the address specified in the New function
+// It will return immediately and the server will run in the background
 func (s *Server) StartAsync(done chan error) {
 	defer interruption.Handle()
 
