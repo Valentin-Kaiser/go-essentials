@@ -48,9 +48,9 @@ var (
 	// ErrorFormat is the format for displaying the error message and additional errors
 	ErrorFormat = "%s [%s]"
 	// ErrorTraceFormat is the format for displaying the error message with a stack trace
-	ErrorTraceFormat = "%s [%s]"
-	// AdvancedTraceFormat is the format for displaying the error message with a stack trace and additional errors
-	AdvancedTraceFormat = "%s | %s [%s]"
+	ErrorTraceFormat = "%s | %s"
+	// FullFormat is the format for displaying the error message with a stack trace and additional errors
+	FullFormat = "%s | %s [%s]"
 )
 
 // Error represents an application error with a stack trace and additional errors
@@ -143,7 +143,7 @@ func (e Error) Error() string {
 		if errors == "" {
 			return fmt.Sprintf(ErrorTraceFormat, trace, e.Message)
 		}
-		return fmt.Sprintf(AdvancedTraceFormat, trace, e.Message, errors)
+		return fmt.Sprintf(FullFormat, trace, e.Message, errors)
 	}
 
 	errors := ""
