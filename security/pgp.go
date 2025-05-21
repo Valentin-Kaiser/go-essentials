@@ -71,6 +71,11 @@ func (p *PGPCipher) EncryptWithPassword(plaintext []byte, out io.Writer) *PGPCip
 		return p
 	}
 
+	if out == nil {
+		p.Error = apperror.NewError("no output writer provided")
+		return p
+	}
+
 	enc, err := p.handle.Encryption().Password(p.passphrase).New()
 	if err != nil {
 		p.Error = apperror.NewError("failed to create encryption handle").AddError(err)
@@ -170,6 +175,11 @@ func (p *PGPCipher) DecryptWithPassword(ciphertext []byte, out io.Writer) *PGPCi
 		return p
 	}
 
+	if out == nil {
+		p.Error = apperror.NewError("no output writer provided")
+		return p
+	}
+
 	dec, err := p.handle.Decryption().Password(p.passphrase).New()
 	if err != nil {
 		p.Error = apperror.NewError("failed to create decryption handle").AddError(err)
@@ -206,6 +216,11 @@ func (p *PGPCipher) DecryptWithPrivateKey(ciphertext []byte, out io.Writer) *PGP
 
 	if len(p.privateKey) == 0 {
 		p.Error = apperror.NewError("no private key provided")
+		return p
+	}
+
+	if out == nil {
+		p.Error = apperror.NewError("no output writer provided")
 		return p
 	}
 
