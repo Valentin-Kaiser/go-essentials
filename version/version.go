@@ -59,6 +59,8 @@ var (
 	Modules   = make([]*Module, 0)
 )
 
+var regex = regexp.MustCompile(`^v([0-9]+)\.([0-9]+)\.([0-9]+)`)
+
 func init() {
 	if info, available := debug.ReadBuildInfo(); available {
 		for _, mod := range info.Deps {
@@ -125,8 +127,7 @@ func String() string {
 
 // IsGitTag checks if the provided tag is a valid Git tag in the format "vX.Y.Z".
 func IsGitTag(tag string) bool {
-	r := regexp.MustCompile(`^v([0-9]+)\.([0-9]+)\.([0-9]+)`)
-	return r.MatchString(tag)
+	return regex.MatchString(tag)
 }
 
 // ParseTagSegment parses the specified segment (major, minor, or patch) from the Git tag.

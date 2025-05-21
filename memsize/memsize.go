@@ -60,7 +60,7 @@ func ToByteString(b int64) string {
 		float64(b)/float64(div), "kMGTPE"[exp])
 }
 
-// interfaceIsNullPointer returns true if the interface is nil or if the interface is a pointer, map, array, chan, or slice and is nil
+// interfaceIsNullPointer returns true if the interface is nil or if the interface is a pointer, map, chan, or slice and is nil
 func interfaceIsNullPointer(i interface{}) bool {
 	if i == nil {
 		return true
