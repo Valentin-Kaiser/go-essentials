@@ -25,7 +25,7 @@
 //
 //	func main() {
 //		done := make(chan error)
-//		web.Get().
+//		web.Server().
 //			WithHost("localhost").
 //			WithPort(8088).
 //			WithSecurityHeaders().
@@ -39,7 +39,7 @@
 //			panic(err)
 //		}
 //
-//		err := web.Get().Stop().Error
+//		err := web.Server().Stop().Error
 //		if err != nil {
 //			panic(err)
 //		}
@@ -70,10 +70,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var instance *Server
+var instance *server
 
-// Server represents a web server with a set of middlewares and handlers
-type Server struct {
+// server represents a web server with a set of middlewares and handlers
+type server struct {
 	// Error is set if the server fails to start
 	Error       error
 	server      *http.Server
@@ -88,11 +88,11 @@ type Server struct {
 	connections map[*websocket.Conn]bool
 }
 
-// Get creates a new instance of the web server
+// Server creates a new instance of the web server
 // It is a singleton and will return the same instance if called multiple times
-func Get() *Server {
+func Server() *server {
 	if instance == nil {
-		instance = &Server{
+		instance = &server{
 			port: 80,
 			upgrader: websocket.Upgrader{
 				CheckOrigin: func(r *http.Request) bool {
@@ -110,7 +110,7 @@ func Get() *Server {
 
 // Start starts the web server
 // All middlewares and handlers that should be registered must be registered before calling this function
-func (s *Server) Start() *Server {
+func (s *server) Start() *server {
 	defer interruption.Handle()
 
 	if s.Error != nil {
@@ -154,7 +154,7 @@ func (s *Server) Start() *Server {
 
 // StartAsync starts the web server asynchronously
 // It will return immediately and the server will run in the background
-func (s *Server) StartAsync(done chan error) {
+func (s *server) StartAsync(done chan error) {
 	defer interruption.Handle()
 
 	if s.Error != nil {
@@ -176,7 +176,7 @@ func (s *Server) StartAsync(done chan error) {
 // Stop stops the web server
 // Close immediately closes all active connections in state. For a graceful shutdown, use Shutdown.
 // Close does not attempt to close any hijacked connections, such as WebSockets.
-func (s *Server) Stop() *Server {
+func (s *server) Stop() *server {
 	defer interruption.Handle()
 
 	if s.Error != nil {
@@ -196,7 +196,7 @@ func (s *Server) Stop() *Server {
 // Shutdown gracefully shuts down the web server
 // It will wait for all active connections to finish before shutting down
 // Make sure the program doesn't exit and waits instead for Shutdown to return
-func (s *Server) Shutdown() *Server {
+func (s *server) Shutdown() *server {
 	defer interruption.Handle()
 
 	if s.Error != nil {
@@ -225,7 +225,7 @@ func (s *Server) Shutdown() *Server {
 
 // Restart gracefully shuts down the web server and starts it again
 // It will wait for all active connections to finish before shutting down
-func (s *Server) Restart() *Server {
+func (s *server) Restart() *server {
 	defer interruption.Handle()
 
 	if s.Error != nil {
@@ -251,7 +251,7 @@ func (s *Server) Restart() *Server {
 }
 
 // WithHost sets the address of the web server
-func (s *Server) WithHost(address string) *Server {
+func (s *server) WithHost(address string) *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.host = address
@@ -259,7 +259,7 @@ func (s *Server) WithHost(address string) *Server {
 }
 
 // WithPort sets the port of the web server
-func (s *Server) WithPort(port uint16) *Server {
+func (s *server) WithPort(port uint16) *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.port = port
@@ -267,19 +267,19 @@ func (s *Server) WithPort(port uint16) *Server {
 }
 
 // WithSecurityHeaders adds security headers to the server
-func (s *Server) WithSecurityHeaders() *Server {
+func (s *server) WithSecurityHeaders() *server {
 	s.middlewares = append(s.middlewares, securityHeader)
 	return s
 }
 
 // WithCORSHeaders adds CORS headers to the server
-func (s *Server) WithCORSHeaders() *Server {
+func (s *server) WithCORSHeaders() *server {
 	s.middlewares = append(s.middlewares, corsHeader)
 	return s
 }
 
 // WithHeader adds a custom header to the server
-func (s *Server) WithHeader(key, value string) *Server {
+func (s *server) WithHeader(key, value string) *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.middlewares = append(s.middlewares, func(next http.Handler) http.Handler {
@@ -291,7 +291,7 @@ func (s *Server) WithHeader(key, value string) *Server {
 	return s
 }
 
-func (s *Server) WithTLS(config *tls.Config) *Server {
+func (s *server) WithTLS(config *tls.Config) *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.tlsConfig = config
@@ -299,7 +299,7 @@ func (s *Server) WithTLS(config *tls.Config) *Server {
 }
 
 // WithHeaders adds multiple custom headers to the server
-func (s *Server) WithHeaders(headers map[string]string) *Server {
+func (s *server) WithHeaders(headers map[string]string) *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.middlewares = append(s.middlewares, func(next http.Handler) http.Handler {
@@ -314,26 +314,26 @@ func (s *Server) WithHeaders(headers map[string]string) *Server {
 }
 
 // WithGzip enables gzip compression for the server
-func (s *Server) WithGzip() *Server {
+func (s *server) WithGzip() *server {
 	s.middlewares = append(s.middlewares, gziphandler.GzipHandler)
 	return s
 }
 
 // WithLogRequest adds a logging middleware to the server
-func (s *Server) WithLogRequest() *Server {
+func (s *server) WithLogRequest() *server {
 	s.middlewares = append(s.middlewares, logRequest)
 	return s
 }
 
 // WithCustomMiddleware adds a custom middleware to the server
-func (s *Server) WithCustomMiddleware(middleware func(http.Handler) http.Handler) *Server {
+func (s *server) WithCustomMiddleware(middleware func(http.Handler) http.Handler) *server {
 	s.middlewares = append(s.middlewares, middleware)
 	return s
 }
 
 // WithHandler adds a custom handler to the server
 // It will return an error in the Error field if the path is already registered as a handler or a websocket
-func (s *Server) WithHandler(path string, handler http.Handler) *Server {
+func (s *server) WithHandler(path string, handler http.Handler) *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -350,7 +350,7 @@ func (s *Server) WithHandler(path string, handler http.Handler) *Server {
 
 // WithHandlerFunc adds a custom handler function to the server
 // It will return an error in the Error field if the path is already registered as a handler or a websocket
-func (s *Server) WithHandlerFunc(path string, handler http.HandlerFunc) *Server {
+func (s *server) WithHandlerFunc(path string, handler http.HandlerFunc) *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -367,7 +367,7 @@ func (s *Server) WithHandlerFunc(path string, handler http.HandlerFunc) *Server 
 
 // WithStaticFS adds a static file server to the server
 // It will serve files from the static embed.FS at the specified entrypoints
-func (s *Server) WithStaticFS(entrypoints []string, static embed.FS) *Server {
+func (s *server) WithStaticFS(entrypoints []string, static embed.FS) *server {
 	staticHandler := s.createStaticHandler(static)
 	for _, entrypoint := range entrypoints {
 		err := s.WithHandler(entrypoint, staticHandler).Error
@@ -381,7 +381,7 @@ func (s *Server) WithStaticFS(entrypoints []string, static embed.FS) *Server {
 
 // WithWebsocket adds a websocket handler to the server
 // It will return an error in the Error field if the path is already registered as a handler or a websocket
-func (s *Server) WithWebsocket(path string, handler func(http.ResponseWriter, *http.Request, *websocket.Conn)) *Server {
+func (s *server) WithWebsocket(path string, handler func(http.ResponseWriter, *http.Request, *websocket.Conn)) *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -396,19 +396,19 @@ func (s *Server) WithWebsocket(path string, handler func(http.ResponseWriter, *h
 	return s
 }
 
-func (s *Server) registerMiddlewares(r *Router) {
+func (s *server) registerMiddlewares(r *Router) {
 	for _, middleware := range s.middlewares {
 		r.Use(middleware)
 	}
 }
 
-func (s *Server) registerHandlers(r *Router) {
+func (s *server) registerHandlers(r *Router) {
 	for entrypoint := range s.handler {
 		r.Handle(entrypoint, s.handler[entrypoint])
 	}
 }
 
-func (s *Server) registerWebsockets(r *Router) {
+func (s *server) registerWebsockets(r *Router) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 	for path := range s.websockets {
@@ -416,7 +416,7 @@ func (s *Server) registerWebsockets(r *Router) {
 	}
 }
 
-func (s *Server) createStaticHandler(static embed.FS) http.Handler {
+func (s *server) createStaticHandler(static embed.FS) http.Handler {
 	fs, err := fs.Sub(static, "static")
 	if err != nil {
 		log.Fatal().Err(apperror.Wrap(err)).Msg("[server-createStaticHandler] could not create static handler")
@@ -424,7 +424,7 @@ func (s *Server) createStaticHandler(static embed.FS) http.Handler {
 	return gziphandler.GzipHandler(securityHeader(http.FileServer(http.FS(fs))))
 }
 
-func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Error().Err(apperror.Wrap(err)).Msg("could not upgrade websocket connection")
@@ -448,7 +448,7 @@ func (s *Server) wsHandler(w http.ResponseWriter, r *http.Request) {
 	conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseUnsupportedData, ""))
 }
 
-func (s *Server) closeWSConnections() *Server {
+func (s *server) closeWSConnections() *server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	for conn := range s.connections {
