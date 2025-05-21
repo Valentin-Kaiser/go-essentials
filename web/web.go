@@ -70,7 +70,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var instance *server
+var instance = &server{
+	port: 80,
+	upgrader: websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	},
+	handler:     make(map[string]http.Handler),
+	middlewares: make([]func(http.Handler) http.Handler, 0),
+	websockets:  make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)),
+	connections: make(map[*websocket.Conn]bool),
+}
 
 // server represents a web server with a set of middlewares and handlers
 type server struct {
@@ -88,23 +99,8 @@ type server struct {
 	connections map[*websocket.Conn]bool
 }
 
-// Server creates a new instance of the web server
-// It is a singleton and will return the same instance if called multiple times
+// Server returns the singleton instance of the web server
 func Server() *server {
-	if instance == nil {
-		instance = &server{
-			port: 80,
-			upgrader: websocket.Upgrader{
-				CheckOrigin: func(r *http.Request) bool {
-					return true
-				},
-			},
-			handler:     make(map[string]http.Handler),
-			middlewares: make([]func(http.Handler) http.Handler, 0),
-			websockets:  make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)),
-			connections: make(map[*websocket.Conn]bool),
-		}
-	}
 	return instance
 }
 
