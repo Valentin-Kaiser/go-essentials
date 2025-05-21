@@ -1,4 +1,4 @@
-// Package logger provides a simple and flexible logging utility built around the zerolog library.
+// Package zlog provides a simple and flexible logging utility built around the zerolog library.
 // It offers structured, leveled logging with support for console output, file logging with rotation,
 // and custom output targets.
 //
@@ -17,23 +17,23 @@
 //	package main
 //
 //	import (
-//		"github.com/Valentin-Kaiser/go-essentials/logger"
+//		"github.com/Valentin-Kaiser/go-essentials/zlog"
 //		"github.com/rs/zerolog"
 //		"github.com/rs/zerolog/log"
 //	)
 //
 //	func main() {
-//		logger.New().
+//		zlog.Logger().
 //			WithConsole().
 //			WithLogFile().
 //			Init("example", zerolog.InfoLevel)
 //
 //		log.Info().Msg("This is an info message")
 //
-//		logger.SetLevel(zerolog.DebugLevel)
+//		zlog.SetLevel(zerolog.DebugLevel)
 //		log.Debug().Msg("This is a debug message")
 //	}
-package logger
+package zlog
 
 import (
 	"io"
@@ -53,7 +53,9 @@ type logger struct {
 	outputs []io.Writer
 }
 
-var instance *logger
+var instance = &logger{
+	outputs: []io.Writer{},
+}
 
 // init initializes the logger with default settings.
 func init() {
@@ -61,14 +63,8 @@ func init() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 }
 
-// New creates a new logger instance.
-// It is a singleton, so it will return the same instance every time it is called.
-func New() *logger {
-	if instance == nil {
-		instance = &logger{
-			outputs: []io.Writer{},
-		}
-	}
+// Logger returns the singleton instance of the logger.
+func Logger() *logger {
 	return instance
 }
 
