@@ -13,36 +13,33 @@
 //
 // Example usage:
 //
-//	package main
+// package main
 //
-//	import (
-//		"net/http"
-//		"os"
-//		"os/signal"
-//		"syscall"
+// import (
 //
-//		"github.com/Valentin-Kaiser/go-essentials/web"
-//	)
+//	"net/http"
+//
+//	"github.com/Valentin-Kaiser/go-essentials/web"
+//
+// )
 //
 //	func main() {
-//		err := web.Get().
+//		done := make(chan error)
+//		web.Get().
 //			WithHost("localhost").
-//			WithPort(8080).
+//			WithPort(8088).
 //			WithSecurityHeaders().
 //			WithCORSHeaders().
 //			WithGzip().
+//			WithLogRequest().
 //			WithHandlerFunc("/", handler).
-//			Start().Error
-//		if err != nil {
+//			StartAsync(done)
+//
+//		if err := <-done; err != nil {
 //			panic(err)
 //		}
 //
-//		// Wait for termination signal to gracefully stop the server
-//		sigChan := make(chan os.Signal, 1)
-//		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-//		<-sigChan
-//
-//		err = web.Get().Stop().Error
+//		err := web.Get().Stop().Error
 //		if err != nil {
 //			panic(err)
 //		}
@@ -56,6 +53,7 @@ package web
 
 import (
 	"context"
+	"crypto/tls"
 	"embed"
 	"fmt"
 	"io"
@@ -82,6 +80,7 @@ type Server struct {
 	host        string
 	port        uint16
 	upgrader    websocket.Upgrader
+	tlsConfig   *tls.Config
 	mutex       sync.RWMutex
 	handler     map[string]http.Handler
 	middlewares []func(http.Handler) http.Handler
@@ -119,30 +118,60 @@ func (s *Server) Start() *Server {
 		return s
 	}
 
-	go func() {
-		s.server = &http.Server{
-			ErrorLog:          l.New(io.Discard, "", 0),
-			ReadTimeout:       15 * time.Second,
-			ReadHeaderTimeout: 5 * time.Second,
-			WriteTimeout:      15 * time.Second,
-			IdleTimeout:       120 * time.Second,
-		}
+	s.server = &http.Server{
+		ErrorLog:          l.New(io.Discard, "", 0),
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 
-		r := NewRouter()
-		s.registerMiddlewares(r)
-		s.registerHandlers(r)
-		s.registerWebsockets(r)
-		s.server.Handler = r.ServeMux
+	r := NewRouter()
+	s.registerMiddlewares(r)
+	s.registerHandlers(r)
+	s.registerWebsockets(r)
+	s.server.Handler = r.ServeMux
 
-		log.Info().Msgf("[Web] listening on http at %s:%d", s.host, s.port)
+	if s.tlsConfig != nil {
+		s.server.TLSConfig = s.tlsConfig
+		log.Info().Msgf("[Web] listening on https at %s:%d", s.host, s.port)
 		s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
-		err := s.server.ListenAndServe()
+		err := s.server.ListenAndServeTLS("", "")
 		if err != nil && err != http.ErrServerClosed {
 			s.Error = apperror.NewError("failed to start webserver").AddError(err)
 		}
-	}()
+		return s
+	}
+
+	log.Info().Msgf("[Web] listening on http at %s:%d", s.host, s.port)
+	s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
+	err := s.server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		s.Error = apperror.NewError("failed to start webserver").AddError(err)
+	}
 
 	return s
+}
+
+// StartAsync starts the web server asynchronously
+// It will listen on the address specified in the New function
+func (s *Server) StartAsync(done chan error) {
+	defer interruption.Handle()
+
+	if s.Error != nil {
+		done <- s.Error
+		return
+	}
+
+	go func() {
+		err := s.Start().Error
+		if err != nil {
+			done <- err
+			return
+		}
+
+		done <- nil
+	}()
 }
 
 // Stop stops the web server
@@ -260,6 +289,13 @@ func (s *Server) WithHeader(key, value string) *Server {
 			next.ServeHTTP(w, r)
 		})
 	})
+	return s
+}
+
+func (s *Server) WithTLS(config *tls.Config) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.tlsConfig = config
 	return s
 }
 
