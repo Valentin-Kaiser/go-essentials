@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"io"
 
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 // AesCipher is a struct that provides methods for encrypting and decrypting data using AES.

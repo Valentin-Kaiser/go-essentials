@@ -22,7 +22,7 @@
 //	GIT_COMMIT := $(shell git rev-parse HEAD)
 //	GIT_SHORT := $(shell git rev-parse --short HEAD)
 //	BUILD_TIME := $(shell date +%FT%T%z)
-//	VERSION_PACKAGE := github.com/Valentin-Kaiser/go-essentials/version
+//	VERSION_PACKAGE := github.com/Valentin-Kaiser/go-core/version
 //
 //	go build -ldflags "-X $(VERSION_PACKAGE).GitTag=$(GIT_TAG) \
 //	                 -X $(VERSION_PACKAGE).GitCommit=$(GIT_COMMIT) \

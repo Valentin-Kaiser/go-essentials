@@ -35,7 +35,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/Valentin-Kaiser/go-essentials/flag"
+	"github.com/Valentin-Kaiser/go-core/flag"
 )
 
 var (
@@ -67,7 +67,7 @@ func NewError(msg string) Error {
 	e := Error{
 		Message: msg,
 	}
-	e.Trace = trace(e, 2)
+	e.Trace = trace(e)
 	return e
 }
 
@@ -77,7 +77,7 @@ func NewErrorf(format string, a ...interface{}) Error {
 	e := Error{
 		Message: fmt.Sprintf(format, a...),
 	}
-	e.Trace = trace(e, 2)
+	e.Trace = trace(e)
 	return e
 }
 
@@ -88,13 +88,13 @@ func Wrap(err error) error {
 		return nil
 	}
 	if e, ok := err.(Error); ok {
-		e.Trace = trace(e, 2)
+		e.Trace = trace(e)
 		return e
 	}
 	e := Error{
 		Message: err.Error(),
 	}
-	e.Trace = trace(e, 2)
+	e.Trace = trace(e)
 	return e
 }
 
@@ -162,8 +162,8 @@ func (e Error) Error() string {
 
 // trace generates a stack trace for the error
 // It uses runtime.Caller to get the file name and line number
-func trace(e Error, level int) []string {
-	pc, file, line, ok := runtime.Caller(level)
+func trace(e Error) []string {
+	pc, file, line, ok := runtime.Caller(2)
 	if !ok {
 		return e.Trace
 	}

@@ -22,7 +22,7 @@
 //
 //	import (
 //		"fmt"
-//		"github.com/Valentin-Kaiser/go-essentials/flag"
+//		"github.com/Valentin-Kaiser/go-core/flag"
 //	)
 //
 //	var CustomFlag string

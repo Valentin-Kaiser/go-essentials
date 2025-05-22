@@ -25,7 +25,7 @@
 //
 //	import (
 //	    "fmt"
-//	    "github.com/Valentin-Kaiser/go-essentials/config/core"
+//	    "github.com/Valentin-Kaiser/go-core/config/core"
 //	    "github.com/fsnotify/fsnotify"
 //	)
 //
@@ -89,8 +89,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
-	"github.com/Valentin-Kaiser/go-essentials/flag"
+	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/flag"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
 

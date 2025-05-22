@@ -10,7 +10,7 @@
 //   - Automatic (re)connection with health checks and retry mechanism
 //   - Support for SQLite and MySQL/MariaDB with configurable parameters
 //   - Schema management and automatic migrations
-//   - Versioning support using the go-essentials/version package
+//   - Versioning support using the go-core/version package
 //   - Connection lifecycle management (Connect, Disconnect, AwaitConnection)
 //   - Thread-safe access with `Execute(func(db *gorm.DB) error)` wrapper
 //   - Registering on-connect hooks to perform actions like seeding or setup
@@ -23,9 +23,9 @@
 //		"fmt"
 //		"time"
 //
-//		"github.com/Valentin-Kaiser/go-essentials/database"
-//		"github.com/Valentin-Kaiser/go-essentials/flag"
-//		"github.com/Valentin-Kaiser/go-essentials/version"
+//		"github.com/Valentin-Kaiser/go-core/database"
+//		"github.com/Valentin-Kaiser/go-core/flag"
+//		"github.com/Valentin-Kaiser/go-core/version"
 //		"gorm.io/gorm"
 //	)
 //
@@ -76,11 +76,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
-	"github.com/Valentin-Kaiser/go-essentials/flag"
-	"github.com/Valentin-Kaiser/go-essentials/interruption"
-	"github.com/Valentin-Kaiser/go-essentials/version"
-	l "github.com/Valentin-Kaiser/go-essentials/zlog"
+	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/flag"
+	"github.com/Valentin-Kaiser/go-core/interruption"
+	"github.com/Valentin-Kaiser/go-core/version"
+	"github.com/Valentin-Kaiser/go-core/zlog"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -220,7 +220,7 @@ func connect(config Config) (*gorm.DB, error) {
 		},
 	)
 	// If we are in trace loglevel, enable gorm logging
-	if l.GetLevel() < zerolog.TraceLevel && flag.Debug {
+	if zlog.Logger().GetLevel() < zerolog.TraceLevel && flag.Debug {
 		newLogger = logger.New(
 			&log.Logger,
 			logger.Config{
@@ -234,13 +234,14 @@ func connect(config Config) (*gorm.DB, error) {
 	switch config.Driver {
 	case "sqlite":
 		if _, err := os.Stat(flag.Path); os.IsNotExist(err) {
-			err := os.Mkdir(flag.Path, 0755)
+			err := os.Mkdir(flag.Path, 0750)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		db, err := gorm.Open(sqlite.Open(filepath.Join(flag.Path, config.Name+".db?cache=shared")), cfg)
+		var err error
+		db, err = gorm.Open(sqlite.Open(filepath.Join(flag.Path, config.Name+".db?cache=shared")), cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +265,8 @@ func connect(config Config) (*gorm.DB, error) {
 			config.Name,
 		)
 
-		db, err := gorm.Open(mysql.Open(dsn), cfg)
+		var err error
+		db, err = gorm.Open(mysql.Open(dsn), cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -291,7 +293,7 @@ func onConnect(config Config) {
 	}
 
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		err := migrateSchema(db)
+		err = migrateSchema(db)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("[Database] schema migration failed")
 		}

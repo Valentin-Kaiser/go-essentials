@@ -20,7 +20,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/Valentin-Kaiser/go-essentials/flag"
+	"github.com/Valentin-Kaiser/go-core/flag"
 	"github.com/rs/zerolog/log"
 )
 

@@ -9,6 +9,9 @@ on:
     branches: [main, master]
 permissions:
   contents: read
+  packages: read
+  statuses: write
+    
 jobs:
   build:
     name: Lint Code Base
@@ -21,7 +24,7 @@ jobs:
           fetch-depth: 0
 
       - name: Lint Code Base
-        uses: github/super-linter/slim@v7
+        uses: super-linter/super-linter/slim@v7.4.0
         env:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
