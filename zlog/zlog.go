@@ -49,6 +49,7 @@ import (
 )
 
 type logger struct {
+	level   zerolog.Level
 	file    *lumberjack.Logger
 	outputs []io.Writer
 }
@@ -113,16 +114,12 @@ func (l *logger) With(writers ...io.Writer) *logger {
 
 // Stop closes the log file.
 // It should be called when the application is shutting down to ensure that all log entries are flushed to the file.
-func Stop() {
-	if instance == nil {
+func (l *logger) Stop() {
+	if l.file == nil {
 		return
 	}
 
-	if instance.file == nil {
-		return
-	}
-
-	err := instance.file.Close()
+	err := l.file.Close()
 	if err != nil {
 		log.Error().Err(err).Msgf("[Logger] failed to close log file")
 	}
@@ -130,12 +127,8 @@ func Stop() {
 
 // Rotate rotates the log file manually.
 // It creates a new log file and closes the old one.
-func Rotate() {
-	if instance == nil {
-		return
-	}
-
-	err := instance.file.Rotate()
+func (l *logger) Rotate() {
+	err := l.file.Rotate()
 	if err != nil {
 		log.Error().Err(err).Msgf("[Logger] failed to rotate log file")
 	}
@@ -143,58 +136,71 @@ func Rotate() {
 
 // SetLevel sets the global log level.
 // It should be used to change the log level at runtime.
-func SetLevel(level zerolog.Level) {
+func (l *logger) SetLevel(level zerolog.Level) *logger {
+	l.level = level
 	zerolog.SetGlobalLevel(level)
+	return l
 }
 
-func GetLevel() zerolog.Level {
-	if instance == nil {
-		return zerolog.InfoLevel
-	}
+func (l *logger) GetLevel() zerolog.Level {
 	return zerolog.GlobalLevel()
+}
+
+func (l *logger) WithLevel(level zerolog.Level) *logger {
+	return &logger{
+		level:   level,
+		file:    l.file,
+		outputs: l.outputs,
+	}
 }
 
 // SetMaxSize sets the maximum size of the log file in megabytes.
 // It should be used to limit the size of the log file and prevent it from growing indefinitely.
-func SetMaxSize(size int) {
-	if instance == nil {
-		return
+func (l *logger) SetMaxSize(size int) *logger {
+	if l.file == nil {
+		return l
 	}
-	instance.file.MaxSize = size
+	l.file.MaxSize = size
+	return l
 }
 
 // SetMaxAge sets the maximum age of the log file in days.
-func SetMaxAge(age int) {
-	if instance == nil {
-		return
+func (l *logger) SetMaxAge(age int) *logger {
+	if l.file == nil {
+		return l
 	}
-	instance.file.MaxAge = age
+	l.file.MaxAge = age
+	return l
 }
 
 // SetMaxBackups sets the maximum number of backup log files to keep.
-func SetMaxBackups(backups int) {
-	if instance == nil {
-		return
+func (l *logger) SetMaxBackups(backups int) *logger {
+	if l.file == nil {
+		return l
 	}
-	instance.file.MaxBackups = backups
+	l.file.MaxBackups = backups
+	return l
 }
 
 // SetCompress sets whether to compress the log files that are no longer needed.
-func SetCompress(compress bool) {
-	if instance == nil {
-		return
+func (l *logger) SetCompress(compress bool) *logger {
+	if l.file == nil {
+		return l
 	}
-	instance.file.Compress = compress
+	l.file.Compress = compress
+	return l
 }
 
 // GetPath returns the path of the log file.
 // It can be used to access the log file directly if needed.
-func GetPath() string {
-	if instance == nil {
+func (l *logger) GetPath() string {
+	if l.file == nil {
 		return ""
 	}
-	if instance.file == nil {
-		return ""
-	}
-	return instance.file.Filename
+	return l.file.Filename
+}
+
+func (l *logger) Write(p []byte) (n int, err error) {
+	log.WithLevel(l.level).Msg(strings.TrimSpace(string(p)))
+	return len(p), nil
 }
