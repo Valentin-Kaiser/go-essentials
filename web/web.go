@@ -39,7 +39,7 @@
 //			panic(err)
 //		}
 //
-//		err := web.Server().Stop().Error
+//		err := web.Server().Stop()
 //		if err != nil {
 //			panic(err)
 //		}
@@ -167,6 +167,7 @@ func (s *server) StartAsync(done chan error) {
 		err := s.Start().Error
 		if err != nil {
 			done <- err
+			s.Error = nil
 			return
 		}
 
@@ -177,67 +178,57 @@ func (s *server) StartAsync(done chan error) {
 // Stop stops the web server
 // Close immediately closes all active connections in state. For a graceful shutdown, use Shutdown.
 // Close does not attempt to close any hijacked connections, such as WebSockets.
-func (s *server) Stop() *server {
+func (s *server) Stop() error {
 	defer interruption.Handle()
+	if s.server != nil {
+		err := s.server.Close()
+		if err != nil {
+			return apperror.NewError("failed to stop webserver").AddError(err)
+		}
 
-	if s.Error != nil {
-		return s
+		log.Trace().Msgf("[Web] server stopped")
 	}
-
-	err := s.server.Close()
-	if err != nil {
-		s.Error = apperror.NewError("failed to stop webserver").AddError(err)
-		return s
-	}
-
-	log.Trace().Msgf("[Web] server stopped")
-	return s
+	return nil
 }
 
 // Shutdown gracefully shuts down the web server
 // It will wait for all active connections to finish before shutting down
 // Make sure the program doesn't exit and waits instead for Shutdown to return
-func (s *server) Shutdown() *server {
+func (s *server) Shutdown() error {
 	defer interruption.Handle()
 
-	if s.Error != nil {
-		return s
+	if s.server != nil {
+		log.Trace().Msgf("[Web] shutting down webserver...")
+		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownRelease()
+
+		err := s.server.Shutdown(shutdownCtx)
+		if err != nil {
+			return apperror.NewError("failed to shutdown webserver").AddError(err)
+		}
+
+		log.Trace().Msgf("[Web] server stopped")
 	}
-
-	log.Trace().Msgf("[Web] shutting down webserver...")
-	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownRelease()
-
-	err := s.server.Shutdown(shutdownCtx)
-	if err != nil {
-		s.Error = apperror.NewError("failed to shutdown webserver").AddError(err)
-		return s
-	}
-
-	log.Trace().Msgf("[Web] server stopped")
-	return s
+	return nil
 }
 
 // Restart gracefully shuts down the web server and starts it again
 // It will wait for all active connections to finish before shutting down
-func (s *server) Restart() *server {
+func (s *server) Restart() error {
 	defer interruption.Handle()
 
-	if s.Error != nil {
-		return s
+	if s.server != nil {
+		log.Trace().Msgf("[Web] restarting webserver...")
+		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownRelease()
+
+		if err := s.server.Shutdown(shutdownCtx); err != nil {
+			return apperror.NewError("failed to shutdown webserver").AddError(err)
+		}
+
+		s.Start()
 	}
-
-	log.Trace().Msgf("[Web] restarting webserver...")
-	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownRelease()
-
-	if err := s.server.Shutdown(shutdownCtx); err != nil {
-		s.Error = apperror.NewError("failed to shutdown webserver").AddError(err)
-		return s
-	}
-
-	s.Start()
-	return s
+	return nil
 }
 
 // WithHandler adds a custom handler to the server
@@ -253,6 +244,7 @@ func (s *server) WithHandler(path string, handler http.Handler) *server {
 		s.Error = apperror.NewErrorf("path %s is already registered as a websocket", path)
 		return s
 	}
+	s.handler[path] = handler
 	s.router.Handle(path, handler)
 	return s
 }
@@ -270,6 +262,7 @@ func (s *server) WithHandlerFunc(path string, handler http.HandlerFunc) *server 
 		s.Error = apperror.NewErrorf("path %s is already registered as a websocket", path)
 		return s
 	}
+	s.handler[path] = handler
 	s.router.HandleFunc(path, handler)
 	return s
 }
@@ -328,6 +321,7 @@ func (s *server) WithWebsocket(path string, handler func(http.ResponseWriter, *h
 		return s
 	}
 
+	s.websockets[path] = handler
 	s.router.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := s.upgrader.Upgrade(w, r, nil)
 		if err != nil {
