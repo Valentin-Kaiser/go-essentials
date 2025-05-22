@@ -28,7 +28,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 // SizeOf returns the number of bytes that 'value' takes up in memory, without using reflect or unsafe

@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 // Config holds the configuration for the database connection

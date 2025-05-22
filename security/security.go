@@ -34,7 +34,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
+	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/cespare/xxhash/v2"
 )
 

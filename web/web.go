@@ -19,7 +19,7 @@
 //
 //	"net/http"
 //
-//	"github.com/Valentin-Kaiser/go-essentials/web"
+//	"github.com/Valentin-Kaiser/go-core/web"
 //
 // )
 //
@@ -66,9 +66,9 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
-	"github.com/Valentin-Kaiser/go-essentials/interruption"
-	"github.com/Valentin-Kaiser/go-essentials/zlog"
+	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/interruption"
+	"github.com/Valentin-Kaiser/go-core/zlog"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

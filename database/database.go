@@ -10,7 +10,7 @@
 //   - Automatic (re)connection with health checks and retry mechanism
 //   - Support for SQLite and MySQL/MariaDB with configurable parameters
 //   - Schema management and automatic migrations
-//   - Versioning support using the go-essentials/version package
+//   - Versioning support using the go-core/version package
 //   - Connection lifecycle management (Connect, Disconnect, AwaitConnection)
 //   - Thread-safe access with `Execute(func(db *gorm.DB) error)` wrapper
 //   - Registering on-connect hooks to perform actions like seeding or setup
@@ -23,9 +23,9 @@
 //		"fmt"
 //		"time"
 //
-//		"github.com/Valentin-Kaiser/go-essentials/database"
-//		"github.com/Valentin-Kaiser/go-essentials/flag"
-//		"github.com/Valentin-Kaiser/go-essentials/version"
+//		"github.com/Valentin-Kaiser/go-core/database"
+//		"github.com/Valentin-Kaiser/go-core/flag"
+//		"github.com/Valentin-Kaiser/go-core/version"
 //		"gorm.io/gorm"
 //	)
 //
@@ -76,11 +76,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
-	"github.com/Valentin-Kaiser/go-essentials/flag"
-	"github.com/Valentin-Kaiser/go-essentials/interruption"
-	"github.com/Valentin-Kaiser/go-essentials/version"
-	"github.com/Valentin-Kaiser/go-essentials/zlog"
+	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/flag"
+	"github.com/Valentin-Kaiser/go-core/interruption"
+	"github.com/Valentin-Kaiser/go-core/version"
+	"github.com/Valentin-Kaiser/go-core/zlog"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"

@@ -8,7 +8,7 @@ import (
 	"github.com/ProtonMail/gopenpgp/v3/constants"
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/ProtonMail/gopenpgp/v3/profile"
-	"github.com/Valentin-Kaiser/go-essentials/apperror"
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 // PGPCipher is a struct that provides methods for encrypting and decrypting data using PGP.

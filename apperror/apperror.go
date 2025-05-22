@@ -35,7 +35,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/Valentin-Kaiser/go-essentials/flag"
+	"github.com/Valentin-Kaiser/go-core/flag"
 )
 
 var (

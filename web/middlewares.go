@@ -3,8 +3,8 @@ package web
 import (
 	"net/http"
 
-	"github.com/Valentin-Kaiser/go-essentials/flag"
-	"github.com/Valentin-Kaiser/go-essentials/version"
+	"github.com/Valentin-Kaiser/go-core/flag"
+	"github.com/Valentin-Kaiser/go-core/version"
 	"github.com/rs/zerolog/log"
 )
 

@@ -1,4 +1,4 @@
-module github.com/Valentin-Kaiser/go-essentials
+module github.com/Valentin-Kaiser/go-core
 
 go 1.24.2
 

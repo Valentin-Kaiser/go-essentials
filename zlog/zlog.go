@@ -17,7 +17,7 @@
 //	package main
 //
 //	import (
-//		"github.com/Valentin-Kaiser/go-essentials/zlog"
+//		"github.com/Valentin-Kaiser/go-core/zlog"
 //		"github.com/rs/zerolog"
 //		"github.com/rs/zerolog/log"
 //	)
@@ -42,7 +42,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Valentin-Kaiser/go-essentials/flag"
+	"github.com/Valentin-Kaiser/go-core/flag"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/natefinch/lumberjack.v2"
