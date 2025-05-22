@@ -9,6 +9,9 @@ on:
     branches: [main, master]
 permissions:
   contents: read
+  packages: read
+  statuses: write
+    
 jobs:
   build:
     name: Lint Code Base
