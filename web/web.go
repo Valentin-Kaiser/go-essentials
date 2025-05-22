@@ -61,6 +61,7 @@ import (
 	l "log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -316,7 +317,7 @@ func (s *server) WithFileServer(entrypoints []string, path string) *server {
 		return s
 	}
 
-	fs := http.FileServer(http.Dir(path))
+	fs := http.FileServer(http.Dir(filepath.Clean(path)))
 	for _, entrypoint := range entrypoints {
 		err := s.WithHandler(entrypoint, http.StripPrefix(entrypoint, fs)).Error
 		if err != nil {

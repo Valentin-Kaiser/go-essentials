@@ -45,7 +45,6 @@ func securityHeaderMiddleware(next http.Handler) http.Handler {
 // It is used to allow cross-origin requests from the client
 func corsHeaderMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		for key, value := range corsHeaders {
 			w.Header().Set(key, value)
 		}
