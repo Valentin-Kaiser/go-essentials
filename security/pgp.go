@@ -3,6 +3,7 @@ package security
 import (
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/ProtonMail/gopenpgp/v3/constants"
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
@@ -266,7 +267,7 @@ func (p *PGPCipher) WithPublicKey(key string) *PGPCipher {
 // WithPublicKeyFromFile sets the public key for the PGPCipher instance from a file.
 func (p *PGPCipher) WithPublicKeyFromFile(filePath string) *PGPCipher {
 	if len(filePath) > 0 && p.Error == nil {
-		key, err := os.ReadFile(filePath)
+		key, err := os.ReadFile(filepath.Clean(filePath))
 		if err != nil {
 			p.Error = apperror.NewError("failed to read public key file").AddError(err)
 			return p
@@ -285,7 +286,7 @@ func (p *PGPCipher) WithPrivateKey(key string) *PGPCipher {
 // WithPrivateKeyFromFile sets the private key for the PGPCipher instance from a file.
 func (p *PGPCipher) WithPrivateKeyFromFile(filePath string) *PGPCipher {
 	if len(filePath) > 0 && p.Error == nil {
-		key, err := os.ReadFile(filePath)
+		key, err := os.ReadFile(filepath.Clean(filePath))
 		if err != nil {
 			p.Error = apperror.NewError("failed to read private key file").AddError(err)
 			return p

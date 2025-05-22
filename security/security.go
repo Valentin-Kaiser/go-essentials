@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path/filepath"
 
 	"github.com/Valentin-Kaiser/go-essentials/apperror"
 	"github.com/cespare/xxhash/v2"
@@ -121,7 +122,7 @@ func ReadOrSavePassphrase(file string, length int) ([]byte, error) {
 		return nil, apperror.Wrap(err)
 	}
 
-	passphrase, err := os.ReadFile(file)
+	passphrase, err := os.ReadFile(filepath.Clean(file))
 	if err != nil {
 		return nil, apperror.Wrap(err)
 	}

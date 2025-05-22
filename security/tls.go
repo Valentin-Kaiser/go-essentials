@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"math/big"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-essentials/apperror"
@@ -58,7 +59,7 @@ func LoadCertificate(certFile, keyFile string) (tls.Certificate, error) {
 
 // LoadCACertPool loads a CA certificate pool from the given PEM file.
 func LoadCACertPool(caFile string) (*x509.CertPool, error) {
-	caCert, err := os.ReadFile(caFile)
+	caCert, err := os.ReadFile(filepath.Clean(caFile))
 	if err != nil {
 		return nil, apperror.NewError("failed to read CA certificate").AddError(err)
 	}
