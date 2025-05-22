@@ -1,0 +1,68 @@
+version: "2"
+run:
+  timeout: 60s
+
+linters:
+  # start with everything
+  default: all
+
+  disable:
+    # too annoying
+    - cyclop
+    - exhaustive
+    - exhaustruct
+    - forbidigo
+    - funlen
+    - gochecknoglobals
+    - godot
+    - lll
+    - nakedret
+    - nestif
+    - nlreturn
+    - tagliatelle
+    - varnamelen
+    - wsl
+    - nonamedreturns
+
+    #complexity linters
+    - gocognit
+    - gocyclo
+    - maintidx
+
+    # i disagree with these
+    - wrapcheck
+    - nolintlint
+    - errorlint
+    - noctx
+    - gochecknoinits
+    - gosmopolitan
+
+    # these might be usefull for suggestions but should not block the build
+    - prealloc
+    - godox
+    - dupl
+    - goconst
+    - nilerr
+    - ireturn
+    - nosprintfhostport
+    - depguard
+    - tagalign
+    - protogetter
+    - mnd
+    - err113
+    - revive
+    - asasalint
+
+    # buggy?
+    - musttag
+    - intrange
+
+    # disabled because of generics
+    - rowserrcheck
+    - sqlclosecheck
+    - wastedassign
+  
+  settings:
+    gosec:
+      excludes:
+        - G115
