@@ -142,10 +142,14 @@ func (l *logger) SetLevel(level zerolog.Level) *logger {
 	return l
 }
 
+// GetLevel returns the current global log level.
 func (l *logger) GetLevel() zerolog.Level {
-	return zerolog.GlobalLevel()
+	return l.level
 }
 
+// WithLevel creates a new logger instance with the specified log level.
+// It does not modify the global logger or the current logger instance.
+// The returned logger should be used as a io.Writer to log messages at the specified level.
 func (l *logger) WithLevel(level zerolog.Level) *logger {
 	return &logger{
 		level:   level,
