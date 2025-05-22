@@ -1,5 +1,5 @@
-// Package web provides a configurable HTTP web server with built-in support for
-// common middleware patterns, static file serving, API endpoints, and WebSocket handling.
+// web provides a configurable HTTP web server with built-in support for
+// common middleware patterns, file serving, and WebSocket handling.
 //
 // This package offers a singleton Server instance that can be customized through
 // fluent-style methods for setting host, port, headers, middleware, handlers, and WebSocket routes.

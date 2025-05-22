@@ -1,9 +1,8 @@
-// Package zlog provides a simple and flexible logging utility built around the zerolog library.
-// It offers structured, leveled logging with support for console output, file logging with rotation,
-// and custom output targets.
+// zlog provides a simple and flexible logging utility built around the zerolog library.
 //
-// This package simplifies logger setup and management by wrapping zerolog and integrating with
-// the lumberjack package for efficient log file rotation.
+// It offers structured, leveled logging with support for console output, file logging with rotation,
+// and custom output targets. This package simplifies logger setup and management by wrapping zerolog
+// and integrating with the lumberjack package for efficient log file rotation.
 //
 // Key Features:
 //   - Structured logging using zerolog

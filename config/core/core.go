@@ -1,5 +1,7 @@
-// Package core provides a simple, structured, and extensible way to manage
-// application configuration in Go. It builds upon the Viper library and adds
+// core provides a simple, structured, and extensible way to manage
+// application configuration in Go.
+//
+// It builds upon the Viper library and adds
 // powerful features like validation, dynamic watching, default value registration,
 // environment and flag integration, and structured config registration.
 //

@@ -1,5 +1,7 @@
-// Package flag provides a simple API for defining and parsing command-line flags
-// in Go applications. It is built on top of the pflag library and includes support
+// flag provides a simple API for defining and parsing command-line flags
+// in Go applications.
+//
+// It is built on top of the pflag library and includes support
 // for a set of common default flags.
 //
 // Default flags:

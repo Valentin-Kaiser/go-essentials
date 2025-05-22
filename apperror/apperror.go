@@ -1,4 +1,4 @@
-// Package apperror provides a custom error type that enhances standard Go errors
+// apperror provides a custom error type that enhances standard Go errors
 // with stack traces and support for additional nested errors.
 //
 // It is designed to improve error handling in Go applications by offering contextual

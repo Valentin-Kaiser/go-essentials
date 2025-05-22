@@ -1,4 +1,4 @@
-// Package memsize provides utilities to estimate the memory footprint of Go values
+// memsize provides utilities to estimate the memory footprint of Go values
 // without relying on the reflect or unsafe packages for direct memory inspection.
 //
 // It leverages the gob encoding mechanism to serialize values into memory buffers

@@ -1,4 +1,4 @@
-// Package database provides a robust and flexible abstraction over GORM,
+// database provides a robust and flexible abstraction over GORM,
 // supporting both SQLite and MySQL/MariaDB as backend databases.
 //
 // It offers features such as automatic connection handling, schema migrations,

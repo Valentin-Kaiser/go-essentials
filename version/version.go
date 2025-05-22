@@ -1,4 +1,4 @@
-// Package version provides utilities to manage, retrieve, and validate version
+// version provides utilities to manage, retrieve, and validate version
 // information of a Go application at runtime.
 //
 // This package captures key metadata about the application build, including the
