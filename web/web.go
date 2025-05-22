@@ -226,12 +226,13 @@ func (s *server) Restart() error {
 		if err != nil {
 			return apperror.NewError("failed to shutdown webserver").AddError(err)
 		}
-
-		err = s.Start().Error
-		if err != nil {
-			return apperror.NewError("failed to start webserver").AddError(err)
-		}
 	}
+
+	err := s.Start().Error
+	if err != nil {
+		return apperror.NewError("failed to start webserver").AddError(err)
+	}
+
 	return nil
 }
 
