@@ -234,13 +234,14 @@ func connect(config Config) (*gorm.DB, error) {
 	switch config.Driver {
 	case "sqlite":
 		if _, err := os.Stat(flag.Path); os.IsNotExist(err) {
-			err := os.Mkdir(flag.Path, 0755)
+			err := os.Mkdir(flag.Path, 0750)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		db, err := gorm.Open(sqlite.Open(filepath.Join(flag.Path, config.Name+".db?cache=shared")), cfg)
+		var err error
+		db, err = gorm.Open(sqlite.Open(filepath.Join(flag.Path, config.Name+".db?cache=shared")), cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +265,8 @@ func connect(config Config) (*gorm.DB, error) {
 			config.Name,
 		)
 
-		db, err := gorm.Open(mysql.Open(dsn), cfg)
+		var err error
+		db, err = gorm.Open(mysql.Open(dsn), cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -291,7 +293,7 @@ func onConnect(config Config) {
 	}
 
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		err := migrateSchema(db)
+		err = migrateSchema(db)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("[Database] schema migration failed")
 		}

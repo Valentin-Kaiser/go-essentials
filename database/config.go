@@ -1,6 +1,8 @@
 package database
 
-import "fmt"
+import (
+	"github.com/Valentin-Kaiser/go-essentials/apperror"
+)
 
 // Config holds the configuration for the database connection
 // This struct can be used with the config core package.
@@ -17,29 +19,29 @@ type Config struct {
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	if c.Driver == "" {
-		return fmt.Errorf("database driver is required")
+		return apperror.NewError("database driver is required")
 	}
 
 	switch c.Driver {
 	case "sqlite":
 		if c.Name == "" {
-			return fmt.Errorf("database name (sqlite file) is required")
+			return apperror.NewError("database name (sqlite file) is required")
 		}
 	default:
 		if c.Host == "" {
-			return fmt.Errorf("database host is required")
+			return apperror.NewError("database host is required")
 		}
 		if c.Port == 0 {
-			return fmt.Errorf("database port is required")
+			return apperror.NewError("database port is required")
 		}
 		if c.User == "" {
-			return fmt.Errorf("database user is required")
+			return apperror.NewError("database user is required")
 		}
 		if c.Password == "" {
-			return fmt.Errorf("database password is required")
+			return apperror.NewError("database password is required")
 		}
 		if c.Name == "" {
-			return fmt.Errorf("database name is required")
+			return apperror.NewError("database name is required")
 		}
 	}
 	return nil
