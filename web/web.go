@@ -176,7 +176,6 @@ func (s *server) StartAsync(done chan error) {
 }
 
 // Stop stops the web server
-// Close immediately closes all active connections in state. For a graceful shutdown, use Shutdown.
 // Close does not attempt to close any hijacked connections, such as WebSockets.
 func (s *server) Stop() error {
 	defer interruption.Handle()
