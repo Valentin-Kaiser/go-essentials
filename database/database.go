@@ -80,7 +80,7 @@ import (
 	"github.com/Valentin-Kaiser/go-essentials/flag"
 	"github.com/Valentin-Kaiser/go-essentials/interruption"
 	"github.com/Valentin-Kaiser/go-essentials/version"
-	l "github.com/Valentin-Kaiser/go-essentials/zlog"
+	"github.com/Valentin-Kaiser/go-essentials/zlog"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -220,7 +220,7 @@ func connect(config Config) (*gorm.DB, error) {
 		},
 	)
 	// If we are in trace loglevel, enable gorm logging
-	if l.Logger().GetLevel() < zerolog.TraceLevel && flag.Debug {
+	if zlog.Logger().GetLevel() < zerolog.TraceLevel && flag.Debug {
 		newLogger = logger.New(
 			&log.Logger,
 			logger.Config{
