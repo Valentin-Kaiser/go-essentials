@@ -222,13 +222,35 @@ func (s *server) Restart() error {
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownRelease()
 
-		if err := s.server.Shutdown(shutdownCtx); err != nil {
+		err := s.server.Shutdown(shutdownCtx)
+		if err != nil {
 			return apperror.NewError("failed to shutdown webserver").AddError(err)
 		}
 
-		s.Start()
+		err = s.Start().Error
+		if err != nil {
+			return apperror.NewError("failed to start webserver").AddError(err)
+		}
 	}
 	return nil
+}
+
+func (s *server) RestartAsync(done chan error) {
+	defer interruption.Handle()
+
+	if s.server != nil {
+		log.Trace().Msgf("[Web] restarting webserver...")
+		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownRelease()
+
+		err := s.server.Shutdown(shutdownCtx)
+		if err != nil {
+			done <- apperror.NewError("failed to shutdown webserver").AddError(err)
+			return
+		}
+	}
+
+	s.StartAsync(done)
 }
 
 // WithHandler adds a custom handler to the server
