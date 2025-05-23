@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/ProtonMail/gopenpgp/v3 v3.2.1
+	github.com/ProtonMail/gopenpgp/v3 v3.3.0
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gorilla/websocket v1.5.3
@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	github.com/ProtonMail/go-crypto v1.2.0 // indirect
+	github.com/ProtonMail/go-crypto v1.3.0 // indirect
 	github.com/cloudflare/circl v1.6.0 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
