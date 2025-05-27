@@ -27,6 +27,31 @@ var (
 
 type Middleware func(http.Handler) http.Handler
 
+type MiddlewareOrder int8
+
+const (
+	// MiddlewareOrderDefault is the default execution order for middlewares.
+	// It is invoked at the same level as the original handler.
+	MiddlewareOrderDefault MiddlewareOrder = 0
+	// MiddlewareOrderLow represents the lowest execution order.
+	// Middlewares with negative values (-128 to -1) are called before the original handler.
+	MiddlewareOrderLow MiddlewareOrder = -128
+	// MiddlewareOrderHigh represents the highest execution order.
+	// Middlewares with positive values (1 to 127) are called after the original handler.
+	MiddlewareOrderHigh MiddlewareOrder = 127
+	// MiddlewareOrderSecurity is a specific order typically used for security-related middlewares.
+	// It is called before the handler.
+	MiddlewareOrderSecurity MiddlewareOrder = -127
+	// MiddlewareOrderCors is a specific order typically used for CORS-related middlewares.
+	// It is called before the handler.
+	MiddlewareOrderCors MiddlewareOrder = -126
+	// MiddlewareOrderLog is a specific order typically used for logging middlewares.
+	// It is called after the handler.
+	MiddlewareOrderLog MiddlewareOrder = 126
+	// MiddlewareOrderGzip is a specific order typically used for gzip compression middlewares.
+	MiddlewareOrderGzip MiddlewareOrder = 127
+)
+
 // securityHeaderMiddleware is a middleware that adds security headers to the response
 // It is used to prevent attacks like XSS, clickjacking, etc.
 func securityHeaderMiddleware(next http.Handler) http.Handler {

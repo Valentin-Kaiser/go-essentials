@@ -9,7 +9,7 @@ import (
 // It implements the http.Handler interface and allows for flexible request handling
 type Router struct {
 	mux         *http.ServeMux
-	middlewares map[int8][]Middleware
+	middlewares map[MiddlewareOrder][]Middleware
 	// onStatus is a map of status codes to callback functions
 	onStatus map[int]func(http.ResponseWriter, *http.Request)
 }
@@ -19,7 +19,7 @@ type Router struct {
 func NewRouter() *Router {
 	r := &Router{
 		mux:         http.NewServeMux(),
-		middlewares: make(map[int8][]Middleware),
+		middlewares: make(map[MiddlewareOrder][]Middleware),
 	}
 
 	return r
@@ -41,11 +41,11 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Use adds a middleware to the router
-func (router *Router) Use(priority int8, middleware func(http.Handler) http.Handler) {
-	if _, ok := router.middlewares[priority]; !ok {
-		router.middlewares[priority] = make([]Middleware, 0)
+func (router *Router) Use(order MiddlewareOrder, middleware func(http.Handler) http.Handler) {
+	if _, ok := router.middlewares[order]; !ok {
+		router.middlewares[order] = make([]Middleware, 0)
 	}
-	router.middlewares[priority] = append(router.middlewares[priority], middleware)
+	router.middlewares[order] = append(router.middlewares[order], middleware)
 }
 
 // Handle registers a handler for the given pattern
@@ -69,18 +69,17 @@ func (router *Router) OnStatus(status int, fn func(http.ResponseWriter, *http.Re
 }
 
 func (router *Router) wrap(handler http.Handler) http.Handler {
-	priorities := make([]int8, 0, len(router.middlewares))
-	for priority := range router.middlewares {
-		priorities = append(priorities, priority)
+	orders := make([]MiddlewareOrder, 0, len(router.middlewares))
+	for order := range router.middlewares {
+		orders = append(orders, order)
 	}
-	sort.Slice(priorities, func(i, j int) bool {
-		return priorities[i] > priorities[j]
+	sort.Slice(orders, func(i, j int) bool {
+		return orders[i] > orders[j]
 	})
 
-	for _, priority := range priorities {
-		mws := router.middlewares[priority]
-		if priority == 0 {
-			// Apply priority 0 middlewares in reverse order
+	for _, order := range orders {
+		mws := router.middlewares[order]
+		if order == MiddlewareOrderDefault {
 			for i := len(mws) - 1; i >= 0; i-- {
 				handler = mws[i](handler)
 			}

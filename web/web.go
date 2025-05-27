@@ -390,13 +390,13 @@ func (s *Server) WithTLS(config *tls.Config) *Server {
 
 // WithSecurityHeaders adds security headers to the server
 func (s *Server) WithSecurityHeaders() *Server {
-	s.router.Use(0, securityHeaderMiddleware)
+	s.router.Use(MiddlewareOrderSecurity, securityHeaderMiddleware)
 	return s
 }
 
 // WithCORSHeaders adds CORS headers to the server
 func (s *Server) WithCORSHeaders() *Server {
-	s.router.Use(0, corsHeaderMiddleware)
+	s.router.Use(MiddlewareOrderCors, corsHeaderMiddleware)
 	return s
 }
 
@@ -404,7 +404,7 @@ func (s *Server) WithCORSHeaders() *Server {
 func (s *Server) WithHeader(key, value string) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(0, func(next http.Handler) http.Handler {
+	s.router.Use(MiddlewareOrderDefault, func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(key, value)
 			next.ServeHTTP(w, r)
@@ -417,7 +417,7 @@ func (s *Server) WithHeader(key, value string) *Server {
 func (s *Server) WithHeaders(headers map[string]string) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(0, func(next http.Handler) http.Handler {
+	s.router.Use(MiddlewareOrderDefault, func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			for key, value := range headers {
 				w.Header().Set(key, value)
@@ -432,7 +432,7 @@ func (s *Server) WithHeaders(headers map[string]string) *Server {
 func (s *Server) WithGzip() *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(127, gziphandler.GzipHandler)
+	s.router.Use(MiddlewareOrderGzip, gziphandler.GzipHandler)
 	return s
 }
 
@@ -446,7 +446,7 @@ func (s *Server) WithGzipLevel(level int) *Server {
 		return s
 	}
 
-	s.router.Use(127, handler)
+	s.router.Use(MiddlewareOrderGzip, handler)
 	return s
 }
 
@@ -454,24 +454,25 @@ func (s *Server) WithGzipLevel(level int) *Server {
 func (s *Server) WithLog() *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(10, logMiddleware)
+	s.router.Use(MiddlewareOrderLog, logMiddleware)
 	return s
 }
 
 // WithCustomMiddleware adds a custom middleware to the server
-// The middleware is registered with a priority of 0
 func (s *Server) WithCustomMiddleware(middleware Middleware) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(0, middleware)
+	s.router.Use(MiddlewareOrderDefault, middleware)
 	return s
 }
 
-// WithCustomMiddlewarePriority adds a custom middleware to the server with a specific priority
-func (s *Server) WithCustomMiddlewarePriority(priority int8, middleware Middleware) *Server {
+// WithCustomMiddlewareOrder adds a custom middleware to the server with a specific order
+// The order is a int8 value that determines the order of the middleware 0 is the original handler,
+// -128 is the beginning of the chain, and 127 is the end of the chain
+func (s *Server) WithCustomMiddlewareOrder(order MiddlewareOrder, middleware Middleware) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(priority, middleware)
+	s.router.Use(order, middleware)
 	return s
 }
 
