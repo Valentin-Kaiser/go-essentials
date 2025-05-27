@@ -18,8 +18,6 @@ type ResponseWriter struct {
 	buf bytes.Buffer
 	// header is a custom header map to hold response headers
 	header http.Header
-	// written indicates if the response header has been written
-	written bool
 }
 
 func newResponseWriter(w http.ResponseWriter, r *http.Request) *ResponseWriter {
