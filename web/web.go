@@ -540,6 +540,7 @@ func (s *Server) WithOnHttpCode(code int, handler func(http.ResponseWriter, *htt
 		return s
 	}
 
+	s.onHttpCode[code] = handler
 	s.router.OnStatus(code, handler)
 	return s
 }
