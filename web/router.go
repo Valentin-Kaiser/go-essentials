@@ -34,13 +34,15 @@ func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handler.ServeHTTP(rw, r)
 
 	if fn, ok := router.onStatus[rw.status]; ok {
-		rw.Clear()
+		rw.clear()
 		fn(rw, rw.r)
 	}
-	rw.Flush()
+	rw.flush()
 }
 
 // Use adds a middleware to the router
+// It allows you to specify the order of execution using MiddlewareOrder
+// All middlewares of the same order will be executed in the order they were added
 func (router *Router) Use(order MiddlewareOrder, middleware func(http.Handler) http.Handler) {
 	if _, ok := router.middlewares[order]; !ok {
 		router.middlewares[order] = make([]Middleware, 0)
@@ -68,6 +70,8 @@ func (router *Router) OnStatus(status int, fn func(http.ResponseWriter, *http.Re
 	router.onStatus[status] = fn
 }
 
+// wrap applies all registered middlewares to the given handler
+// It sorts the middlewares by their order and applies them LIFO (last in, first out)
 func (router *Router) wrap(handler http.Handler) http.Handler {
 	orders := make([]MiddlewareOrder, 0, len(router.middlewares))
 	for order := range router.middlewares {
@@ -78,15 +82,9 @@ func (router *Router) wrap(handler http.Handler) http.Handler {
 	})
 
 	for _, order := range orders {
-		mws := router.middlewares[order]
-		if order == MiddlewareOrderDefault {
-			for i := len(mws) - 1; i >= 0; i-- {
-				handler = mws[i](handler)
-			}
-			continue
-		}
-		for _, mw := range mws {
-			handler = mw(handler)
+		middlewares := router.middlewares[order]
+		for i := len(middlewares) - 1; i >= 0; i-- {
+			handler = middlewares[i](handler)
 		}
 	}
 

@@ -25,6 +25,8 @@ var (
 	}
 )
 
+// Middleware is a function that takes an http.Handler and returns an http.Handler.
+
 type Middleware func(http.Handler) http.Handler
 
 type MiddlewareOrder int8

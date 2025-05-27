@@ -19,6 +19,8 @@ type responseWriter struct {
 	buf bytes.Buffer
 	// header is a custom header map to hold response headers
 	header http.Header
+	// written indicates if the response header has been written
+	written bool
 }
 
 func newResponseWriter(w http.ResponseWriter, r *http.Request) *responseWriter {
@@ -40,6 +42,7 @@ func (rw *responseWriter) Header() http.Header {
 }
 
 // WriteHeader captures the status code but does not send it immediately
+// It is send when Flush is called
 func (rw *responseWriter) WriteHeader(status int) {
 	rw.status = status
 }
@@ -47,23 +50,6 @@ func (rw *responseWriter) WriteHeader(status int) {
 // Write buffers the response body
 func (rw *responseWriter) Write(b []byte) (int, error) {
 	return rw.buf.Write(b)
-}
-
-// Flush writes the buffered response to the original ResponseWriter
-func (rw *responseWriter) Flush() {
-	for k, vv := range rw.header {
-		for _, v := range vv {
-			rw.w.Header().Add(k, v)
-		}
-	}
-	_, err := rw.w.Write(rw.buf.Bytes())
-	if err != nil {
-		http.Error(rw.w, "Internal Server Error", http.StatusInternalServerError)
-	}
-}
-
-func (rw *responseWriter) Clear() {
-	rw.buf.Reset()
 }
 
 // Status returns the status code of the response
@@ -78,4 +64,23 @@ func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return nil, nil, errors.New("hijack not supported")
 	}
 	return h.Hijack()
+}
+
+// flush writes the buffered response to the original ResponseWriter
+func (rw *responseWriter) flush() {
+	for k, vv := range rw.header {
+		for _, v := range vv {
+			rw.w.Header().Add(k, v)
+		}
+	}
+	rw.w.WriteHeader(rw.status)
+	_, err := rw.w.Write(rw.buf.Bytes())
+	if err != nil {
+		http.Error(rw.w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (rw *responseWriter) clear() {
+	rw.buf.Reset()
 }
