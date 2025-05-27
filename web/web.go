@@ -93,7 +93,7 @@ var instance = &Server{
 	onHttpCode:        make(map[int]func(http.ResponseWriter, *http.Request)),
 }
 
-// Server represents a web Server with a set of middlewares and handlers
+// Server represents a web server with a set of middlewares and handlers
 type Server struct {
 	// Error is the error that occurred during the server's operation
 	// It will be nil if no error occurred
