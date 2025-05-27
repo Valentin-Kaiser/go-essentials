@@ -202,7 +202,6 @@ func (s *Server) Stop() error {
 // Make sure the program doesn't exit and waits instead for Shutdown to return
 func (s *Server) Shutdown() error {
 	defer interruption.Handle()
-
 	if s.server != nil {
 		log.Trace().Msgf("[Web] shutting down webserver...")
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
@@ -222,7 +221,6 @@ func (s *Server) Shutdown() error {
 // It will wait for all active connections to finish before shutting down
 func (s *Server) Restart() error {
 	defer interruption.Handle()
-
 	if s.server != nil {
 		log.Trace().Msgf("[Web] restarting webserver...")
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
@@ -263,6 +261,10 @@ func (s *Server) RestartAsync(done chan error) {
 // WithHandler adds a custom handler to the server
 // It will return an error in the Error field if the path is already registered as a handler or a websocket
 func (s *Server) WithHandler(path string, handler http.Handler) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -281,6 +283,10 @@ func (s *Server) WithHandler(path string, handler http.Handler) *Server {
 // WithHandlerFunc adds a custom handler function to the server
 // It will return an error in the Error field if the path is already registered as a handler or a websocket
 func (s *Server) WithHandlerFunc(path string, handler http.HandlerFunc) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -299,6 +305,10 @@ func (s *Server) WithHandlerFunc(path string, handler http.HandlerFunc) *Server 
 // WithEmbedFS adds a static file server to the server
 // It will serve files from the static embed.FS at the specified entrypoints
 func (s *Server) WithEmbedFS(entrypoints []string, static embed.FS) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	fs, err := fs.Sub(static, "static")
 	if err != nil {
 		s.Error = apperror.NewError("failed to create sub fs").AddError(err)
@@ -317,6 +327,10 @@ func (s *Server) WithEmbedFS(entrypoints []string, static embed.FS) *Server {
 // WithFileServer serves files from the specified directory
 // It will fail if the directory does not exist
 func (s *Server) WithFileServer(entrypoints []string, path string) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	_, err := os.Stat(path)
 	if err != nil {
 		s.Error = apperror.NewErrorf("directory %s does not exist", path).AddError(err)
@@ -339,6 +353,10 @@ func (s *Server) WithFileServer(entrypoints []string, path string) *Server {
 // The handler function will be called with the http.ResponseWriter, http.Request and *websocket.Conn
 // and will be responsible for handling and closing the connection
 func (s *Server) WithWebsocket(path string, handler func(http.ResponseWriter, *http.Request, *websocket.Conn)) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -438,6 +456,10 @@ func (s *Server) WithGzip() *Server {
 
 // WithGzipLevel enables gzip compression with a specific level for the server
 func (s *Server) WithGzipLevel(level int) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	handler, err := gziphandler.NewGzipLevelHandler(level)
@@ -533,6 +555,10 @@ func (s *Server) WithCustomErrorLog(logger *l.Logger) *Server {
 // It will be called after the request is handled and before the response is sent,
 // and is called with the http.ResponseWriter and the http.Request
 func (s *Server) WithOnHttpCode(code int, handler func(http.ResponseWriter, *http.Request)) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	_, ok := s.onHttpCode[code]
