@@ -53,9 +53,14 @@ func corsHeaderMiddleware(next http.Handler) http.Handler {
 }
 
 // logMiddleware is a middleware that logs the request and response
+// Must be used before the gzip middleware to ensure the response is logged correctly
 func logMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rw := &ResponseWriter{ResponseWriter: w, status: http.StatusOK}
+		rw, ok := w.(*ResponseWriter)
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
 		next.ServeHTTP(rw, r)
 
 		loglevel := log.Debug
