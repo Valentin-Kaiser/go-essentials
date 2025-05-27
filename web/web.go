@@ -116,7 +116,7 @@ type Server struct {
 	onHttpCode        map[int]func(http.ResponseWriter, *http.Request)
 }
 
-// Returns the singleton instance of the web server
+// Instance returns the singleton instance of the web server
 func Instance() *Server {
 	return instance
 }

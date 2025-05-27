@@ -10,8 +10,8 @@ import (
 type Router struct {
 	mux         *http.ServeMux
 	middlewares map[MiddlewareOrder][]Middleware
-	// onStatus is a map of status codes to callback functions
-	onStatus map[int]func(http.ResponseWriter, *http.Request)
+	sorted      [][]Middleware
+	onStatus    map[int]func(http.ResponseWriter, *http.Request)
 }
 
 // NewRouter creates a new Router instance
@@ -48,6 +48,7 @@ func (router *Router) Use(order MiddlewareOrder, middleware func(http.Handler) h
 		router.middlewares[order] = make([]Middleware, 0)
 	}
 	router.middlewares[order] = append(router.middlewares[order], middleware)
+	router.sort()
 }
 
 // Handle registers a handler for the given pattern
@@ -73,6 +74,17 @@ func (router *Router) OnStatus(status int, fn func(http.ResponseWriter, *http.Re
 // wrap applies all registered middlewares to the given handler
 // It sorts the middlewares by their order and applies them LIFO (last in, first out)
 func (router *Router) wrap(handler http.Handler) http.Handler {
+	for _, middlewares := range router.sorted {
+		for i := len(middlewares) - 1; i >= 0; i-- {
+			handler = middlewares[i](handler)
+		}
+	}
+
+	return handler
+}
+
+func (router *Router) sort() {
+	router.sorted = make([][]Middleware, 0, len(router.middlewares))
 	orders := make([]MiddlewareOrder, 0, len(router.middlewares))
 	for order := range router.middlewares {
 		orders = append(orders, order)
@@ -82,11 +94,6 @@ func (router *Router) wrap(handler http.Handler) http.Handler {
 	})
 
 	for _, order := range orders {
-		middlewares := router.middlewares[order]
-		for i := len(middlewares) - 1; i >= 0; i-- {
-			handler = middlewares[i](handler)
-		}
+		router.sorted = append(router.sorted, router.middlewares[order])
 	}
-
-	return handler
 }

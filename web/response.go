@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-// responseWriter is a wrapper around http.responseWriter that captures the status code
+// responseWriter is a wrapper around http.ResponseWriter that captures the status code
 type responseWriter struct {
 	w http.ResponseWriter
 	r *http.Request
