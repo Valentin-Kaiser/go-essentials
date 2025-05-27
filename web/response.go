@@ -9,8 +9,8 @@ import (
 	"net/http"
 )
 
-// ResponseWriter is a wrapper around http.ResponseWriter that captures the status code
-type ResponseWriter struct {
+// responseWriter is a wrapper around http.responseWriter that captures the status code
+type responseWriter struct {
 	w http.ResponseWriter
 	r *http.Request
 	// status is the HTTP status code to be sent
@@ -19,12 +19,20 @@ type ResponseWriter struct {
 	buf bytes.Buffer
 	// header is a custom header map to hold response headers
 	header http.Header
-	// wroteHeader indicates whether WriteHeader has been called
-	wroteHeader bool
+}
+
+func newResponseWriter(w http.ResponseWriter, r *http.Request) *responseWriter {
+	return &responseWriter{
+		w:      w,
+		r:      r,
+		status: http.StatusOK, // Default status code
+		header: make(http.Header),
+		buf:    bytes.Buffer{},
+	}
 }
 
 // Header returns the custom header map
-func (rw *ResponseWriter) Header() http.Header {
+func (rw *responseWriter) Header() http.Header {
 	if rw.header == nil {
 		rw.header = make(http.Header)
 	}
@@ -32,29 +40,21 @@ func (rw *ResponseWriter) Header() http.Header {
 }
 
 // WriteHeader captures the status code but does not send it immediately
-func (rw *ResponseWriter) WriteHeader(status int) {
-	if rw.wroteHeader {
-		fmt.Println("WriteHeader called multiple times, ignoring subsequent calls")
-		return
-	}
+func (rw *responseWriter) WriteHeader(status int) {
 	rw.status = status
-	rw.wroteHeader = true
 }
 
 // Write buffers the response body
-func (rw *ResponseWriter) Write(b []byte) (int, error) {
+func (rw *responseWriter) Write(b []byte) (int, error) {
 	return rw.buf.Write(b)
 }
 
 // Flush writes the buffered response to the original ResponseWriter
-func (rw *ResponseWriter) Flush() {
+func (rw *responseWriter) Flush() {
 	for k, vv := range rw.header {
 		for _, v := range vv {
 			rw.w.Header().Add(k, v)
 		}
-	}
-	if rw.status == 0 {
-		rw.status = http.StatusOK
 	}
 	_, err := rw.w.Write(rw.buf.Bytes())
 	if err != nil {
@@ -62,20 +62,17 @@ func (rw *ResponseWriter) Flush() {
 	}
 }
 
-func (rw *ResponseWriter) Clear() {
+func (rw *responseWriter) Clear() {
 	rw.buf.Reset()
-	rw.status = http.StatusOK
-	rw.wroteHeader = false
-	rw.header = make(http.Header)
 }
 
 // Status returns the status code of the response
-func (rw *ResponseWriter) Status() string {
+func (rw *responseWriter) Status() string {
 	return fmt.Sprintf("%d %s", rw.status, http.StatusText(rw.status))
 }
 
 // Hijack is a wrapper around the http.Hijacker interface
-func (rw *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	h, ok := rw.w.(http.Hijacker)
 	if !ok {
 		return nil, nil, errors.New("hijack not supported")

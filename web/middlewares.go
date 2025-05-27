@@ -56,10 +56,9 @@ func corsHeaderMiddleware(next http.Handler) http.Handler {
 // Must be used before the gzip middleware to ensure the response is logged correctly
 func logMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rw, ok := w.(*ResponseWriter)
+		rw, ok := w.(*responseWriter)
 		if !ok {
-			next.ServeHTTP(w, r)
-			return
+			rw = newResponseWriter(w, r)
 		}
 		next.ServeHTTP(rw, r)
 

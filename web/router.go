@@ -30,13 +30,7 @@ func NewRouter() *Router {
 func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	handler := router.wrap(router.mux)
 
-	rw := &ResponseWriter{
-		w:      w,
-		r:      r,
-		status: http.StatusOK,
-		header: make(http.Header),
-	}
-
+	rw := newResponseWriter(w, r)
 	handler.ServeHTTP(rw, r)
 
 	if fn, ok := router.onStatus[rw.status]; ok {
