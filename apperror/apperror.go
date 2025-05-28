@@ -34,6 +34,7 @@ package apperror
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/Valentin-Kaiser/go-core/flag"
 )
@@ -184,4 +185,29 @@ func getErrors(err error) []error {
 		return e.Errors
 	}
 	return nil
+}
+
+// Where returns the trace location of the caller at the specified level
+// The level parameter indicates how many stack frames to skip
+func Where(level int) string {
+	pc := make([]uintptr, 32)
+	n := runtime.Callers(level, pc)
+	if n == 0 {
+		return "unknown"
+	}
+
+	pc = pc[:n]
+	frames := runtime.CallersFrames(pc)
+
+	var sb strings.Builder
+	for {
+		frame, more := frames.Next()
+		// Format: file:line (func)
+		fmt.Fprintf(&sb, "%s:%d (%s)\n", frame.File, frame.Line, frame.Function)
+
+		if !more {
+			break
+		}
+	}
+	return sb.String()
 }

@@ -74,7 +74,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var instance = &server{
+var instance = &Server{
 	port:   80,
 	router: NewRouter(),
 	upgrader: websocket.Upgrader{
@@ -89,10 +89,14 @@ var instance = &server{
 	errorLog:          l.New(io.Discard, "", 0),
 	handler:           make(map[string]http.Handler),
 	websockets:        make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)),
+	once:              sync.Once{},
+	onHttpCode:        make(map[int]func(http.ResponseWriter, *http.Request)),
 }
 
-// server represents a web server with a set of middlewares and handlers
-type server struct {
+// Server represents a web server with a set of middlewares and handlers
+type Server struct {
+	// Error is the error that occurred during the server's operation
+	// It will be nil if no error occurred
 	Error             error
 	server            *http.Server
 	router            *Router
@@ -108,16 +112,18 @@ type server struct {
 	errorLog          *l.Logger
 	handler           map[string]http.Handler
 	websockets        map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)
+	once              sync.Once
+	onHttpCode        map[int]func(http.ResponseWriter, *http.Request)
 }
 
-// Server returns the singleton instance of the web server
-func Server() *server {
+// Instance returns the singleton instance of the web server
+func Instance() *Server {
 	return instance
 }
 
 // Start starts the web server
 // All middlewares and handlers that should be registered must be registered before calling this function
-func (s *server) Start() *server {
+func (s *Server) Start() *Server {
 	defer interruption.Handle()
 
 	if s.Error != nil {
@@ -156,7 +162,7 @@ func (s *server) Start() *server {
 
 // StartAsync starts the web server asynchronously
 // It will return immediately and the server will run in the background
-func (s *server) StartAsync(done chan error) {
+func (s *Server) StartAsync(done chan error) {
 	defer interruption.Handle()
 
 	if s.Error != nil {
@@ -178,7 +184,7 @@ func (s *server) StartAsync(done chan error) {
 
 // Stop stops the web server
 // Close does not attempt to close any hijacked connections, such as WebSockets.
-func (s *server) Stop() error {
+func (s *Server) Stop() error {
 	defer interruption.Handle()
 	if s.server != nil {
 		err := s.server.Close()
@@ -194,9 +200,8 @@ func (s *server) Stop() error {
 // Shutdown gracefully shuts down the web server
 // It will wait for all active connections to finish before shutting down
 // Make sure the program doesn't exit and waits instead for Shutdown to return
-func (s *server) Shutdown() error {
+func (s *Server) Shutdown() error {
 	defer interruption.Handle()
-
 	if s.server != nil {
 		log.Trace().Msgf("[Web] shutting down webserver...")
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
@@ -214,9 +219,8 @@ func (s *server) Shutdown() error {
 
 // Restart gracefully shuts down the web server and starts it again
 // It will wait for all active connections to finish before shutting down
-func (s *server) Restart() error {
+func (s *Server) Restart() error {
 	defer interruption.Handle()
-
 	if s.server != nil {
 		log.Trace().Msgf("[Web] restarting webserver...")
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
@@ -236,7 +240,7 @@ func (s *server) Restart() error {
 	return nil
 }
 
-func (s *server) RestartAsync(done chan error) {
+func (s *Server) RestartAsync(done chan error) {
 	defer interruption.Handle()
 
 	if s.server != nil {
@@ -256,7 +260,11 @@ func (s *server) RestartAsync(done chan error) {
 
 // WithHandler adds a custom handler to the server
 // It will return an error in the Error field if the path is already registered as a handler or a websocket
-func (s *server) WithHandler(path string, handler http.Handler) *server {
+func (s *Server) WithHandler(path string, handler http.Handler) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -274,7 +282,11 @@ func (s *server) WithHandler(path string, handler http.Handler) *server {
 
 // WithHandlerFunc adds a custom handler function to the server
 // It will return an error in the Error field if the path is already registered as a handler or a websocket
-func (s *server) WithHandlerFunc(path string, handler http.HandlerFunc) *server {
+func (s *Server) WithHandlerFunc(path string, handler http.HandlerFunc) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -292,7 +304,11 @@ func (s *server) WithHandlerFunc(path string, handler http.HandlerFunc) *server 
 
 // WithEmbedFS adds a static file server to the server
 // It will serve files from the static embed.FS at the specified entrypoints
-func (s *server) WithEmbedFS(entrypoints []string, static embed.FS) *server {
+func (s *Server) WithEmbedFS(entrypoints []string, static embed.FS) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	fs, err := fs.Sub(static, "static")
 	if err != nil {
 		s.Error = apperror.NewError("failed to create sub fs").AddError(err)
@@ -310,7 +326,11 @@ func (s *server) WithEmbedFS(entrypoints []string, static embed.FS) *server {
 
 // WithFileServer serves files from the specified directory
 // It will fail if the directory does not exist
-func (s *server) WithFileServer(entrypoints []string, path string) *server {
+func (s *Server) WithFileServer(entrypoints []string, path string) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	_, err := os.Stat(path)
 	if err != nil {
 		s.Error = apperror.NewErrorf("directory %s does not exist", path).AddError(err)
@@ -332,7 +352,11 @@ func (s *server) WithFileServer(entrypoints []string, path string) *server {
 // It will return an error in the Error field if the path is already registered as a handler or a websocket
 // The handler function will be called with the http.ResponseWriter, http.Request and *websocket.Conn
 // and will be responsible for handling and closing the connection
-func (s *server) WithWebsocket(path string, handler func(http.ResponseWriter, *http.Request, *websocket.Conn)) *server {
+func (s *Server) WithWebsocket(path string, handler func(http.ResponseWriter, *http.Request, *websocket.Conn)) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	if _, ok := s.handler[path]; ok {
@@ -359,7 +383,7 @@ func (s *server) WithWebsocket(path string, handler func(http.ResponseWriter, *h
 }
 
 // WithHost sets the address of the web server
-func (s *server) WithHost(address string) *server {
+func (s *Server) WithHost(address string) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.host = address
@@ -367,14 +391,15 @@ func (s *server) WithHost(address string) *server {
 }
 
 // WithPort sets the port of the web server
-func (s *server) WithPort(port uint16) *server {
+func (s *Server) WithPort(port uint16) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.port = port
 	return s
 }
 
-func (s *server) WithTLS(config *tls.Config) *server {
+// WithTLS sets the TLS configuration for the web server
+func (s *Server) WithTLS(config *tls.Config) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.tlsConfig = config
@@ -382,22 +407,22 @@ func (s *server) WithTLS(config *tls.Config) *server {
 }
 
 // WithSecurityHeaders adds security headers to the server
-func (s *server) WithSecurityHeaders() *server {
-	s.router.Use(securityHeaderMiddleware)
+func (s *Server) WithSecurityHeaders() *Server {
+	s.router.Use(MiddlewareOrderSecurity, securityHeaderMiddleware)
 	return s
 }
 
 // WithCORSHeaders adds CORS headers to the server
-func (s *server) WithCORSHeaders() *server {
-	s.router.Use(corsHeaderMiddleware)
+func (s *Server) WithCORSHeaders() *Server {
+	s.router.Use(MiddlewareOrderCors, corsHeaderMiddleware)
 	return s
 }
 
 // WithHeader adds a custom header to the server
-func (s *server) WithHeader(key, value string) *server {
+func (s *Server) WithHeader(key, value string) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(func(next http.Handler) http.Handler {
+	s.router.Use(MiddlewareOrderDefault, func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(key, value)
 			next.ServeHTTP(w, r)
@@ -407,10 +432,10 @@ func (s *server) WithHeader(key, value string) *server {
 }
 
 // WithHeaders adds multiple custom headers to the server
-func (s *server) WithHeaders(headers map[string]string) *server {
+func (s *Server) WithHeaders(headers map[string]string) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(func(next http.Handler) http.Handler {
+	s.router.Use(MiddlewareOrderDefault, func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			for key, value := range headers {
 				w.Header().Set(key, value)
@@ -422,14 +447,19 @@ func (s *server) WithHeaders(headers map[string]string) *server {
 }
 
 // WithGzip enables gzip compression for the server
-func (s *server) WithGzip() *server {
+func (s *Server) WithGzip() *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(gziphandler.GzipHandler)
+	s.router.Use(MiddlewareOrderGzip, gziphandler.GzipHandler)
 	return s
 }
 
-func (s *server) WithGzipLevel(level int) *server {
+// WithGzipLevel enables gzip compression with a specific level for the server
+func (s *Server) WithGzipLevel(level int) *Server {
+	if s.Error != nil {
+		return s
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	handler, err := gziphandler.NewGzipLevelHandler(level)
@@ -438,29 +468,39 @@ func (s *server) WithGzipLevel(level int) *server {
 		return s
 	}
 
-	s.router.Use(handler)
+	s.router.Use(MiddlewareOrderGzip, handler)
 	return s
 }
 
 // WithLog adds a logging middleware to the server
-func (s *server) WithLog() *server {
+func (s *Server) WithLog() *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(logMiddleware)
+	s.router.Use(MiddlewareOrderLog, logMiddleware)
 	return s
 }
 
 // WithCustomMiddleware adds a custom middleware to the server
-func (s *server) WithCustomMiddleware(middleware Middleware) *server {
+func (s *Server) WithCustomMiddleware(middleware Middleware) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	s.router.Use(middleware)
+	s.router.Use(MiddlewareOrderDefault, middleware)
+	return s
+}
+
+// WithCustomMiddlewareOrder adds a custom middleware to the server with a specific order
+// The order is a int8 value that determines the order of the middleware 0 is the original handler,
+// -128 is the beginning of the chain, and 127 is the end of the chain
+func (s *Server) WithCustomMiddlewareOrder(order MiddlewareOrder, middleware Middleware) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.router.Use(order, middleware)
 	return s
 }
 
 // WithReadTimeout sets the read timeout for the server
 // It will be used for all requests and connections
-func (s *server) WithReadTimeout(timeout time.Duration) *server {
+func (s *Server) WithReadTimeout(timeout time.Duration) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.readTimeout = timeout
@@ -469,7 +509,7 @@ func (s *server) WithReadTimeout(timeout time.Duration) *server {
 
 // WithReadHeaderTimeout sets the read header timeout for the server
 // It will be used for all requests and connections
-func (s *server) WithReadHeaderTimeout(timeout time.Duration) *server {
+func (s *Server) WithReadHeaderTimeout(timeout time.Duration) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.readHeaderTimeout = timeout
@@ -478,7 +518,7 @@ func (s *server) WithReadHeaderTimeout(timeout time.Duration) *server {
 
 // WithWriteTimeout sets the write timeout for the server
 // It will be used for all requests and connections
-func (s *server) WithWriteTimeout(timeout time.Duration) *server {
+func (s *Server) WithWriteTimeout(timeout time.Duration) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.writeTimeout = timeout
@@ -487,14 +527,16 @@ func (s *server) WithWriteTimeout(timeout time.Duration) *server {
 
 // WithIdleTimeout sets the idle timeout for the server
 // It will be used for all requests and connections
-func (s *server) WithIdleTimeout(timeout time.Duration) *server {
+func (s *Server) WithIdleTimeout(timeout time.Duration) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.idleTimeout = timeout
 	return s
 }
 
-func (s *server) WithErrorLog() *server {
+// WithErrorLog sets the default error log for the server
+// It will log errors at the Error level using the zerolog logger
+func (s *Server) WithErrorLog() *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.errorLog = l.New(zlog.Logger().WithLevel(zerolog.ErrorLevel), "", 0)
@@ -502,9 +544,30 @@ func (s *server) WithErrorLog() *server {
 }
 
 // WithCustomErrorLog sets the error log for the server
-func (s *server) WithCustomErrorLog(logger *l.Logger) *server {
+func (s *Server) WithCustomErrorLog(logger *l.Logger) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.errorLog = logger
+	return s
+}
+
+// WithOnHttpCode adds a custom handler for a specific HTTP status code
+// It will be called after the request is handled and before the response is sent,
+// and is called with the http.ResponseWriter and the http.Request
+func (s *Server) WithOnHttpCode(code int, handler func(http.ResponseWriter, *http.Request)) *Server {
+	if s.Error != nil {
+		return s
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	_, ok := s.onHttpCode[code]
+	if ok {
+		s.Error = apperror.NewErrorf("http code %d is already registered", code)
+		return s
+	}
+
+	s.onHttpCode[code] = handler
+	s.router.OnStatus(code, handler)
 	return s
 }
