@@ -16,17 +16,20 @@ type ResponseWriter struct {
 	status int
 	// buf is a buffer to hold the response body before sending it
 	buf bytes.Buffer
+	// history is a slice to hold the response body history
+	history [][]byte
 	// header is a custom header map to hold response headers
 	header http.Header
 }
 
 func newResponseWriter(w http.ResponseWriter, r *http.Request) *ResponseWriter {
 	return &ResponseWriter{
-		w:      w,
-		r:      r,
-		status: http.StatusOK, // Default status code
-		header: make(http.Header),
-		buf:    bytes.Buffer{},
+		w:       w,
+		r:       r,
+		status:  http.StatusOK, // Default status code
+		header:  make(http.Header),
+		buf:     bytes.Buffer{},
+		history: make([][]byte, 0),
 	}
 }
 
@@ -47,6 +50,11 @@ func (rw *ResponseWriter) WriteHeader(status int) {
 // Write buffers the response body
 func (rw *ResponseWriter) Write(b []byte) (int, error) {
 	return rw.buf.Write(b)
+}
+
+// History returns the history of response bodies written
+func (rw *ResponseWriter) History() [][]byte {
+	return rw.history
 }
 
 // Status returns the status code of the response
@@ -79,5 +87,6 @@ func (rw *ResponseWriter) flush() {
 }
 
 func (rw *ResponseWriter) clear() {
+	rw.history = append(rw.history, rw.buf.Bytes())
 	rw.buf.Reset()
 }

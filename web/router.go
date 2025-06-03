@@ -3,6 +3,7 @@ package web
 import (
 	"net/http"
 	"sort"
+	"strings"
 )
 
 // Router is a custom HTTP router that supports middlewares and status callbacks
@@ -11,7 +12,7 @@ type Router struct {
 	mux         *http.ServeMux
 	middlewares map[MiddlewareOrder][]Middleware
 	sorted      [][]Middleware
-	onStatus    map[int]func(http.ResponseWriter, *http.Request)
+	onStatus    map[string]map[int]func(http.ResponseWriter, *http.Request)
 }
 
 // NewRouter creates a new Router instance
@@ -28,15 +29,9 @@ func NewRouter() *Router {
 // ServeHTTP implements the http.Handler interface for the Router
 // It wraps the request with middlewares and handles the response
 func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	handler := router.wrap(router.mux)
-
 	rw := newResponseWriter(w, r)
-	handler.ServeHTTP(rw, r)
-
-	if fn, ok := router.onStatus[rw.status]; ok {
-		rw.clear()
-		fn(rw, rw.r)
-	}
+	router.wrap(router.mux).ServeHTTP(rw, r)
+	router.handleStatusHooks(rw, r)
 	rw.flush()
 }
 
@@ -62,13 +57,16 @@ func (router *Router) HandleFunc(pattern string, handlerFunc http.HandlerFunc) {
 }
 
 // OnStatus registers a callback function for a specific HTTP status code
-// This function will be called after the response is written if the status matches
+// This function will be called after the response is written if the status and pattern match
 // It allows you to handle specific status codes, such as logging or a custom response
-func (router *Router) OnStatus(status int, fn func(http.ResponseWriter, *http.Request)) {
+func (router *Router) OnStatus(pattern string, status int, fn func(http.ResponseWriter, *http.Request)) {
 	if router.onStatus == nil {
-		router.onStatus = make(map[int]func(http.ResponseWriter, *http.Request))
+		router.onStatus = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
 	}
-	router.onStatus[status] = fn
+	if _, ok := router.onStatus[pattern]; !ok {
+		router.onStatus[pattern] = make(map[int]func(http.ResponseWriter, *http.Request))
+	}
+	router.onStatus[pattern][status] = fn
 }
 
 // wrap applies all registered middlewares to the given handler
@@ -96,4 +94,26 @@ func (router *Router) sort() {
 	for _, order := range orders {
 		router.sorted = append(router.sorted, router.middlewares[order])
 	}
+}
+
+func (router *Router) handleStatusHooks(rw *ResponseWriter, r *http.Request) {
+	if matched := router.matchPattern(r.URL.Path); matched != "" {
+		if fn, ok := router.onStatus[matched][rw.status]; ok {
+			rw.clear()
+			fn(rw, r)
+		}
+	}
+}
+
+func (router *Router) matchPattern(path string) (matched string) {
+	for pattern := range router.onStatus {
+		if pattern == path ||
+			(strings.HasSuffix(pattern, "/") && strings.HasPrefix(path, pattern)) ||
+			pattern == "/" {
+			if len(pattern) > len(matched) {
+				matched = pattern
+			}
+		}
+	}
+	return
 }
