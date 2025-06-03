@@ -57,7 +57,7 @@ func (router *Router) HandleFunc(pattern string, handlerFunc http.HandlerFunc) {
 }
 
 // OnStatus registers a callback function for a specific HTTP status code
-// This function will be called after the response is written if the status matches
+// This function will be called after the response is written if the status and pattern match
 // It allows you to handle specific status codes, such as logging or a custom response
 func (router *Router) OnStatus(pattern string, status int, fn func(http.ResponseWriter, *http.Request)) {
 	if router.onStatus == nil {

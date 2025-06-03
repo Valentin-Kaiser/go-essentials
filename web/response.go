@@ -52,7 +52,7 @@ func (rw *ResponseWriter) Write(b []byte) (int, error) {
 	return rw.buf.Write(b)
 }
 
-// Read reads the buffered response body
+// History returns the history of response bodies written
 func (rw *ResponseWriter) History() [][]byte {
 	return rw.history
 }

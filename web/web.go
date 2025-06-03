@@ -551,7 +551,7 @@ func (s *Server) WithCustomErrorLog(logger *l.Logger) *Server {
 	return s
 }
 
-// WithOnHttpCode adds a custom handler for a specific HTTP status code
+// WithOnHttpCode adds a custom handler for a specific HTTP status code and pattern.
 // It will be called after the request is handled and before the response is sent,
 // and is called with the http.ResponseWriter and the http.Request
 func (s *Server) WithOnHttpCode(code int, pattern []string, handler func(http.ResponseWriter, *http.Request)) *Server {
