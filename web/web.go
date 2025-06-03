@@ -90,7 +90,7 @@ var instance = &Server{
 	handler:           make(map[string]http.Handler),
 	websockets:        make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)),
 	once:              sync.Once{},
-	onHttpCode:        make(map[int]func(http.ResponseWriter, *http.Request)),
+	onHttpCode:        make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
 }
 
 // Server represents a web server with a set of middlewares and handlers
@@ -113,7 +113,7 @@ type Server struct {
 	handler           map[string]http.Handler
 	websockets        map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)
 	once              sync.Once
-	onHttpCode        map[int]func(http.ResponseWriter, *http.Request)
+	onHttpCode        map[string]map[int]func(http.ResponseWriter, *http.Request)
 }
 
 // Instance returns the singleton instance of the web server
@@ -554,20 +554,37 @@ func (s *Server) WithCustomErrorLog(logger *l.Logger) *Server {
 // WithOnHttpCode adds a custom handler for a specific HTTP status code
 // It will be called after the request is handled and before the response is sent,
 // and is called with the http.ResponseWriter and the http.Request
-func (s *Server) WithOnHttpCode(code int, handler func(http.ResponseWriter, *http.Request)) *Server {
+func (s *Server) WithOnHttpCode(code int, pattern []string, handler func(http.ResponseWriter, *http.Request)) *Server {
 	if s.Error != nil {
+		return s
+	}
+
+	if code < http.StatusContinue || code > http.StatusNetworkAuthenticationRequired {
+		s.Error = apperror.NewErrorf("invalid HTTP status code %d", code)
+		return s
+	}
+
+	if len(pattern) == 0 {
+		s.Error = apperror.NewError("no pattern provided for HTTP status code handler")
 		return s
 	}
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	_, ok := s.onHttpCode[code]
-	if ok {
-		s.Error = apperror.NewErrorf("http code %d is already registered", code)
-		return s
-	}
+	for _, p := range pattern {
+		_, ok := s.onHttpCode[p]
+		if !ok {
+			s.onHttpCode[p] = make(map[int]func(http.ResponseWriter, *http.Request))
+		}
 
-	s.onHttpCode[code] = handler
-	s.router.OnStatus(code, handler)
+		_, ok = s.onHttpCode[p][code]
+		if ok {
+			s.Error = apperror.NewErrorf("http code %d is already registered for path %s", code, p)
+			return s
+		}
+
+		s.onHttpCode[p][code] = handler
+		s.router.OnStatus(p, code, handler)
+	}
 	return s
 }
