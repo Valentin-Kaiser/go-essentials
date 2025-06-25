@@ -75,6 +75,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 )
 
@@ -145,29 +146,33 @@ func (s *Server) Start() *Server {
 	}
 
 	if s.tlsConfig != nil {
-		errChan := make(chan error, 1)
-		go func() {
-			if s.redirect != nil {
+		g, _ := errgroup.WithContext(context.Background())
+		if s.redirect != nil {
+			g.Go(func() error {
 				log.Info().Msgf("[Web] redirecting HTTP to HTTPS at %s", s.redirect.Addr)
 				err := s.redirect.ListenAndServe()
 				if err != nil && err != http.ErrServerClosed {
-					errChan <- apperror.NewError("failed to start redirect server").AddError(err)
+					return apperror.NewError("failed to start redirect server").AddError(err)
 				}
-			}
-		}()
+				return nil
+			})
+		}
 
-		go func() {
+		g.Go(func() error {
 			s.server.TLSConfig = s.tlsConfig
-			log.Info().Msgf("[Web] listening on https at %s:%d", s.host, s.port)
 			s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
+			log.Info().Msgf("[Web] listening on https at %s", s.server.Addr)
+
 			err := s.server.ListenAndServeTLS("", "")
 			if err != nil && err != http.ErrServerClosed {
-				errChan <- apperror.NewError("failed to start webserver").AddError(err)
+				return apperror.NewError("failed to start webserver").AddError(err)
 			}
-			errChan <- nil
-		}()
+			return nil
+		})
 
-		s.Error = <-errChan
+		if err := g.Wait(); err != nil {
+			s.Error = err
+		}
 		return s
 	}
 
