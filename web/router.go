@@ -16,8 +16,8 @@ import (
 type Router struct {
 	mux              *http.ServeMux
 	canonicalDomain  string
-	middlewares      map[MiddlewareOrder][]Middleware
 	sorted           [][]Middleware
+	middlewares      map[MiddlewareOrder][]Middleware
 	onStatus         map[string]map[int]func(http.ResponseWriter, *http.Request)
 	onStatusPatterns map[string]any
 	limits           map[string]*rate.Limiter
@@ -185,7 +185,6 @@ func (router *Router) honeypot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info().Str("ip", ip.String()).Msg("honeypot accessed")
 	if !router.ipInList(ip, router.whitelist) {
 		cidr := ip.String() + "/32"
 		if ip.To4() == nil {
@@ -198,6 +197,7 @@ func (router *Router) honeypot(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		log.Debug().Str("ip", network.String()).Msg("honeypot triggered, blocking IP address")
 		router.blacklist[network.String()] = network
 		if router.honeypotCallback != nil {
 			router.honeypotCallback(router.blacklist)
