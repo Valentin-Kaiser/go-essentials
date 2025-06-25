@@ -666,7 +666,10 @@ func (s *Server) SetWhitelist(list []string) *Server {
 		return s
 	}
 
-	s.router.setWhitelist(list)
+	err := s.router.setWhitelist(list)
+	if err != nil {
+		s.Error = apperror.Wrap(err)
+	}
 	return s
 }
 
@@ -680,7 +683,10 @@ func (s *Server) SetBlacklist(list []string) *Server {
 		return s
 	}
 
-	s.router.setBlacklist(list)
+	err := s.router.setBlacklist(list)
+	if err != nil {
+		s.Error = apperror.Wrap(err)
+	}
 	return s
 }
 
