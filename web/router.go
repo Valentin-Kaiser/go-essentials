@@ -1,26 +1,44 @@
 package web
 
 import (
+	"net"
 	"net/http"
 	"sort"
 	"strings"
+
+	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/time/rate"
 )
 
 // Router is a custom HTTP router that supports middlewares and status callbacks
 // It implements the http.Handler interface and allows for flexible request handling
 type Router struct {
-	mux         *http.ServeMux
-	middlewares map[MiddlewareOrder][]Middleware
-	sorted      [][]Middleware
-	onStatus    map[string]map[int]func(http.ResponseWriter, *http.Request)
+	mux              *http.ServeMux
+	canonicalDomain  string
+	middlewares      map[MiddlewareOrder][]Middleware
+	sorted           [][]Middleware
+	onStatus         map[string]map[int]func(http.ResponseWriter, *http.Request)
+	onStatusPatterns map[string]any
+	limits           map[string]*rate.Limiter
+	limitedPatterns  map[string]any
+	whitelist        map[string]*net.IPNet
+	blacklist        map[string]*net.IPNet
+	honeypotCallback func(map[string]*net.IPNet)
 }
 
 // NewRouter creates a new Router instance
 // It initializes the ServeMux and the middlewares map
 func NewRouter() *Router {
 	r := &Router{
-		mux:         http.NewServeMux(),
-		middlewares: make(map[MiddlewareOrder][]Middleware),
+		mux:              http.NewServeMux(),
+		middlewares:      make(map[MiddlewareOrder][]Middleware),
+		onStatus:         make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
+		onStatusPatterns: make(map[string]any),
+		limits:           make(map[string]*rate.Limiter),
+		limitedPatterns:  make(map[string]any),
+		whitelist:        make(map[string]*net.IPNet),
+		blacklist:        make(map[string]*net.IPNet),
 	}
 
 	return r
@@ -30,6 +48,9 @@ func NewRouter() *Router {
 // It wraps the request with middlewares and handles the response
 func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rw := newResponseWriter(w, r)
+	router.block(rw, r)
+	router.canonicalRedirect(rw, r)
+	router.rateLimit(rw, r)
 	router.wrap(router.mux).ServeHTTP(rw, r)
 	router.handleStatusHooks(rw, r)
 	rw.flush()
@@ -60,13 +81,27 @@ func (router *Router) HandleFunc(pattern string, handlerFunc http.HandlerFunc) {
 // This function will be called after the response is written if the status and pattern match
 // It allows you to handle specific status codes, such as logging or a custom response
 func (router *Router) OnStatus(pattern string, status int, fn func(http.ResponseWriter, *http.Request)) {
-	if router.onStatus == nil {
-		router.onStatus = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
-	}
 	if _, ok := router.onStatus[pattern]; !ok {
 		router.onStatus[pattern] = make(map[int]func(http.ResponseWriter, *http.Request))
 	}
 	router.onStatus[pattern][status] = fn
+	router.onStatusPatterns[pattern] = nil
+}
+
+// registerRateLimit applies a rate limit to the given pattern
+// It uses the golang.org/x/time/rate package to limit the number of requests
+func (router *Router) registerRateLimit(pattern string, limit rate.Limit, burst int) error {
+	if limit <= 0 || burst <= 0 {
+		return apperror.NewErrorf("invalid rate limit or burst value: limit=%v, burst=%d", limit, burst)
+	}
+
+	if _, exists := router.limits[pattern]; exists {
+		return apperror.NewErrorf("pattern %s is already rate limited", pattern)
+	}
+
+	router.limits[pattern] = rate.NewLimiter(limit, burst)
+	router.limitedPatterns[pattern] = nil
+	return nil
 }
 
 // wrap applies all registered middlewares to the given handler
@@ -97,7 +132,7 @@ func (router *Router) sort() {
 }
 
 func (router *Router) handleStatusHooks(rw *ResponseWriter, r *http.Request) {
-	if matched := router.matchPattern(r.URL.Path); matched != "" {
+	if matched := router.matchPattern(r.URL.Path, router.onStatusPatterns); matched != "" {
 		if fn, ok := router.onStatus[matched][rw.status]; ok {
 			rw.clear()
 			fn(rw, r)
@@ -105,8 +140,117 @@ func (router *Router) handleStatusHooks(rw *ResponseWriter, r *http.Request) {
 	}
 }
 
-func (router *Router) matchPattern(path string) (matched string) {
-	for pattern := range router.onStatus {
+func (router *Router) rateLimit(w http.ResponseWriter, r *http.Request) {
+	matched := router.matchPattern(r.URL.Path, router.limitedPatterns)
+	if matched != "" {
+		if !router.limits[matched].Allow() {
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+	}
+}
+
+func (router *Router) canonicalRedirect(w http.ResponseWriter, r *http.Request) {
+	if router.canonicalDomain == "" {
+		return
+	}
+
+	addr := strings.Split(r.Host, ":")
+
+	port := ""
+	domain := addr[0]
+	if len(addr) > 1 {
+		port = ":" + addr[1]
+	}
+
+	if domain != router.canonicalDomain {
+		protocol := "http"
+		if r.TLS != nil {
+			protocol = "https"
+		}
+
+		log.Trace().Str("host", r.Host).Str("domain", router.canonicalDomain).Str("port", port).Str("protocol", protocol).Msg("redirecting to canonical domain")
+		http.Redirect(w, r, protocol+"://"+router.canonicalDomain+port+r.RequestURI, http.StatusMovedPermanently)
+		return
+	}
+}
+
+func (router *Router) honeypot(w http.ResponseWriter, r *http.Request) {
+	ipStr := router.clientIP(r)
+
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		log.Warn().Str("ip", ipStr).Msg("honeypot accessed with invalid IP address")
+		http.Error(w, "Invalid IP address", http.StatusBadRequest)
+		return
+	}
+
+	log.Info().Str("ip", ip.String()).Msg("honeypot accessed")
+	if !router.ipInList(ip, router.whitelist) {
+		cidr := ip.String() + "/32"
+		if ip.To4() == nil {
+			cidr = ip.String() + "/128" // Use /128 for IPv6 addresses
+		}
+
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			log.Error().Err(err).Str("ip", cidr).Msg("failed to parse IP address for honeypot")
+			return
+		}
+
+		router.blacklist[network.String()] = network
+		if router.honeypotCallback != nil {
+			router.honeypotCallback(router.blacklist)
+		}
+	}
+}
+
+// block blocks all requests to the router coming from a IP address defined in the blacklist
+func (router *Router) block(w http.ResponseWriter, r *http.Request) {
+	ipStr := router.clientIP(r)
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		log.Warn().Str("ip", ipStr).Msg("blocked request with invalid IP address")
+		http.Error(w, "Invalid IP address", http.StatusBadRequest)
+		return
+	}
+
+	if router.ipInList(ip, router.whitelist) {
+		return // If the IP is whitelisted, do not block it
+	}
+	if router.ipInList(ip, router.blacklist) {
+		log.Warn().Str("ip", ip.String()).Msg("blocked request from IP address")
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+}
+
+func (router *Router) setWhitelist(entries []string) error {
+	networks, err := router.parseIPList(entries)
+	if err != nil {
+		return apperror.Wrap(err)
+	}
+	router.whitelist = make(map[string]*net.IPNet, len(networks))
+	for _, network := range networks {
+		router.whitelist[network.String()] = network
+	}
+	return nil
+}
+
+func (router *Router) setBlacklist(entries []string) error {
+	networks, err := router.parseIPList(entries)
+	if err != nil {
+		return apperror.Wrap(err)
+	}
+	router.blacklist = make(map[string]*net.IPNet, len(networks))
+	for _, network := range networks {
+		router.blacklist[network.String()] = network
+	}
+	return nil
+}
+
+func (router *Router) matchPattern(path string, patterns map[string]any) (matched string) {
+	for pattern := range patterns {
 		if pattern == path ||
 			(strings.HasSuffix(pattern, "/") && strings.HasPrefix(path, pattern)) ||
 			pattern == "/" {
@@ -116,4 +260,55 @@ func (router *Router) matchPattern(path string) (matched string) {
 		}
 	}
 	return
+}
+
+func (router *Router) clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
+	}
+
+	if xRealIP := r.Header.Get("X-Real-IP"); xRealIP != "" {
+		return strings.TrimSpace(xRealIP)
+	}
+
+	if r.RemoteAddr != "" {
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			return r.RemoteAddr
+		}
+		return host
+	}
+
+	return ""
+}
+
+func (router *Router) ipInList(ip net.IP, list map[string]*net.IPNet) bool {
+	for _, network := range list {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func (router *Router) parseIPList(entries []string) ([]*net.IPNet, error) {
+	var list []*net.IPNet
+	for _, entry := range entries {
+		if !strings.Contains(entry, "/") {
+			if ip := net.ParseIP(entry); ip != nil {
+				if ip.To4() != nil {
+					entry += "/32" // Use /32 for IPv4 addresses
+				} else {
+					entry += "/128" // Use /128 for IPv6 addresses
+				}
+			}
+		}
+		_, network, err := net.ParseCIDR(entry)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, network)
+	}
+	return list, nil
 }

@@ -54,11 +54,13 @@ package web
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509/pkix"
 	"embed"
 	"fmt"
 	"io"
 	"io/fs"
 	l "log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -68,10 +70,12 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/Valentin-Kaiser/go-core/interruption"
+	"github.com/Valentin-Kaiser/go-core/security"
 	"github.com/Valentin-Kaiser/go-core/zlog"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/time/rate"
 )
 
 var instance = &Server{
@@ -99,6 +103,7 @@ type Server struct {
 	// It will be nil if no error occurred
 	Error             error
 	server            *http.Server
+	redirect          *http.Server // Server for protocol redirects (HTTP to HTTPS)
 	router            *Router
 	mutex             sync.RWMutex
 	host              string
@@ -140,13 +145,29 @@ func (s *Server) Start() *Server {
 	}
 
 	if s.tlsConfig != nil {
-		s.server.TLSConfig = s.tlsConfig
-		log.Info().Msgf("[Web] listening on https at %s:%d", s.host, s.port)
-		s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
-		err := s.server.ListenAndServeTLS("", "")
-		if err != nil && err != http.ErrServerClosed {
-			s.Error = apperror.NewError("failed to start webserver").AddError(err)
-		}
+		errChan := make(chan error, 1)
+		go func() {
+			if s.redirect != nil {
+				log.Info().Msgf("[Web] redirecting HTTP to HTTPS at %s", s.redirect.Addr)
+				err := s.redirect.ListenAndServe()
+				if err != nil && err != http.ErrServerClosed {
+					errChan <- apperror.NewError("failed to start redirect server").AddError(err)
+				}
+			}
+		}()
+
+		go func() {
+			s.server.TLSConfig = s.tlsConfig
+			log.Info().Msgf("[Web] listening on https at %s:%d", s.host, s.port)
+			s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
+			err := s.server.ListenAndServeTLS("", "")
+			if err != nil && err != http.ErrServerClosed {
+				errChan <- apperror.NewError("failed to start webserver").AddError(err)
+			}
+			errChan <- nil
+		}()
+
+		s.Error = <-errChan
 		return s
 	}
 
@@ -406,6 +427,74 @@ func (s *Server) WithTLS(config *tls.Config) *Server {
 	return s
 }
 
+func (s *Server) WithSelfSignedTLS() *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.Error != nil {
+		return s
+	}
+
+	cert, pool, err := security.GenerateSelfSignedCertificate(pkix.Name{CommonName: s.host})
+	if err != nil {
+		s.Error = apperror.Wrap(err)
+		return s
+	}
+	s.tlsConfig = security.NewTLSConfig(cert, pool, tls.NoClientCert)
+	return s
+}
+
+// WithRedirectToHTTPS sets up a redirect server that redirects HTTP requests to HTTPS
+// It must be called after WithPort and WithTLS or else it will return an error
+func (s *Server) WithRedirectToHTTPS(port uint16) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.Error != nil {
+		return s
+	}
+
+	if s.tlsConfig == nil {
+		s.Error = apperror.NewError("redirect server requires TLS configuration to be set")
+		return s
+	}
+
+	if s.port == port {
+		s.Error = apperror.NewErrorf("redirect server port %d cannot be the same as the main server port", port)
+		return s
+	}
+
+	if s.redirect != nil {
+		s.Error = apperror.NewErrorf("redirect server is already set to %d", port)
+		return s
+	}
+
+	s.redirect = &http.Server{
+		Addr: fmt.Sprintf("%s:%d", s.host, port),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			h, _, err := net.SplitHostPort(r.Host)
+			if err != nil {
+				log.Error().Err(apperror.Wrap(err)).Msg("failed to split host and port from request")
+				http.Error(w, "Bad Request", http.StatusBadRequest)
+				return
+			}
+			ip := net.ParseIP(h)
+			if ip != nil && ip.To16() != nil && ip.To4() == nil {
+				h = "[" + ip.String() + "]"
+			}
+			log.Trace().Msgf("[Web] redirecting HTTP request from %s to HTTPS", r.URL.Path)
+			http.Redirect(w, r, fmt.Sprintf("https://%s:%d%s", h, s.port, r.URL.Path), http.StatusMovedPermanently)
+		}),
+		ErrorLog:          s.errorLog,
+		ReadTimeout:       s.readTimeout,
+		ReadHeaderTimeout: s.readHeaderTimeout,
+		WriteTimeout:      s.writeTimeout,
+		IdleTimeout:       s.idleTimeout,
+	}
+
+	return s
+}
+
 // WithSecurityHeaders adds security headers to the server
 func (s *Server) WithSecurityHeaders() *Server {
 	s.router.Use(MiddlewareOrderSecurity, securityHeaderMiddleware)
@@ -477,6 +566,116 @@ func (s *Server) WithLog() *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.router.Use(MiddlewareOrderLog, logMiddleware)
+	return s
+}
+
+// WithRateLimit applies a rate limit to the given pattern
+// The limiter allows `count` events per `period` duration
+// Example: WithRateLimit("/api", 10, time.Minute) allows 10 requests per minute
+func (s *Server) WithRateLimit(pattern string, count int, period time.Duration) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.Error != nil {
+		return s
+	}
+
+	if count <= 0 || period <= 0 {
+		s.Error = apperror.NewErrorf("invalid rate limit parameters: count=%d, period=%v", count, period)
+		return s
+	}
+
+	err := s.router.registerRateLimit(pattern, rate.Every(period/time.Duration(count)), count)
+	if err != nil {
+		s.Error = apperror.Wrap(err)
+	}
+	return s
+}
+
+func (s *Server) WithCanonicalRedirect(domain string) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.Error != nil {
+		return s
+	}
+
+	if s.router.canonicalDomain != "" {
+		s.Error = apperror.NewErrorf("canonical redirect domain is already set to %s", s.router.canonicalDomain)
+		return s
+	}
+
+	s.router.canonicalDomain = domain
+	return s
+}
+
+// WithHoneypot registers a handler for the given pattern
+// Clients that access this pattern will be blocked
+// This is useful for detecting and blocking malicious bots or crawlers
+func (s *Server) WithHoneypot(pattern string) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.Error != nil {
+		return s
+	}
+
+	if _, ok := s.handler[pattern]; ok {
+		s.Error = apperror.NewErrorf("path %s is already registered as a handler", pattern)
+		return s
+	}
+	if _, ok := s.websockets[pattern]; ok {
+		s.Error = apperror.NewErrorf("path %s is already registered as a websocket", pattern)
+		return s
+	}
+
+	s.router.HandleFunc(pattern, s.router.honeypot)
+	return s
+}
+
+// WithOnHoneypot registers a callback function that will be called when a honeypot is triggered
+// The callback will receives the blocklist used. Useful for persisting the blocklist
+func (s *Server) WithOnHoneypot(callback func(map[string]*net.IPNet)) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.Error != nil {
+		return s
+	}
+
+	if s.router.honeypotCallback != nil {
+		s.Error = apperror.NewError("honeypot callback is already set")
+		return s
+	}
+
+	s.router.honeypotCallback = callback
+	return s
+}
+
+// SetWhitelist registers a whitelist for the server
+// Addresses in the whitelist will be ignored by the rate limit and honey pot
+func (s *Server) SetWhitelist(list []string) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if s.Error != nil {
+		return s
+	}
+
+	s.router.setWhitelist(list)
+	return s
+}
+
+// SetBlacklist registers a blacklist for the server
+// Addresses in the blacklist will be blocked from accessing the server
+// This is useful for blocking known malicious IPs or ranges
+func (s *Server) SetBlacklist(list []string) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if s.Error != nil {
+		return s
+	}
+
+	s.router.setBlacklist(list)
 	return s
 }
 
