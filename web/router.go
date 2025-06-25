@@ -19,9 +19,9 @@ type Router struct {
 	sorted           [][]Middleware
 	middlewares      map[MiddlewareOrder][]Middleware
 	onStatus         map[string]map[int]func(http.ResponseWriter, *http.Request)
-	onStatusPatterns map[string]any
+	onStatusPatterns map[string]struct{}
 	limits           map[string]*rate.Limiter
-	limitedPatterns  map[string]any
+	limitedPatterns  map[string]struct{}
 	whitelist        map[string]*net.IPNet
 	blacklist        map[string]*net.IPNet
 	honeypotCallback func(map[string]*net.IPNet)
@@ -34,9 +34,9 @@ func NewRouter() *Router {
 		mux:              http.NewServeMux(),
 		middlewares:      make(map[MiddlewareOrder][]Middleware),
 		onStatus:         make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
-		onStatusPatterns: make(map[string]any),
+		onStatusPatterns: make(map[string]struct{}),
 		limits:           make(map[string]*rate.Limiter),
-		limitedPatterns:  make(map[string]any),
+		limitedPatterns:  make(map[string]struct{}),
 		whitelist:        make(map[string]*net.IPNet),
 		blacklist:        make(map[string]*net.IPNet),
 	}
@@ -85,7 +85,7 @@ func (router *Router) OnStatus(pattern string, status int, fn func(http.Response
 		router.onStatus[pattern] = make(map[int]func(http.ResponseWriter, *http.Request))
 	}
 	router.onStatus[pattern][status] = fn
-	router.onStatusPatterns[pattern] = nil
+	router.onStatusPatterns[pattern] = struct{}{}
 }
 
 // registerRateLimit applies a rate limit to the given pattern
@@ -100,7 +100,7 @@ func (router *Router) registerRateLimit(pattern string, limit rate.Limit, burst 
 	}
 
 	router.limits[pattern] = rate.NewLimiter(limit, burst)
-	router.limitedPatterns[pattern] = nil
+	router.limitedPatterns[pattern] = struct{}{}
 	return nil
 }
 
@@ -249,7 +249,7 @@ func (router *Router) setBlacklist(entries []string) error {
 	return nil
 }
 
-func (router *Router) matchPattern(path string, patterns map[string]any) (matched string) {
+func (router *Router) matchPattern(path string, patterns map[string]struct{}) (matched string) {
 	for pattern := range patterns {
 		if pattern == path ||
 			(strings.HasSuffix(pattern, "/") && strings.HasPrefix(path, pattern)) ||
