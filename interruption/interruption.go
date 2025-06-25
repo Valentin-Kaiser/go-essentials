@@ -1,4 +1,4 @@
-// interruption provides a simple mechanism for recovering from panics
+// Package interruption provides a simple mechanism for recovering from panics
 // in both the main application and concurrently running goroutines.
 //
 // It ensures that unexpected runtime panics do not crash the application silently,
