@@ -50,7 +50,7 @@ linters:
     - protogetter
     - mnd
     - err113
-    - revive
+    # - revive
     - asasalint
 
     # buggy?

@@ -1,4 +1,4 @@
-// web provides a configurable HTTP web server with built-in support for
+// Package web provides a configurable HTTP web server with built-in support for
 // common middleware patterns, file serving, and WebSocket handling.
 //
 // This package offers a singleton Server instance that can be customized through
@@ -83,7 +83,7 @@ var instance = &Server{
 	port:   80,
 	router: NewRouter(),
 	upgrader: websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
+		CheckOrigin: func(_ *http.Request) bool {
 			return true
 		},
 	},
@@ -95,7 +95,7 @@ var instance = &Server{
 	handler:           make(map[string]http.Handler),
 	websockets:        make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)),
 	once:              sync.Once{},
-	onHttpCode:        make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
+	onHTTPCode:        make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
 }
 
 // Server represents a web server with a set of middlewares and handlers
@@ -119,7 +119,7 @@ type Server struct {
 	handler           map[string]http.Handler
 	websockets        map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)
 	once              sync.Once
-	onHttpCode        map[string]map[int]func(http.ResponseWriter, *http.Request)
+	onHTTPCode        map[string]map[int]func(http.ResponseWriter, *http.Request)
 }
 
 // Instance returns the singleton instance of the web server
@@ -266,6 +266,8 @@ func (s *Server) Restart() error {
 	return nil
 }
 
+// RestartAsync gracefully shuts down the web server and starts it again asynchronously
+// It will wait for all active connections to finish before shutting down
 func (s *Server) RestartAsync(done chan error) {
 	defer interruption.Handle()
 
@@ -432,6 +434,8 @@ func (s *Server) WithTLS(config *tls.Config) *Server {
 	return s
 }
 
+// WithSelfSignedTLS generates a self-signed TLS certificate for the web server
+// It will use the host set by WithHost as the common name for the certificate
 func (s *Server) WithSelfSignedTLS() *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -597,6 +601,9 @@ func (s *Server) WithRateLimit(pattern string, count int, period time.Duration) 
 	return s
 }
 
+// WithCanonicalRedirect sets a canonical redirect domain for the server
+// If a request is made to the server with a different domain, it will be redirected to the canonical domain
+// This is useful for SEO purposes and to avoid duplicate content issues
 func (s *Server) WithCanonicalRedirect(domain string) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -761,10 +768,10 @@ func (s *Server) WithCustomErrorLog(logger *l.Logger) *Server {
 	return s
 }
 
-// WithOnHttpCode adds a custom handler for a specific HTTP status code and pattern.
+// WithOnHTTPCode adds a custom handler for a specific HTTP status code and pattern.
 // It will be called after the request is handled and before the response is sent,
 // and is called with the http.ResponseWriter and the http.Request
-func (s *Server) WithOnHttpCode(code int, pattern []string, handler func(http.ResponseWriter, *http.Request)) *Server {
+func (s *Server) WithOnHTTPCode(code int, pattern []string, handler func(http.ResponseWriter, *http.Request)) *Server {
 	if s.Error != nil {
 		return s
 	}
@@ -782,18 +789,18 @@ func (s *Server) WithOnHttpCode(code int, pattern []string, handler func(http.Re
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	for _, p := range pattern {
-		_, ok := s.onHttpCode[p]
+		_, ok := s.onHTTPCode[p]
 		if !ok {
-			s.onHttpCode[p] = make(map[int]func(http.ResponseWriter, *http.Request))
+			s.onHTTPCode[p] = make(map[int]func(http.ResponseWriter, *http.Request))
 		}
 
-		_, ok = s.onHttpCode[p][code]
+		_, ok = s.onHTTPCode[p][code]
 		if ok {
 			s.Error = apperror.NewErrorf("http code %d is already registered for path %s", code, p)
 			return s
 		}
 
-		s.onHttpCode[p][code] = handler
+		s.onHTTPCode[p][code] = handler
 		s.router.OnStatus(p, code, handler)
 	}
 	return s

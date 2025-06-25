@@ -1,4 +1,4 @@
-// security provides cryptographic utilities and PGP and AES encryption/decryption functionality.
+// Package security provides cryptographic utilities and PGP and AES encryption/decryption functionality.
 //
 // It offers functions for generating cryptographically secure random bytes and passwords,
 // hashing data using SHA256, MD5, and xxHash algorithms, and deriving keys from strings.

@@ -1,4 +1,4 @@
-// flag provides a simple API for defining and parsing command-line flags
+// Package flag provides a simple API for defining and parsing command-line flags
 // in Go applications.
 //
 // It is built on top of the pflag library and includes support
@@ -45,10 +45,14 @@ import (
 )
 
 var (
-	Path    string
-	Help    bool
+	// Path is the default path for the application data
+	Path string
+	// Help indicates whether the help message should be printed
+	Help bool
+	// Version indicates whether the version information should be printed
 	Version bool
-	Debug   bool
+	// Debug indicates whether debug mode is enabled
+	Debug bool
 )
 
 func init() {

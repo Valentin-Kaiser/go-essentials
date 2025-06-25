@@ -2,6 +2,7 @@ package web
 
 import "net/http"
 
+// ErrorCodes contains a list of HTTP status codes that are considered errors.
 var ErrorCodes = []int{
 	http.StatusBadRequest,
 	http.StatusUnauthorized,

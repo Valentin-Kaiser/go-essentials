@@ -1,4 +1,4 @@
-// version provides utilities to manage, retrieve, and validate version
+// Package version provides utilities to manage, retrieve, and validate version
 // information of a Go application at runtime.
 //
 // This package captures key metadata about the application build, including the
@@ -50,13 +50,20 @@ import (
 )
 
 var (
-	GitTag    = "v0.0.0"
+	// GitTag is the release tag of the application, typically in the format "vX.Y.Z".
+	GitTag = "v0.0.0"
+	// GitCommit is the full commit hash of the application at build time.
 	GitCommit = "unknown"
-	GitShort  = "unknown"
+	// GitShort is the short commit hash of the application at build time.
+	GitShort = "unknown"
+	// BuildDate is the date and time when the application was built.
 	BuildDate = "unknown"
+	// GoVersion is the version of the Go runtime used to build the application.
 	GoVersion = runtime.Version()
-	Platform  = runtime.GOOS + "/" + runtime.GOARCH
-	Modules   = make([]*Module, 0)
+	// Platform is the target platform of the application, formatted as "GOOS/GOARCH".
+	Platform = runtime.GOOS + "/" + runtime.GOARCH
+	// Modules is a list of Go modules used in the application, populated from debug.BuildInfo.
+	Modules = make([]*Module, 0)
 )
 
 var regex = regexp.MustCompile(`^v([0-9]+)\.([0-9]+)\.([0-9]+)`)
