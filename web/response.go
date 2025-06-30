@@ -20,6 +20,8 @@ type ResponseWriter struct {
 	history [][]byte
 	// header is a custom header map to hold response headers
 	header http.Header
+
+	hijacked bool // hijacked indicates if the connection has been hijacked
 }
 
 func newResponseWriter(w http.ResponseWriter, r *http.Request) *ResponseWriter {
@@ -68,11 +70,21 @@ func (rw *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if !ok {
 		return nil, nil, errors.New("hijack not supported")
 	}
-	return h.Hijack()
+	conn, rwbuf, err := h.Hijack()
+	if err != nil {
+		return nil, nil, err
+	}
+	rw.hijacked = true
+	rw.clear() // Clear the buffer and history when hijacking
+	return conn, rwbuf, nil
 }
 
 // flush writes the buffered response to the original ResponseWriter
 func (rw *ResponseWriter) flush() {
+	if rw.hijacked {
+		// If the connection has been hijacked, we do not send the response
+		return
+	}
 	for k, vv := range rw.header {
 		for _, v := range vv {
 			rw.w.Header().Add(k, v)
@@ -89,4 +101,5 @@ func (rw *ResponseWriter) flush() {
 func (rw *ResponseWriter) clear() {
 	rw.history = append(rw.history, rw.buf.Bytes())
 	rw.buf.Reset()
+	rw.header = make(http.Header)
 }
