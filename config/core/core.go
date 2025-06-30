@@ -118,6 +118,14 @@ type Config interface {
 // RegisterConfig registers a configuration struct and parses its tags
 // The name is used as the name of the configuration file and the prefix for the environment variables
 func RegisterConfig(name string, c Config) error {
+	if c == nil {
+		return apperror.NewError("the configuration provided is nil")
+	}
+
+	if reflect.TypeOf(c).Kind() != reflect.Ptr || reflect.TypeOf(c).Elem().Kind() != reflect.Struct {
+		return apperror.NewErrorf("the configuration provided is not a pointer to a struct, got %T", c)
+	}
+
 	configname = name
 	viper.SetEnvPrefix(strings.ReplaceAll(configname, "-", "_"))
 	viper.SetTypeByDefaultValue(true)
