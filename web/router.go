@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/rs/zerolog/log"
@@ -20,11 +21,29 @@ type Router struct {
 	middlewares      map[MiddlewareOrder][]Middleware
 	onStatus         map[string]map[int]func(http.ResponseWriter, *http.Request)
 	onStatusPatterns map[string]struct{}
-	limits           map[string]*rate.Limiter
+	limits           map[string]*limitStore
 	limitedPatterns  map[string]struct{}
 	whitelist        map[string]*net.IPNet
 	blacklist        map[string]*net.IPNet
 	honeypotCallback func(map[string]*net.IPNet)
+}
+
+type limitStore struct {
+	mutex sync.Mutex
+	limit rate.Limit
+	burst int
+	state map[string]*rate.Limiter
+}
+
+func (ls *limitStore) limiter(ip string) *rate.Limiter {
+	ls.mutex.Lock()
+	defer ls.mutex.Unlock()
+	if limiter, exists := ls.state[ip]; exists {
+		return limiter
+	}
+	limiter := rate.NewLimiter(ls.limit, ls.burst)
+	ls.state[ip] = limiter
+	return limiter
 }
 
 // NewRouter creates a new Router instance
@@ -35,7 +54,7 @@ func NewRouter() *Router {
 		middlewares:      make(map[MiddlewareOrder][]Middleware),
 		onStatus:         make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
 		onStatusPatterns: make(map[string]struct{}),
-		limits:           make(map[string]*rate.Limiter),
+		limits:           make(map[string]*limitStore),
 		limitedPatterns:  make(map[string]struct{}),
 		whitelist:        make(map[string]*net.IPNet),
 		blacklist:        make(map[string]*net.IPNet),
@@ -48,10 +67,12 @@ func NewRouter() *Router {
 // It wraps the request with middlewares and handles the response
 func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rw := newResponseWriter(w, r)
-	router.block(rw, r)
-	router.canonicalRedirect(rw, r)
-	router.rateLimit(rw, r)
-	router.wrap(router.mux).ServeHTTP(rw, r)
+	blocked := router.block(rw, r)
+	if !blocked {
+		router.canonicalRedirect(rw, r)
+		router.rateLimit(rw, r)
+		router.wrap(router.mux).ServeHTTP(rw, r)
+	}
 	router.handleStatusHooks(rw, r)
 	rw.flush()
 }
@@ -99,7 +120,11 @@ func (router *Router) registerRateLimit(pattern string, limit rate.Limit, burst 
 		return apperror.NewErrorf("pattern %s is already rate limited", pattern)
 	}
 
-	router.limits[pattern] = rate.NewLimiter(limit, burst)
+	router.limits[pattern] = &limitStore{
+		limit: limit,
+		burst: burst,
+		state: make(map[string]*rate.Limiter),
+	}
 	router.limitedPatterns[pattern] = struct{}{}
 	return nil
 }
@@ -143,7 +168,15 @@ func (router *Router) handleStatusHooks(rw *ResponseWriter, r *http.Request) {
 func (router *Router) rateLimit(w http.ResponseWriter, r *http.Request) {
 	matched := router.matchPattern(r.URL.Path, router.limitedPatterns)
 	if matched != "" {
-		if !router.limits[matched].Allow() {
+		ip := router.clientIP(r)
+		if ip == "" {
+			log.Warn().Msg("rate limiting failed, no client IP found")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		limiter := router.limits[matched].limiter(ip)
+		if !limiter.Allow() {
 			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 			return
 		}
@@ -185,6 +218,7 @@ func (router *Router) honeypot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Trace().Str("ip", ip.String()).Msg("honeypot triggered, checking IP address")
 	if !router.ipInList(ip, router.whitelist) {
 		cidr := ip.String() + "/32"
 		if ip.To4() == nil {
@@ -206,23 +240,22 @@ func (router *Router) honeypot(w http.ResponseWriter, r *http.Request) {
 }
 
 // block blocks all requests to the router coming from a IP address defined in the blacklist
-func (router *Router) block(w http.ResponseWriter, r *http.Request) {
+func (router *Router) block(w http.ResponseWriter, r *http.Request) bool {
 	ipStr := router.clientIP(r)
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		log.Warn().Str("ip", ipStr).Msg("blocked request with invalid IP address")
 		http.Error(w, "Invalid IP address", http.StatusBadRequest)
-		return
+		return true
 	}
 
-	if router.ipInList(ip, router.whitelist) {
-		return // If the IP is whitelisted, do not block it
-	}
-	if router.ipInList(ip, router.blacklist) {
-		log.Warn().Str("ip", ip.String()).Msg("blocked request from IP address")
+	if !router.ipInList(ip, router.whitelist) && router.ipInList(ip, router.blacklist) {
+		log.Trace().Str("ip", ip.String()).Msg("blocked request from IP address")
 		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
+		return true
 	}
+
+	return false
 }
 
 func (router *Router) setWhitelist(entries []string) error {
@@ -306,7 +339,7 @@ func (router *Router) parseIPList(entries []string) ([]*net.IPNet, error) {
 		}
 		_, network, err := net.ParseCIDR(entry)
 		if err != nil {
-			return nil, err
+			return nil, apperror.NewErrorf("failed to parse CIDR entry '%s'", entry).AddError(err)
 		}
 		list = append(list, network)
 	}
