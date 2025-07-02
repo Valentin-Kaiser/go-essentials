@@ -78,7 +78,10 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var instance *Server
+var (
+	mutex    sync.RWMutex
+	instance *Server
+)
 
 // Server represents a web server with a set of middlewares and handlers
 type Server struct {
@@ -100,7 +103,6 @@ type Server struct {
 	errorLog          *l.Logger
 	handler           map[string]http.Handler
 	websockets        map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)
-	once              sync.Once
 	onHTTPCode        map[string]map[int]func(http.ResponseWriter, *http.Request)
 }
 
@@ -110,11 +112,15 @@ func init() {
 
 // Instance returns the singleton instance of the web server
 func Instance() *Server {
+	mutex.RLock()
+	defer mutex.RUnlock()
 	return instance
 }
 
 // New creates a new singleton instance of the web server
 func New() *Server {
+	mutex.Lock()
+	defer mutex.Unlock()
 	instance = &Server{
 		port:   80,
 		router: NewRouter(),
@@ -130,7 +136,6 @@ func New() *Server {
 		errorLog:          l.New(io.Discard, "", 0),
 		handler:           make(map[string]http.Handler),
 		websockets:        make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)),
-		once:              sync.Once{},
 		onHTTPCode:        make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
 	}
 
