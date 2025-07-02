@@ -78,24 +78,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var instance = &Server{
-	port:   80,
-	router: NewRouter(),
-	upgrader: websocket.Upgrader{
-		CheckOrigin: func(_ *http.Request) bool {
-			return true
-		},
-	},
-	readTimeout:       15 * time.Second,
-	readHeaderTimeout: 5 * time.Second,
-	writeTimeout:      15 * time.Second,
-	idleTimeout:       120 * time.Second,
-	errorLog:          l.New(io.Discard, "", 0),
-	handler:           make(map[string]http.Handler),
-	websockets:        make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)),
-	once:              sync.Once{},
-	onHTTPCode:        make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
-}
+var instance *Server
 
 // Server represents a web server with a set of middlewares and handlers
 type Server struct {
@@ -121,8 +104,36 @@ type Server struct {
 	onHTTPCode        map[string]map[int]func(http.ResponseWriter, *http.Request)
 }
 
+func init() {
+	New()
+}
+
 // Instance returns the singleton instance of the web server
 func Instance() *Server {
+	return instance
+}
+
+// New creates a new singleton instance of the web server
+func New() *Server {
+	instance = &Server{
+		port:   80,
+		router: NewRouter(),
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(_ *http.Request) bool {
+				return true
+			},
+		},
+		readTimeout:       15 * time.Second,
+		readHeaderTimeout: 5 * time.Second,
+		writeTimeout:      15 * time.Second,
+		idleTimeout:       120 * time.Second,
+		errorLog:          l.New(io.Discard, "", 0),
+		handler:           make(map[string]http.Handler),
+		websockets:        make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)),
+		once:              sync.Once{},
+		onHTTPCode:        make(map[string]map[int]func(http.ResponseWriter, *http.Request)),
+	}
+
 	return instance
 }
 
