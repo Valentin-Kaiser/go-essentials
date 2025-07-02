@@ -55,7 +55,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509/pkix"
-	"embed"
 	"fmt"
 	"io"
 	"io/fs"
@@ -330,20 +329,15 @@ func (s *Server) WithHandlerFunc(path string, handler http.HandlerFunc) *Server 
 	return s
 }
 
-// WithEmbedFS adds a static file server to the server
-// It will serve files from the static embed.FS at the specified entrypoints
-func (s *Server) WithEmbedFS(entrypoints []string, static embed.FS) *Server {
+// WithFS serves files from the specified filesystem
+// It will return an error in the Error field if the entrypoint is already registered as a handler or a websocket
+func (s *Server) WithFS(entrypoints []string, filesystem fs.FS) *Server {
 	if s.Error != nil {
 		return s
 	}
 
-	fs, err := fs.Sub(static, "static")
-	if err != nil {
-		s.Error = apperror.NewError("failed to create sub fs").AddError(err)
-		return s
-	}
 	for _, entrypoint := range entrypoints {
-		err := s.WithHandler(entrypoint, http.FileServer(http.FS(fs))).Error
+		err := s.WithHandler(entrypoint, http.FileServer(http.FS(filesystem))).Error
 		if err != nil {
 			s.Error = apperror.Wrap(err)
 			return s
@@ -367,7 +361,7 @@ func (s *Server) WithFileServer(entrypoints []string, path string) *Server {
 
 	fs := http.FileServer(http.Dir(filepath.Clean(path)))
 	for _, entrypoint := range entrypoints {
-		err := s.WithHandler(entrypoint, http.StripPrefix(entrypoint, fs)).Error
+		err := s.WithHandler(entrypoint, fs).Error
 		if err != nil {
 			s.Error = apperror.Wrap(err)
 			return s
