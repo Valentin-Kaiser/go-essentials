@@ -161,6 +161,48 @@ func (e Error) Error() string {
 	return fmt.Sprintf(ErrorFormat, e.Message, errors)
 }
 
+// Split separates the error into its components: message, trace, and additional errors
+// It returns the message, a slice of trace strings, and a slice of additional errors
+func Split(err error) (string, []string, []error) {
+	aerr, ok := err.(Error)
+	if !ok {
+		return err.Error(), nil, nil
+	}
+
+	if aerr.Message == "" && len(aerr.Trace) == 0 && len(aerr.Errors) == 0 {
+		return "", nil, nil
+	}
+
+	return aerr.Message, aerr.Trace, aerr.Errors
+}
+
+// Parse takes a string representation of an error and returns an Error instance
+// The string should be formatted with TraceDelimiter to separate the trace entries
+func Parse(str string) Error {
+	parts := strings.Split(str, TraceDelimiter)
+	if len(parts) < 2 {
+		return NewError(str)
+	}
+
+	t := parts[:len(parts)-1]
+	message := parts[len(parts)-1]
+
+	e := Error{
+		Message: message,
+		Trace:   t,
+	}
+
+	if len(parts) > 2 {
+		errors := parts[1 : len(parts)-1]
+		for _, errStr := range errors {
+			e.Errors = append(e.Errors, NewError(errStr))
+		}
+	}
+
+	e.Trace = trace(e)
+	return e
+}
+
 // trace generates a stack trace for the error
 // It uses runtime.Caller to get the file name and line number
 func trace(e Error) []string {
