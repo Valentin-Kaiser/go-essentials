@@ -12,7 +12,7 @@ import (
 var (
 	securityHeaders = map[string]string{
 		"ETag":                      version.GitCommit,
-		"Cache-Control":             "public, must-revalidate, max-age=86400",
+		"Cache-Control":             "public, must-revalidate, max-age=86400, stale-while-revalidate=3600, stale-if-error=86400",
 		"Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
 		"X-Content-Type-Options":    "nosniff",
 		"X-Frame-Options":           "DENY",
@@ -59,6 +59,16 @@ const (
 // It is used to prevent attacks like XSS, clickjacking, etc.
 func securityHeaderMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check If-None-Match header for ETag validation
+		if inm := r.Header.Get("If-None-Match"); inm != "" {
+			// Compare with current ETag (version.GitCommit)
+			if inm == version.GitCommit || inm == `"`+version.GitCommit+`"` {
+				// ETag matches, return 304 Not Modified
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
+
 		for key, value := range securityHeaders {
 			w.Header().Set(key, value)
 		}
