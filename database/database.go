@@ -233,12 +233,8 @@ func connect(config Config) (*gorm.DB, error) {
 
 	switch config.Driver {
 	case "sqlite":
-		var dbPath string
-		if config.Name == ":memory:" {
-			// Use in-memory SQLite database
-			dbPath = ":memory:?cache=shared"
-		} else {
-			// Use file-based SQLite database
+		dbPath := ":memory:?cache=shared"
+		if config.Name != ":memory:" {
 			if _, err := os.Stat(flag.Path); os.IsNotExist(err) {
 				err := os.Mkdir(flag.Path, 0750)
 				if err != nil {
