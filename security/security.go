@@ -90,6 +90,13 @@ func GetRandomBytesBase64(size uint) (string, error) {
 
 // GenerateRandomPassword generates a random password of the specified length
 func GenerateRandomPassword(length int) (string, error) {
+	if length < 0 {
+		return "", apperror.NewError("password length cannot be negative")
+	}
+	if length == 0 {
+		return "", nil
+	}
+
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-#!+/")
 	gen := make([]rune, length)
 

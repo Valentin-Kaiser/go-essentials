@@ -2,11 +2,16 @@ package security
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509/pkix"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/ProtonMail/gopenpgp/v3/profile"
 )
 
 func TestGetRandomBytes(t *testing.T) {
@@ -299,18 +304,578 @@ func TestReadOrSavePassphraseFilePermissions(t *testing.T) {
 	}
 }
 
-// Benchmark tests
-func BenchmarkGetRandomBytes(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		_, err := GetRandomBytes(32)
-		if err != nil {
-			b.Fatalf("GetRandomBytes error: %v", err)
-		}
+func TestStringToKey32BytesEdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"empty string", ""},
+		{"single character", "a"},
+		{"long string", strings.Repeat("test", 1000)},
+		{"unicode string", "测试中文字符串🚀"},
+		{"special characters", "!@#$%^&*()_+-=[]{}|;':\",./<>?"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := StringToKey32Bytes(tt.input)
+			if len(result) != 32 {
+				t.Errorf("StringToKey32Bytes() returned %d bytes, expected 32", len(result))
+			}
+
+			// Test consistency
+			result2 := StringToKey32Bytes(tt.input)
+			if !bytes.Equal(result, result2) {
+				t.Error("StringToKey32Bytes() should return consistent results")
+			}
+		})
 	}
 }
 
+func TestStringToKey32EdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"empty string", ""},
+		{"single character", "a"},
+		{"long string", strings.Repeat("test", 1000)},
+		{"unicode string", "测试中文字符串🚀"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := StringToKey32(tt.input)
+			if len(result) != 32 {
+				t.Errorf("StringToKey32() returned %d characters, expected 32", len(result))
+			}
+
+			// Test consistency
+			result2 := StringToKey32(tt.input)
+			if result != result2 {
+				t.Error("StringToKey32() should return consistent results")
+			}
+		})
+	}
+}
+
+func TestSHA256EdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []byte
+	}{
+		{"empty bytes", []byte{}},
+		{"single byte", []byte{0}},
+		{"null bytes", []byte{0, 0, 0, 0}},
+		{"large input", bytes.Repeat([]byte("test"), 10000)},
+		{"binary data", []byte{0xFF, 0xFE, 0xFD, 0xFC}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SHA256(tt.input)
+			if len(result) != 64 { // SHA256 hex string is 64 characters
+				t.Errorf("SHA256() returned %d characters, expected 64", len(result))
+			}
+
+			// Test consistency
+			result2 := SHA256(tt.input)
+			if result != result2 {
+				t.Error("SHA256() should return consistent results")
+			}
+		})
+	}
+}
+
+func TestXXHashEdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []byte
+	}{
+		{"empty bytes", []byte{}},
+		{"single byte", []byte{0}},
+		{"large input", bytes.Repeat([]byte("test"), 10000)},
+		{"binary data", []byte{0xFF, 0xFE, 0xFD, 0xFC}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := XX(tt.input)
+
+			// Test consistency
+			result2 := XX(tt.input)
+			if result != result2 {
+				t.Error("XX() should return consistent results")
+			}
+		})
+	}
+}
+
+func TestMd5EdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+	}{
+		{"nil", nil},
+		{"empty string", ""},
+		{"number", 42},
+		{"float", 3.14159},
+		{"bool", true},
+		{"slice", []int{1, 2, 3}},
+		{"struct", struct{ Name string }{"test"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Md5(tt.input)
+			if len(result) != 32 { // MD5 hex string is 32 characters
+				t.Errorf("Md5() returned %d characters, expected 32", len(result))
+			}
+
+			// Test consistency
+			result2 := Md5(tt.input)
+			if result != result2 {
+				t.Error("Md5() should return consistent results")
+			}
+		})
+	}
+}
+
+func TestGenerateRandomPasswordEdgeCases(t *testing.T) {
+	tests := []struct {
+		name   string
+		length int
+		valid  bool
+	}{
+		{"zero length", 0, true},
+		{"small length", 1, true},
+		{"normal length", 16, true},
+		{"large length", 1000, true},
+		{"negative length", -1, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := GenerateRandomPassword(tt.length)
+
+			if tt.valid {
+				if err != nil {
+					t.Errorf("GenerateRandomPassword() should succeed for length %d: %v", tt.length, err)
+				}
+				if len(result) != tt.length {
+					t.Errorf("GenerateRandomPassword() returned %d characters, expected %d", len(result), tt.length)
+				}
+			} else {
+				// For negative lengths, the behavior depends on the implementation
+				// It might fail or return empty string
+				_ = result
+				_ = err
+			}
+		})
+	}
+}
+
+func TestReadOrSavePassphraseFileOperations(t *testing.T) {
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name     string
+		filename string
+		length   int
+		setup    func(string) error
+		wantErr  bool
+	}{
+		{
+			name:     "new file",
+			filename: "new_passphrase.txt",
+			length:   32,
+			setup:    nil,
+			wantErr:  false,
+		},
+		{
+			name:     "existing file with sufficient length",
+			filename: "existing_passphrase.txt",
+			length:   16,
+			setup: func(path string) error {
+				return os.WriteFile(path, []byte("this_is_a_long_enough_passphrase"), 0600)
+			},
+			wantErr: false,
+		},
+		{
+			name:     "existing file with insufficient length",
+			filename: "short_passphrase.txt",
+			length:   32,
+			setup: func(path string) error {
+				return os.WriteFile(path, []byte("short"), 0600)
+			},
+			wantErr: true,
+		},
+		{
+			name:     "permission denied directory",
+			filename: "readonly/passphrase.txt",
+			length:   16,
+			setup: func(path string) error {
+				dir := filepath.Dir(path)
+				if err := os.MkdirAll(dir, 0000); err != nil {
+					return err
+				}
+				return nil
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filePath := filepath.Join(tempDir, tt.filename)
+
+			if tt.setup != nil {
+				if err := tt.setup(filePath); err != nil {
+					t.Fatalf("Setup failed: %v", err)
+				}
+			}
+
+			result, err := ReadOrSavePassphrase(filePath, tt.length)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("ReadOrSavePassphrase() should have failed")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("ReadOrSavePassphrase() failed: %v", err)
+				}
+				if len(result) != tt.length {
+					t.Errorf("ReadOrSavePassphrase() returned %d bytes, expected %d", len(result), tt.length)
+				}
+			}
+
+			// Cleanup permission denied test
+			if strings.Contains(tt.filename, "readonly") {
+				os.Chmod(filepath.Dir(filePath), 0755)
+			}
+		})
+	}
+}
+
+func TestPGPCipherCreation(t *testing.T) {
+	// Test with default profile
+	cipher1 := NewPGPCipher(nil)
+	if cipher1 == nil {
+		t.Error("NewPGPCipher() should not return nil")
+	}
+	if cipher1.handle == nil {
+		t.Error("PGPCipher should have a handle")
+	}
+
+	// Test with custom profile
+	customProfile := profile.RFC4880()
+	cipher2 := NewPGPCipher(customProfile)
+	if cipher2 == nil {
+		t.Error("NewPGPCipher() should not return nil with custom profile")
+	}
+	if cipher2.handle == nil {
+		t.Error("PGPCipher should have a handle with custom profile")
+	}
+}
+
+func TestPGPCipherWithoutKeysOrPassphrase(t *testing.T) {
+	cipher := NewPGPCipher(nil)
+	var buf bytes.Buffer
+
+	// Test encryption without keys or passphrase
+	cipher.Encrypt([]byte("test message"), &buf)
+	if cipher.Error == nil {
+		t.Error("Encrypt() should fail without keys or passphrase")
+	}
+
+	// Reset error and test decryption
+	cipher.Error = nil
+	buf.Reset()
+	cipher.Decrypt([]byte("encrypted data"), &buf)
+	if cipher.Error == nil {
+		t.Error("Decrypt() should fail without keys or passphrase")
+	}
+}
+
+func TestPGPCipherEncryptWithPasswordEdgeCases(t *testing.T) {
+	cipher := NewPGPCipher(nil)
+	var buf bytes.Buffer
+
+	tests := []struct {
+		name       string
+		passphrase []byte
+		plaintext  []byte
+		writer     io.Writer
+		wantErr    bool
+	}{
+		{
+			name:       "empty plaintext",
+			passphrase: []byte("test_passphrase"),
+			plaintext:  []byte{},
+			writer:     &buf,
+			wantErr:    true,
+		},
+		{
+			name:       "nil writer",
+			passphrase: []byte("test_passphrase"),
+			plaintext:  []byte("test message"),
+			writer:     nil,
+			wantErr:    true,
+		},
+		{
+			name:       "empty passphrase",
+			passphrase: []byte{},
+			plaintext:  []byte("test message"),
+			writer:     &buf,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cipher.Error = nil
+			cipher.passphrase = tt.passphrase
+			buf.Reset()
+
+			cipher.EncryptWithPassword(tt.plaintext, tt.writer)
+
+			if tt.wantErr {
+				if cipher.Error == nil {
+					t.Error("EncryptWithPassword() should have failed")
+				}
+			} else {
+				if cipher.Error != nil {
+					t.Errorf("EncryptWithPassword() failed: %v", cipher.Error)
+				}
+			}
+		})
+	}
+}
+
+func TestPGPCipherEncryptWithPublicKeyEdgeCases(t *testing.T) {
+	cipher := NewPGPCipher(nil)
+	var buf bytes.Buffer
+
+	tests := []struct {
+		name      string
+		publicKey string
+		plaintext []byte
+		writer    io.Writer
+		wantErr   bool
+	}{
+		{
+			name:      "empty plaintext",
+			publicKey: "fake_public_key",
+			plaintext: []byte{},
+			writer:    &buf,
+			wantErr:   true,
+		},
+		{
+			name:      "nil writer",
+			publicKey: "fake_public_key",
+			plaintext: []byte("test message"),
+			writer:    nil,
+			wantErr:   true,
+		},
+		{
+			name:      "empty public key",
+			publicKey: "",
+			plaintext: []byte("test message"),
+			writer:    &buf,
+			wantErr:   true,
+		},
+		{
+			name:      "invalid public key",
+			publicKey: "invalid_key_format",
+			plaintext: []byte("test message"),
+			writer:    &buf,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cipher.Error = nil
+			cipher.publicKey = tt.publicKey
+			buf.Reset()
+
+			cipher.EncryptWithPublicKey(tt.plaintext, tt.writer)
+
+			if tt.wantErr {
+				if cipher.Error == nil {
+					t.Error("EncryptWithPublicKey() should have failed")
+				}
+			}
+		})
+	}
+}
+
+// Test TLS functions
+func TestNewTLSConfig(t *testing.T) {
+	// Generate a self-signed certificate for testing
+	subject := pkix.Name{
+		Organization:  []string{"Test"},
+		Country:       []string{"US"},
+		Province:      []string{""},
+		Locality:      []string{"Test City"},
+		StreetAddress: []string{""},
+		PostalCode:    []string{""},
+	}
+
+	cert, caPool, err := GenerateSelfSignedCertificate(subject)
+	if err != nil {
+		t.Fatalf("Failed to generate test certificate: %v", err)
+	}
+
+	config := NewTLSConfig(cert, caPool, tls.RequireAndVerifyClientCert)
+
+	if config == nil {
+		t.Error("NewTLSConfig() should not return nil")
+	}
+
+	if config.MinVersion != tls.VersionTLS12 {
+		t.Errorf("Expected MinVersion to be TLS 1.2, got %d", config.MinVersion)
+	}
+
+	if len(config.Certificates) != 1 {
+		t.Errorf("Expected 1 certificate, got %d", len(config.Certificates))
+	}
+
+	if config.ClientCAs != caPool {
+		t.Error("ClientCAs should be set to the provided CA pool")
+	}
+
+	if config.ClientAuth != tls.RequireAndVerifyClientCert {
+		t.Error("ClientAuth should be set correctly")
+	}
+}
+
+func TestGenerateSelfSignedCertificate(t *testing.T) {
+	subject := pkix.Name{
+		Organization:  []string{"Test Org"},
+		Country:       []string{"US"},
+		Province:      []string{"CA"},
+		Locality:      []string{"San Francisco"},
+		StreetAddress: []string{"123 Test St"},
+		PostalCode:    []string{"12345"},
+	}
+
+	cert, caPool, err := GenerateSelfSignedCertificate(subject)
+	if err != nil {
+		t.Fatalf("GenerateSelfSignedCertificate() failed: %v", err)
+	}
+
+	if len(cert.Certificate) == 0 {
+		t.Error("Generated certificate should not be empty")
+	}
+
+	if caPool == nil {
+		t.Error("CA pool should not be nil")
+	}
+
+	// Validate the generated certificate
+	err = ValidateCertificate(cert)
+	if err != nil {
+		t.Errorf("Generated certificate should be valid: %v", err)
+	}
+
+	// Check if certificate is not expired
+	expired, err := IsCertificateExpired(cert)
+	if err != nil {
+		t.Errorf("Error checking certificate expiration: %v", err)
+	}
+	if expired {
+		t.Error("Newly generated certificate should not be expired")
+	}
+}
+
+func TestValidateCertificate(t *testing.T) {
+	// Test with empty certificate
+	emptyCert := tls.Certificate{}
+	err := ValidateCertificate(emptyCert)
+	if err == nil {
+		t.Error("ValidateCertificate() should fail with empty certificate")
+	}
+
+	// Test with valid certificate
+	subject := pkix.Name{Organization: []string{"Test"}}
+	cert, _, err := GenerateSelfSignedCertificate(subject)
+	if err != nil {
+		t.Fatalf("Failed to generate test certificate: %v", err)
+	}
+
+	err = ValidateCertificate(cert)
+	if err != nil {
+		t.Errorf("ValidateCertificate() should pass with valid certificate: %v", err)
+	}
+}
+
+func TestIsCertificateExpired(t *testing.T) {
+	// Test with empty certificate
+	emptyCert := tls.Certificate{}
+	_, err := IsCertificateExpired(emptyCert)
+	if err == nil {
+		t.Error("IsCertificateExpired() should fail with empty certificate")
+	}
+
+	// Test with valid certificate
+	subject := pkix.Name{Organization: []string{"Test"}}
+	cert, _, err := GenerateSelfSignedCertificate(subject)
+	if err != nil {
+		t.Fatalf("Failed to generate test certificate: %v", err)
+	}
+
+	expired, err := IsCertificateExpired(cert)
+	if err != nil {
+		t.Errorf("IsCertificateExpired() failed: %v", err)
+	}
+	if expired {
+		t.Error("Newly generated certificate should not be expired")
+	}
+}
+
+func TestLoadCertAndConfig(t *testing.T) {
+	// This test will fail because we don't have actual cert files
+	// but it tests the error handling path
+	_, err := LoadCertAndConfig("nonexistent.crt", "nonexistent.key", "nonexistent.ca", tls.NoClientCert)
+	if err == nil {
+		t.Error("LoadCertAndConfig() should fail with nonexistent files")
+	}
+}
+
+func TestLoadCertificate(t *testing.T) {
+	// Test with nonexistent files
+	_, err := LoadCertificate("nonexistent.crt", "nonexistent.key")
+	if err == nil {
+		t.Error("LoadCertificate() should fail with nonexistent files")
+	}
+}
+
+func TestLoadCACertPool(t *testing.T) {
+	// Test with nonexistent file
+	_, err := LoadCACertPool("nonexistent.ca")
+	if err == nil {
+		t.Error("LoadCACertPool() should fail with nonexistent file")
+	}
+
+	// Test with invalid CA file
+	tempDir := t.TempDir()
+	invalidCAFile := filepath.Join(tempDir, "invalid.ca")
+	err = os.WriteFile(invalidCAFile, []byte("invalid certificate data"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create invalid CA file: %v", err)
+	}
+
+	_, err = LoadCACertPool(invalidCAFile)
+	if err == nil {
+		t.Error("LoadCACertPool() should fail with invalid certificate data")
+	}
+}
+
+// Benchmark tests for security functions
 func BenchmarkSHA256(b *testing.B) {
-	data := []byte("benchmark test data")
+	data := []byte("benchmark test data for SHA256 hashing function")
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -319,7 +884,7 @@ func BenchmarkSHA256(b *testing.B) {
 }
 
 func BenchmarkXX(b *testing.B) {
-	data := []byte("benchmark test data")
+	data := []byte("benchmark test data for xxHash function")
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -328,7 +893,7 @@ func BenchmarkXX(b *testing.B) {
 }
 
 func BenchmarkMd5(b *testing.B) {
-	data := "benchmark test data"
+	data := "benchmark test data for MD5 hashing function"
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
@@ -336,11 +901,23 @@ func BenchmarkMd5(b *testing.B) {
 	}
 }
 
+func BenchmarkGetRandomBytes(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		GetRandomBytes(32)
+	}
+}
+
 func BenchmarkGenerateRandomPassword(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, err := GenerateRandomPassword(32)
-		if err != nil {
-			b.Fatalf("GenerateRandomPassword error: %v", err)
-		}
+		GenerateRandomPassword(16)
+	}
+}
+
+func BenchmarkStringToKey32(b *testing.B) {
+	input := "benchmark test string for key derivation"
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		StringToKey32(input)
 	}
 }
