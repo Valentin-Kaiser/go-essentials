@@ -126,6 +126,11 @@ func RegisterConfig(name string, c Config) error {
 		return apperror.NewErrorf("the configuration provided is not a pointer to a struct, got %T", c)
 	}
 
+	// Clear previous state when registering a new config
+	mutex.Lock()
+	onChange = nil // Clear previous onChange callbacks
+	mutex.Unlock()
+
 	configname = name
 	viper.SetEnvPrefix(strings.ReplaceAll(configname, "-", "_"))
 	viper.SetTypeByDefaultValue(true)
@@ -164,7 +169,8 @@ func Read() error {
 		if err := os.MkdirAll(flag.Path, 0750); err != nil {
 			return apperror.NewError("creating configuration directory failed").AddError(err)
 		}
-		if err := viper.SafeWriteConfig(); err != nil {
+		// Write the default config using our own save function instead of viper's SafeWriteConfig
+		if err := save(); err != nil {
 			return apperror.NewError("writing default configuration file failed").AddError(err)
 		}
 	}
@@ -247,6 +253,11 @@ func apply(appConfig Config) {
 // save saves the configuration to the file
 // If the file does not exist, it creates a new one with the default values
 func save() error {
+	// Ensure the directory exists before trying to create the file
+	if err := os.MkdirAll(flag.Path, 0750); err != nil {
+		return apperror.NewError("creating configuration directory failed").AddError(err)
+	}
+
 	path, err := filepath.Abs(filepath.Join(flag.Path, configname+".yaml"))
 	if err != nil {
 		return apperror.NewError("building absolute path of configuration file failed").AddError(err)
@@ -282,6 +293,15 @@ func declareFlag(label string, usage string, defaultValue interface{}) error {
 	viper.SetDefault(label, defaultValue)
 	pflagLabel := strcase.KebabCase(label)
 	label = strings.ToLower(label)
+
+	// Check if flag already exists to avoid redefinition errors
+	if pflag.Lookup(pflagLabel) != nil {
+		// Flag already exists, just bind to viper
+		if err := viper.BindPFlag(label, pflag.Lookup(pflagLabel)); err != nil {
+			return apperror.NewErrorf("binding existing flag %s to viper failed", label).AddError(err)
+		}
+		return nil
+	}
 
 	switch v := defaultValue.(type) {
 	case string:
@@ -384,4 +404,17 @@ func parseStructTags(v reflect.Value, labelBase string) error {
 	}
 
 	return nil
+}
+
+// Reset clears all global state - primarily for testing purposes
+func Reset() {
+	mutex.Lock()
+	defer mutex.Unlock()
+	config = nil
+	configname = ""
+	onChange = nil
+	lastChange.Store(0)
+
+	// Reset viper state
+	viper.Reset()
 }

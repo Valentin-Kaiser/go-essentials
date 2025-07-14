@@ -510,19 +510,30 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		{
+	}
+
+	// Add permission test only for non-Windows systems
+	if runtime.GOOS != "windows" {
+		tests = append(tests, struct {
+			name     string
+			filename string
+			length   int
+			setup    func(string) error
+			wantErr  bool
+		}{
 			name:     "permission denied directory",
 			filename: "readonly/passphrase.txt",
 			length:   16,
 			setup: func(path string) error {
 				dir := filepath.Dir(path)
-				if err := os.MkdirAll(dir, 0000); err != nil {
+				if err := os.MkdirAll(dir, 0755); err != nil {
 					return err
 				}
-				return nil
+				// Remove all permissions on Unix-like systems
+				return os.Chmod(dir, 0000)
 			},
 			wantErr: true,
-		},
+		})
 	}
 
 	for _, tt := range tests {
@@ -552,7 +563,21 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 
 			// Cleanup permission denied test
 			if strings.Contains(tt.filename, "readonly") {
-				os.Chmod(filepath.Dir(filePath), 0755)
+				dir := filepath.Dir(filePath)
+				// Restore permissions before cleanup
+				os.Chmod(dir, 0755)
+			}
+		})
+	}
+
+	// Separate Windows-specific permission test using a different approach
+	if runtime.GOOS == "windows" {
+		t.Run("windows permission test - invalid path", func(t *testing.T) {
+			// On Windows, test with an invalid path that should cause an error
+			invalidPath := filepath.Join("Z:\\nonexistent\\path\\that\\should\\not\\exist", "passphrase.txt")
+			_, err := ReadOrSavePassphrase(invalidPath, 16)
+			if err == nil {
+				t.Error("ReadOrSavePassphrase() should fail with invalid path on Windows")
 			}
 		})
 	}
