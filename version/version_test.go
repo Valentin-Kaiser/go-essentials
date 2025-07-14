@@ -144,7 +144,7 @@ func TestParseTagSegment(t *testing.T) {
 		{"v1.2.3", 0, 1},
 		{"v1.2.3", 1, 2},
 		{"v1.2.3", 2, 3},
-		{"v1.2.3", 3, 0}, // out of range
+		{"v1.2.3", 3, 0},  // out of range
 		{"invalid", 0, 0}, // invalid tag
 		{"v1.2", 2, 0},    // insufficient segments
 	}

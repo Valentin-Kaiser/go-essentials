@@ -25,7 +25,7 @@ func TestHandle(t *testing.T) {
 func TestHandleWithPanic(t *testing.T) {
 	// Test that Handle actually recovers from panic
 	var handled bool
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -56,7 +56,7 @@ func TestHandleWithDifferentPanicTypes(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var handled bool
-			
+
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -81,9 +81,9 @@ func TestHandleInDebugMode(t *testing.T) {
 
 	// Test with debug mode enabled
 	flag.Debug = true
-	
+
 	var handled bool
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -106,9 +106,9 @@ func TestHandleInProductionMode(t *testing.T) {
 
 	// Test with debug mode disabled
 	flag.Debug = false
-	
+
 	var handled bool
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -127,7 +127,7 @@ func TestHandleInProductionMode(t *testing.T) {
 func TestHandleNested(t *testing.T) {
 	// Test nested panic handling
 	var outerHandled, innerHandled bool
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -135,7 +135,7 @@ func TestHandleNested(t *testing.T) {
 			}
 			outerHandled = true
 		}()
-		
+
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -145,7 +145,7 @@ func TestHandleNested(t *testing.T) {
 			}()
 			panic("inner panic")
 		}()
-		
+
 		panic("outer panic")
 	}()
 
@@ -161,7 +161,7 @@ func TestHandleMultiple(t *testing.T) {
 	// Test multiple separate panic recoveries
 	for i := 0; i < 3; i++ {
 		var handled bool
-		
+
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -181,7 +181,7 @@ func TestHandleMultiple(t *testing.T) {
 func TestHandleWithoutPanic(t *testing.T) {
 	// Test that Handle doesn't interfere with normal execution
 	var normalExecution bool
-	
+
 	func() {
 		defer Handle()
 		normalExecution = true
@@ -195,7 +195,7 @@ func TestHandleWithoutPanic(t *testing.T) {
 // Test that shows Handle can be used in goroutines
 func TestHandleInGoroutine(t *testing.T) {
 	done := make(chan bool)
-	
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {

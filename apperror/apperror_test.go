@@ -131,7 +131,7 @@ func TestErrorString(t *testing.T) {
 	// Test without debug mode
 	flag.Debug = false
 	err := NewError("test error")
-	
+
 	if err.Error() != "test error" {
 		t.Errorf("Expected 'test error', got '%s'", err.Error())
 	}
@@ -147,11 +147,11 @@ func TestErrorString(t *testing.T) {
 	flag.Debug = true
 	err = NewError("test error")
 	errorStr := err.Error()
-	
+
 	if !strings.Contains(errorStr, "test error") {
 		t.Error("Error string should contain the original message")
 	}
-	
+
 	if !strings.Contains(errorStr, "TestErrorString") {
 		t.Error("Error string should contain trace information in debug mode")
 	}
@@ -161,7 +161,7 @@ func TestSplit(t *testing.T) {
 	// Test with standard error
 	standardErr := errors.New("standard error")
 	msg, trace, errs := Split(standardErr)
-	
+
 	if msg != "standard error" {
 		t.Errorf("Expected message 'standard error', got '%s'", msg)
 	}
@@ -175,7 +175,7 @@ func TestSplit(t *testing.T) {
 	// Test with app error
 	appErr := NewError("app error").AddError(errors.New("additional error"))
 	msg, trace, errs = Split(appErr)
-	
+
 	if msg != "app error" {
 		t.Errorf("Expected message 'app error', got '%s'", msg)
 	}
@@ -242,7 +242,7 @@ func TestErrorWithMultipleAdditionalErrors(t *testing.T) {
 	err = err.AddError(errors.New("error 3"))
 
 	errorStr := err.Error()
-	
+
 	if !strings.Contains(errorStr, "error 1") {
 		t.Error("Error string should contain first additional error")
 	}
@@ -256,7 +256,7 @@ func TestErrorWithMultipleAdditionalErrors(t *testing.T) {
 
 func TestErrorImplementsErrorInterface(t *testing.T) {
 	var err error = NewError("test error")
-	
+
 	if err.Error() != "test error" {
 		t.Error("Error should implement the error interface correctly")
 	}
@@ -272,7 +272,7 @@ func BenchmarkNewError(b *testing.B) {
 func BenchmarkWrap(b *testing.B) {
 	baseErr := errors.New("base error")
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		Wrap(baseErr)
 	}
@@ -281,7 +281,7 @@ func BenchmarkWrap(b *testing.B) {
 func BenchmarkErrorString(b *testing.B) {
 	err := NewError("benchmark error").AddError(errors.New("additional"))
 	b.ResetTimer()
-	
+
 	for i := 0; i < b.N; i++ {
 		_ = err.Error()
 	}

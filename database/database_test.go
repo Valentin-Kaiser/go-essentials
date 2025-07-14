@@ -146,7 +146,7 @@ func TestConnected(t *testing.T) {
 	if Connected() {
 		t.Error("Expected not connected initially")
 	}
-	
+
 	// Test that we can call the function without panic
 	result := Connected()
 	if result {
@@ -159,7 +159,7 @@ func TestExecuteWithoutConnection(t *testing.T) {
 	err := Execute(func(db *gorm.DB) error {
 		return nil
 	})
-	
+
 	if err == nil {
 		t.Error("Execute should return error when not connected")
 	}
@@ -168,7 +168,7 @@ func TestExecuteWithoutConnection(t *testing.T) {
 func TestReconnect(t *testing.T) {
 	// Test that Reconnect doesn't panic
 	Reconnect()
-	
+
 	// Should still not be connected after reconnect without actual connection
 	if Connected() {
 		t.Error("Expected not connected after reconnect without connection")
@@ -178,13 +178,13 @@ func TestReconnect(t *testing.T) {
 func TestAwaitConnectionTimeout(t *testing.T) {
 	// Test AwaitConnection with timeout to avoid hanging
 	done := make(chan bool)
-	
+
 	go func() {
 		// This should block since we're not connected
 		AwaitConnection()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		t.Error("AwaitConnection should have blocked when not connected")
@@ -198,18 +198,18 @@ func TestConnectWithInvalidConfig(t *testing.T) {
 	config := Config{
 		Driver: "invalid-driver",
 	}
-	
+
 	// This should not panic
 	Connect(time.Millisecond, config)
-	
+
 	// Give it a moment to try connecting
 	time.Sleep(10 * time.Millisecond)
-	
+
 	// Should still not be connected
 	if Connected() {
 		t.Error("Should not be connected with invalid config")
 	}
-	
+
 	// Clean up
 	Disconnect()
 }
@@ -220,33 +220,33 @@ func TestConnectWithSQLiteConfig(t *testing.T) {
 		Driver: "sqlite",
 		Name:   ":memory:",
 	}
-	
+
 	// This should not panic
 	Connect(time.Millisecond, config)
-	
+
 	// Give it a moment to connect
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Should be connected to in-memory SQLite
 	if !Connected() {
 		t.Error("Should be connected to in-memory SQLite")
 	}
-	
+
 	// Test Execute with connection
 	err := Execute(func(db *gorm.DB) error {
 		return db.Exec("SELECT 1").Error
 	})
-	
+
 	if err != nil {
 		t.Errorf("Execute should work when connected: %v", err)
 	}
-	
+
 	// Clean up
 	Disconnect()
-	
+
 	// Give it more time to disconnect since it's asynchronous
 	time.Sleep(50 * time.Millisecond)
-	
+
 	// Note: The Connected() status might not immediately reflect disconnection
 	// due to the asynchronous nature of the connection management
 }
@@ -257,16 +257,16 @@ func TestRegisterSchema(t *testing.T) {
 		ID   uint   `gorm:"primaryKey"`
 		Name string `gorm:"not null"`
 	}
-	
+
 	// This should not panic
 	RegisterSchema(&TestModel{})
-	
+
 	// Test with multiple schemas
 	type AnotherModel struct {
 		ID    uint   `gorm:"primaryKey"`
 		Value string `gorm:"not null"`
 	}
-	
+
 	RegisterSchema(&TestModel{}, &AnotherModel{})
 }
 
@@ -276,12 +276,12 @@ func TestRegisterMigrationStep(t *testing.T) {
 		GitTag:    "v1.0.0",
 		GitCommit: "abc123",
 	}
-	
+
 	// This should not panic
 	RegisterMigrationStep(v, func(db *gorm.DB) error {
 		return nil
 	})
-	
+
 	// Test with migration that returns error
 	RegisterMigrationStep(version.Version{
 		GitTag:    "v1.0.1",
@@ -294,17 +294,17 @@ func TestRegisterMigrationStep(t *testing.T) {
 func TestRegisterOnConnectHandler(t *testing.T) {
 	// Test OnConnect handler registration
 	var handlerCalled bool
-	
+
 	RegisterOnConnectHandler(func(db *gorm.DB, config Config) error {
 		handlerCalled = true
 		return nil
 	})
-	
+
 	// Handler should be registered but not called yet
 	if handlerCalled {
 		t.Error("OnConnect handler should not be called immediately")
 	}
-	
+
 	// Test handler with error
 	RegisterOnConnectHandler(func(db *gorm.DB, config Config) error {
 		return errors.New("handler error")
@@ -316,7 +316,7 @@ func TestDisconnectWithoutConnection(t *testing.T) {
 	// The Disconnect function works by sending a signal through a channel
 	// Even when not connected, it should still handle the disconnect signal
 	done := make(chan bool)
-	
+
 	go func() {
 		// Start a connection attempt first to have something to disconnect
 		Connect(time.Millisecond, Config{Driver: "invalid"})
@@ -324,7 +324,7 @@ func TestDisconnectWithoutConnection(t *testing.T) {
 		Disconnect()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Expected behavior
@@ -343,27 +343,27 @@ func TestConfigStruct(t *testing.T) {
 		Password: "password",
 		Name:     "test",
 	}
-	
+
 	if config.Driver != "mysql" {
 		t.Error("Driver field not set correctly")
 	}
-	
+
 	if config.Host != "localhost" {
 		t.Error("Host field not set correctly")
 	}
-	
+
 	if config.Port != 3306 {
 		t.Error("Port field not set correctly")
 	}
-	
+
 	if config.User != "root" {
 		t.Error("User field not set correctly")
 	}
-	
+
 	if config.Password != "password" {
 		t.Error("Password field not set correctly")
 	}
-	
+
 	if config.Name != "test" {
 		t.Error("Name field not set correctly")
 	}
@@ -388,7 +388,7 @@ func BenchmarkConfigValidate(b *testing.B) {
 		Password: "password",
 		Name:     "test",
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		config.Validate()

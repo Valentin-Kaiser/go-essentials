@@ -172,7 +172,7 @@ func BenchmarkSizeOf(b *testing.B) {
 
 func BenchmarkToByteString(b *testing.B) {
 	testValues := []int64{42, 1024, 1048576, 1073741824}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, value := range testValues {
