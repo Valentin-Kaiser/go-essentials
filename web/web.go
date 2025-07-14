@@ -28,6 +28,7 @@
 //		web.Server().
 //			WithHost("localhost").
 //			WithPort(8088).
+//			WithCacheControl("max-age=3600, s-maxage=7200").
 //			WithSecurityHeaders().
 //			WithCORSHeaders().
 //			WithGzip().
@@ -104,6 +105,7 @@ type Server struct {
 	handler           map[string]http.Handler
 	websockets        map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn)
 	onHTTPCode        map[string]map[int]func(http.ResponseWriter, *http.Request)
+	cacheControl      string // Custom cache control header value
 }
 
 func init() {
@@ -535,7 +537,7 @@ func (s *Server) WithRedirectToHTTPS(port uint16) *Server {
 
 // WithSecurityHeaders adds security headers to the server
 func (s *Server) WithSecurityHeaders() *Server {
-	s.router.Use(MiddlewareOrderSecurity, securityHeaderMiddleware)
+	s.router.Use(MiddlewareOrderSecurity, securityHeaderMiddlewareWithServer(s))
 	return s
 }
 
@@ -570,6 +572,15 @@ func (s *Server) WithHeaders(headers map[string]string) *Server {
 			next.ServeHTTP(w, r)
 		})
 	})
+	return s
+}
+
+// WithCacheControl sets a custom Cache-Control header value that will override the default
+// cache control setting in security headers
+func (s *Server) WithCacheControl(cacheControl string) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.cacheControl = cacheControl
 	return s
 }
 

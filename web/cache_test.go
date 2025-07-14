@@ -116,3 +116,71 @@ func TestETagValidation(t *testing.T) {
 		t.Errorf("handler returned wrong status code for request without If-None-Match: got %v want %v", status, http.StatusOK)
 	}
 }
+
+// TestCustomCacheControlHeaders tests that custom cache control headers are properly set
+func TestCustomCacheControlHeaders(t *testing.T) {
+	// Create a new server instance for testing
+	server := &Server{
+		cacheControl: "no-cache, no-store, must-revalidate",
+	}
+
+	// Create a test handler
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+	})
+
+	// Apply the security middleware with custom cache control
+	middlewareHandler := securityHeaderMiddlewareWithServer(server)(handler)
+
+	// Create a request
+	req, err := http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a response recorder
+	rr := httptest.NewRecorder()
+
+	// Execute the handler
+	middlewareHandler.ServeHTTP(rr, req)
+
+	// Check that the response code is correct
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check that the custom cache control header is set
+	cacheControl := rr.Header().Get("Cache-Control")
+	expectedCacheControl := "no-cache, no-store, must-revalidate"
+	if cacheControl != expectedCacheControl {
+		t.Errorf("Cache-Control header = %v, want %v", cacheControl, expectedCacheControl)
+	}
+
+	// Check that other security headers are still set
+	etag := rr.Header().Get("ETag")
+	if etag != version.GitCommit {
+		t.Errorf("ETag header = %v, want %v", etag, version.GitCommit)
+	}
+
+	strictTransportSecurity := rr.Header().Get("Strict-Transport-Security")
+	expectedSTS := "max-age=31536000; includeSubDomains; preload"
+	if strictTransportSecurity != expectedSTS {
+		t.Errorf("Strict-Transport-Security header = %v, want %v", strictTransportSecurity, expectedSTS)
+	}
+}
+
+// TestWithCacheControlMethod tests the WithCacheControl method
+func TestWithCacheControlMethod(t *testing.T) {
+	// Create a new server instance
+	server := New()
+
+	// Set custom cache control
+	customCacheControl := "max-age=3600, s-maxage=7200"
+	server.WithCacheControl(customCacheControl)
+
+	// Check that the cache control is set
+	if server.cacheControl != customCacheControl {
+		t.Errorf("server.cacheControl = %v, want %v", server.cacheControl, customCacheControl)
+	}
+}
