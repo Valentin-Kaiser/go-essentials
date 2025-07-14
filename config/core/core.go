@@ -126,11 +126,6 @@ func RegisterConfig(name string, c Config) error {
 		return apperror.NewErrorf("the configuration provided is not a pointer to a struct, got %T", c)
 	}
 
-	// Clear previous state when registering a new config
-	mutex.Lock()
-	onChange = nil // Clear previous onChange callbacks
-	mutex.Unlock()
-
 	configname = name
 	viper.SetEnvPrefix(strings.ReplaceAll(configname, "-", "_"))
 	viper.SetTypeByDefaultValue(true)

@@ -637,6 +637,7 @@ func TestOnChangeCallbacks(t *testing.T) {
 }
 
 func TestOnChangeCallbackError(t *testing.T) {
+	defer Reset()
 	cfg := &TestConfig{
 		ApplicationName: "test-app",
 		ServerPort:      8080,

@@ -397,9 +397,8 @@ func (s *Server) WithFileServer(entrypoints []string, path string) *Server {
 	fs := http.FileServer(http.Dir(filepath.Clean(path)))
 	for _, entrypoint := range entrypoints {
 		handler := http.StripPrefix(entrypoint, fs)
-		err := s.WithHandler(entrypoint, handler).Error
-		if err != nil {
-			s.Error = apperror.Wrap(err)
+		s.WithHandler(entrypoint, handler)
+		if s.Error != nil {
 			return s
 		}
 	}
