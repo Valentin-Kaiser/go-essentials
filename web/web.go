@@ -79,7 +79,7 @@ import (
 )
 
 var (
-	mutex    sync.RWMutex
+	mutex    sync.Mutex
 	instance *Server
 )
 
@@ -112,8 +112,6 @@ func init() {
 
 // Instance returns the singleton instance of the web server
 func Instance() *Server {
-	mutex.RLock()
-	defer mutex.RUnlock()
 	return instance
 }
 
@@ -151,6 +149,7 @@ func (s *Server) Start() *Server {
 		return s
 	}
 
+	s.mutex.Lock()
 	s.server = &http.Server{
 		ErrorLog:          s.errorLog,
 		ReadTimeout:       s.readTimeout,
@@ -159,6 +158,7 @@ func (s *Server) Start() *Server {
 		IdleTimeout:       s.idleTimeout,
 		Handler:           s.router,
 	}
+	s.mutex.Unlock()
 
 	if s.tlsConfig != nil {
 		g, _ := errgroup.WithContext(context.Background())
@@ -227,8 +227,13 @@ func (s *Server) StartAsync(done chan error) {
 // Close does not attempt to close any hijacked connections, such as WebSockets.
 func (s *Server) Stop() error {
 	defer interruption.Handle()
-	if s.server != nil {
-		err := s.server.Close()
+
+	s.mutex.RLock()
+	server := s.server
+	s.mutex.RUnlock()
+
+	if server != nil {
+		err := server.Close()
 		if err != nil {
 			return apperror.NewError("failed to stop webserver").AddError(err)
 		}
@@ -243,12 +248,17 @@ func (s *Server) Stop() error {
 // Make sure the program doesn't exit and waits instead for Shutdown to return
 func (s *Server) Shutdown() error {
 	defer interruption.Handle()
-	if s.server != nil {
+
+	s.mutex.RLock()
+	server := s.server
+	s.mutex.RUnlock()
+
+	if server != nil {
 		log.Trace().Msgf("[Web] shutting down webserver...")
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownRelease()
 
-		err := s.server.Shutdown(shutdownCtx)
+		err := server.Shutdown(shutdownCtx)
 		if err != nil {
 			return apperror.NewError("failed to shutdown webserver").AddError(err)
 		}
@@ -262,12 +272,17 @@ func (s *Server) Shutdown() error {
 // It will wait for all active connections to finish before shutting down
 func (s *Server) Restart() error {
 	defer interruption.Handle()
-	if s.server != nil {
+
+	s.mutex.RLock()
+	server := s.server
+	s.mutex.RUnlock()
+
+	if server != nil {
 		log.Trace().Msgf("[Web] restarting webserver...")
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownRelease()
 
-		err := s.server.Shutdown(shutdownCtx)
+		err := server.Shutdown(shutdownCtx)
 		if err != nil {
 			return apperror.NewError("failed to shutdown webserver").AddError(err)
 		}
@@ -286,12 +301,16 @@ func (s *Server) Restart() error {
 func (s *Server) RestartAsync(done chan error) {
 	defer interruption.Handle()
 
-	if s.server != nil {
+	s.mutex.RLock()
+	server := s.server
+	s.mutex.RUnlock()
+
+	if server != nil {
 		log.Trace().Msgf("[Web] restarting webserver...")
 		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownRelease()
 
-		err := s.server.Shutdown(shutdownCtx)
+		err := server.Shutdown(shutdownCtx)
 		if err != nil {
 			done <- apperror.NewError("failed to shutdown webserver").AddError(err)
 			return
