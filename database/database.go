@@ -233,15 +233,19 @@ func connect(config Config) (*gorm.DB, error) {
 
 	switch config.Driver {
 	case "sqlite":
-		if _, err := os.Stat(flag.Path); os.IsNotExist(err) {
-			err := os.Mkdir(flag.Path, 0750)
-			if err != nil {
-				return nil, err
+		dbPath := ":memory:?cache=shared"
+		if config.Name != ":memory:" {
+			if _, err := os.Stat(flag.Path); os.IsNotExist(err) {
+				err := os.Mkdir(flag.Path, 0750)
+				if err != nil {
+					return nil, err
+				}
 			}
+			dbPath = filepath.Join(flag.Path, config.Name+".db?cache=shared")
 		}
 
 		var err error
-		db, err = gorm.Open(sqlite.Open(filepath.Join(flag.Path, config.Name+".db?cache=shared")), cfg)
+		db, err = gorm.Open(sqlite.Open(dbPath), cfg)
 		if err != nil {
 			return nil, err
 		}
