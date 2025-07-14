@@ -58,25 +58,42 @@ const (
 // securityHeaderMiddleware is a middleware that adds security headers to the response
 // It is used to prevent attacks like XSS, clickjacking, etc.
 func securityHeaderMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check If-None-Match header for ETag validation
-		if inm := r.Header.Get("If-None-Match"); inm != "" {
-			// Compare with current ETag (version.GitCommit)
-			if inm == version.GitCommit || inm == `"`+version.GitCommit+`"` {
-				// ETag matches, return 304 Not Modified
-				w.WriteHeader(http.StatusNotModified)
-				return
-			}
-		}
+	return securityHeaderMiddlewareWithServer(Instance())(next)
+}
 
-		for key, value := range securityHeaders {
-			w.Header().Set(key, value)
-		}
-		if flag.Debug {
-			w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-		}
-		next.ServeHTTP(w, r)
-	})
+// securityHeaderMiddlewareWithServer creates a security header middleware with access to server configuration
+func securityHeaderMiddlewareWithServer(server *Server) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check If-None-Match header for ETag validation
+			if inm := r.Header.Get("If-None-Match"); inm != "" {
+				// Compare with current ETag (version.GitCommit)
+				if inm == version.GitCommit || inm == `"`+version.GitCommit+`"` {
+					// ETag matches, return 304 Not Modified
+					w.WriteHeader(http.StatusNotModified)
+					return
+				}
+			}
+
+			for key, value := range securityHeaders {
+				// Skip Cache-Control if a custom one is set
+				if key == "Cache-Control" && server.cacheControl != "" {
+					continue
+				}
+				w.Header().Set(key, value)
+			}
+
+			// Set custom cache control if specified
+			if server.cacheControl != "" {
+				w.Header().Set("Cache-Control", server.cacheControl)
+			}
+
+			if flag.Debug {
+				w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // corsHeaderMiddleware is a middleware that adds CORS headers to the response
