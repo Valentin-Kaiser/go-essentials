@@ -15,14 +15,19 @@ package interruption
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 
 	"github.com/Valentin-Kaiser/go-core/flag"
 	"github.com/rs/zerolog/log"
 )
+
+var wg = sync.WaitGroup{}
 
 // Handle is a function that handles panics in the application
 // It recovers from the panic and logs the error message along with the stack trace
@@ -41,4 +46,32 @@ func Handle() {
 		}
 		log.Error().Msgf("[Interrupt] %v code: %v => %v", caller, line, err)
 	}
+}
+
+// OnSignal registers a handler function to be called when the specified signals are received.
+// It allows graceful shutdown or cleanup operations when the application receives termination signals.
+// The application termination is blocked until the handler function returns.
+func OnSignal(handler func() error, signals ...os.Signal) error {
+	if len(signals) == 0 {
+		return fmt.Errorf("no signals provided")
+	}
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, signals...)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-sigChan
+		err := handler()
+		if err != nil {
+			log.Error().Err(err).Msg("Error handling signal")
+		}
+	}()
+
+	return nil
+}
+
+func Wait() {
+	wg.Wait()
 }
