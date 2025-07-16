@@ -264,14 +264,14 @@ func TestServerWithStaticFiles(t *testing.T) {
 	}
 
 	server := New()
-	result := server.WithFileServer([]string{"/static/"}, tempDir)
+	result := server.WithFileServer([]string{"/"}, tempDir)
 
 	if result != server {
 		t.Error("WithFileServer() should return the same server instance")
 	}
 
 	// Test serving static file
-	req := httptest.NewRequest("GET", "/static/test.txt", nil)
+	req := httptest.NewRequest("GET", "/test.txt", nil)
 	w := httptest.NewRecorder()
 
 	server.router.ServeHTTP(w, req)
