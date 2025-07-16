@@ -32,7 +32,6 @@ func LoggingMiddleware(next JobHandler) JobHandler {
 			Msg("job started")
 
 		err := next(ctx, job)
-
 		duration := time.Since(start)
 
 		if err != nil {
@@ -42,15 +41,15 @@ func LoggingMiddleware(next JobHandler) JobHandler {
 				Str("job_type", job.Type).
 				Dur("duration", duration).
 				Msg("job failed")
-		} else {
-			log.Info().
-				Str("job_id", job.ID).
-				Str("job_type", job.Type).
-				Dur("duration", duration).
-				Msg("job completed")
+			return err
 		}
 
-		return err
+		log.Info().
+			Str("job_id", job.ID).
+			Str("job_type", job.Type).
+			Dur("duration", duration).
+			Msg("job completed")
+		return nil
 	}
 }
 
@@ -81,32 +80,29 @@ func MetricsMiddleware(next JobHandler) JobHandler {
 	return func(ctx context.Context, job *Job) error {
 		start := time.Now()
 
-		// Increment job started counter
 		log.Debug().
 			Str("job_id", job.ID).
 			Str("job_type", job.Type).
 			Msg("job metrics: started")
 
 		err := next(ctx, job)
-
 		duration := time.Since(start)
 
-		// Track duration and success/failure
 		if err != nil {
 			log.Debug().
 				Str("job_id", job.ID).
 				Str("job_type", job.Type).
 				Dur("duration", duration).
 				Msg("job metrics: failed")
-		} else {
-			log.Debug().
-				Str("job_id", job.ID).
-				Str("job_type", job.Type).
-				Dur("duration", duration).
-				Msg("job metrics: completed")
+			return err
 		}
 
-		return err
+		log.Debug().
+			Str("job_id", job.ID).
+			Str("job_type", job.Type).
+			Dur("duration", duration).
+			Msg("job metrics: completed")
+		return nil
 	}
 }
 

@@ -39,8 +39,8 @@ func (jb *JobBuilder) WithPayload(payload map[string]interface{}) *JobBuilder {
 	return jb
 }
 
-// WithPayloadJSON sets the job payload from JSON
-func (jb *JobBuilder) WithPayloadJSON(jsonData []byte) *JobBuilder {
+// WithJSONPayload sets the job payload from JSON
+func (jb *JobBuilder) WithJSONPayload(jsonData []byte) *JobBuilder {
 	jb.job.Payload = jsonData
 	return jb
 }

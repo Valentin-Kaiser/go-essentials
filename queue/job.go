@@ -193,13 +193,11 @@ func (bm *BatchManager) UpdateBatchStatus(ctx context.Context, batchID string) e
 		return apperror.NewError("batch not found")
 	}
 
-	// Reset counters
 	batch.Pending = 0
 	batch.Running = 0
 	batch.Completed = 0
 	batch.Failed = 0
 
-	// Count job statuses
 	for _, jobID := range batch.JobIDs {
 		job, err := bm.manager.GetJob(ctx, jobID)
 		if err != nil {
@@ -218,15 +216,15 @@ func (bm *BatchManager) UpdateBatchStatus(ctx context.Context, batchID string) e
 		}
 	}
 
-	// Update batch status
-	if batch.Completed == batch.Total {
+	switch {
+	case batch.Completed == batch.Total:
 		batch.Status = StatusCompleted
 		batch.CompletedAt = time.Now()
-	} else if batch.Failed > 0 {
+	case batch.Failed > 0:
 		batch.Status = StatusFailed
-	} else if batch.Running > 0 {
+	case batch.Running > 0:
 		batch.Status = StatusRunning
-	} else {
+	default:
 		batch.Status = StatusPending
 	}
 
@@ -256,7 +254,6 @@ func (bm *BatchManager) DeleteBatch(ctx context.Context, id string) error {
 		return apperror.NewError("batch not found")
 	}
 
-	// Delete all jobs in the batch
 	for _, jobID := range batch.JobIDs {
 		bm.manager.queue.DeleteJob(ctx, jobID)
 	}

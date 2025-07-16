@@ -35,33 +35,26 @@ func (rq *RedisQueue) Enqueue(ctx context.Context, job *Job) error {
 		return apperror.NewError("queue is closed")
 	}
 
-	// Serialize job
 	jobData, err := json.Marshal(job)
 	if err != nil {
 		return apperror.Wrap(err)
 	}
 
 	pipe := rq.client.Pipeline()
-
-	// Store job data
 	pipe.HSet(ctx, rq.jobKey(job.ID), "data", jobData)
 
-	// Add to appropriate queue based on status
 	if job.IsScheduled() {
-		// Add to scheduled jobs with timestamp as score
 		pipe.ZAdd(ctx, rq.scheduledKey(), redis.Z{
 			Score:  float64(job.ScheduleAt.Unix()),
 			Member: job.ID,
 		})
 	} else {
-		// Add to pending jobs with priority as score
 		pipe.ZAdd(ctx, rq.pendingKey(), redis.Z{
 			Score:  float64(job.Priority),
 			Member: job.ID,
 		})
 	}
 
-	// Execute pipeline
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return apperror.Wrap(err)
@@ -76,7 +69,6 @@ func (rq *RedisQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job,
 		return nil, apperror.NewError("queue is closed")
 	}
 
-	// Use BZPOPMAX to block until a job is available
 	result, err := rq.client.BZPopMax(ctx, timeout, rq.pendingKey()).Result()
 	if err != nil {
 		if err == redis.Nil {
@@ -85,13 +77,11 @@ func (rq *RedisQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job,
 		return nil, apperror.Wrap(err)
 	}
 
-	// Get job data
 	jobData, err := rq.client.HGet(ctx, rq.jobKey(result.Member.(string)), "data").Result()
 	if err != nil {
 		return nil, apperror.Wrap(err)
 	}
 
-	// Deserialize job
 	var job Job
 	if err := json.Unmarshal([]byte(jobData), &job); err != nil {
 		return nil, apperror.Wrap(err)
@@ -106,7 +96,6 @@ func (rq *RedisQueue) Schedule(ctx context.Context, job *Job) error {
 		return apperror.NewError("queue is closed")
 	}
 
-	// Serialize job
 	jobData, err := json.Marshal(job)
 	if err != nil {
 		return apperror.Wrap(err)
@@ -114,16 +103,12 @@ func (rq *RedisQueue) Schedule(ctx context.Context, job *Job) error {
 
 	pipe := rq.client.Pipeline()
 
-	// Store job data
 	pipe.HSet(ctx, rq.jobKey(job.ID), "data", jobData)
-
-	// Add to scheduled jobs with timestamp as score
 	pipe.ZAdd(ctx, rq.scheduledKey(), redis.Z{
 		Score:  float64(job.ScheduleAt.Unix()),
 		Member: job.ID,
 	})
 
-	// Execute pipeline
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return apperror.Wrap(err)
@@ -160,22 +145,16 @@ func (rq *RedisQueue) UpdateJob(ctx context.Context, job *Job) error {
 		return apperror.NewError("queue is closed")
 	}
 
-	// Serialize job
 	jobData, err := json.Marshal(job)
 	if err != nil {
 		return apperror.Wrap(err)
 	}
 
 	pipe := rq.client.Pipeline()
-
-	// Update job data
 	pipe.HSet(ctx, rq.jobKey(job.ID), "data", jobData)
-
-	// Remove from all queues first
 	pipe.ZRem(ctx, rq.pendingKey(), job.ID)
 	pipe.ZRem(ctx, rq.scheduledKey(), job.ID)
 
-	// Add to appropriate queue based on status
 	switch job.Status {
 	case StatusPending:
 		pipe.ZAdd(ctx, rq.pendingKey(), redis.Z{
@@ -189,7 +168,6 @@ func (rq *RedisQueue) UpdateJob(ctx context.Context, job *Job) error {
 		})
 	}
 
-	// Execute pipeline
 	_, err = pipe.Exec(ctx)
 	if err != nil {
 		return apperror.Wrap(err)
@@ -205,15 +183,10 @@ func (rq *RedisQueue) DeleteJob(ctx context.Context, id string) error {
 	}
 
 	pipe := rq.client.Pipeline()
-
-	// Remove job data
 	pipe.Del(ctx, rq.jobKey(id))
-
-	// Remove from all queues
 	pipe.ZRem(ctx, rq.pendingKey(), id)
 	pipe.ZRem(ctx, rq.scheduledKey(), id)
 
-	// Execute pipeline
 	_, err := pipe.Exec(ctx)
 	if err != nil {
 		return apperror.Wrap(err)
@@ -229,8 +202,6 @@ func (rq *RedisQueue) GetJobs(ctx context.Context, status Status, limit int) ([]
 	}
 
 	var jobs []*Job
-
-	// Get all job IDs first
 	var jobIDs []string
 	var err error
 
@@ -248,7 +219,6 @@ func (rq *RedisQueue) GetJobs(ctx context.Context, status Status, limit int) ([]
 		return nil, apperror.Wrap(err)
 	}
 
-	// Get job data for each ID
 	for _, jobID := range jobIDs {
 		job, err := rq.GetJob(ctx, jobID)
 		if err != nil {
@@ -313,7 +283,6 @@ func (rq *RedisQueue) GetStats(ctx context.Context) (*Stats, error) {
 
 	stats := &Stats{}
 
-	// Get pending jobs count
 	pendingCount, err := rq.client.ZCard(ctx, rq.pendingKey()).Result()
 	if err != nil {
 		return nil, apperror.Wrap(err)
@@ -321,7 +290,6 @@ func (rq *RedisQueue) GetStats(ctx context.Context) (*Stats, error) {
 	stats.Pending = pendingCount
 	stats.QueueSize += pendingCount
 
-	// Get scheduled jobs count
 	scheduledCount, err := rq.client.ZCard(ctx, rq.scheduledKey()).Result()
 	if err != nil {
 		return nil, apperror.Wrap(err)
@@ -329,7 +297,6 @@ func (rq *RedisQueue) GetStats(ctx context.Context) (*Stats, error) {
 	stats.Scheduled = scheduledCount
 	stats.QueueSize += scheduledCount
 
-	// Scan through all jobs to get other statistics
 	var cursor uint64
 	for {
 		keys, nextCursor, err := rq.client.Scan(ctx, cursor, rq.keyPrefix+":job:*", 100).Result()
@@ -403,7 +370,6 @@ func (rq *RedisQueue) MoveScheduledToPending(ctx context.Context) error {
 
 	now := time.Now().Unix()
 
-	// Get jobs that are ready to be processed
 	jobIDs, err := rq.client.ZRangeByScore(ctx, rq.scheduledKey(), &redis.ZRangeBy{
 		Min: "-inf",
 		Max: strconv.FormatInt(now, 10),
@@ -413,7 +379,6 @@ func (rq *RedisQueue) MoveScheduledToPending(ctx context.Context) error {
 		return apperror.Wrap(err)
 	}
 
-	// Move each job to pending
 	for _, jobID := range jobIDs {
 		job, err := rq.GetJob(ctx, jobID)
 		if err != nil {

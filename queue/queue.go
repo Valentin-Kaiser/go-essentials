@@ -181,7 +181,6 @@ func (m *Manager) Stop() error {
 	}
 
 	log.Info().Msg("stopping queue manager")
-
 	if m.scheduleTicker != nil {
 		m.scheduleTicker.Stop()
 	}
@@ -362,33 +361,35 @@ func (m *Manager) processJob(ctx context.Context, job *Job, workerID int) {
 				job.RetryAt = time.Time{}
 				m.queue.Enqueue(ctx, job)
 			}()
-		} else {
-			job.Status = StatusFailed
-			job.Error = err.Error()
-			job.UpdatedAt = time.Now()
-			m.queue.UpdateJob(ctx, job)
-			atomic.AddInt64(&m.stats.JobsFailed, 1)
-
-			log.Error().
-				Err(err).
-				Str("job_id", job.ID).
-				Str("job_type", job.Type).
-				Int("attempt", job.Attempts).
-				Msg("job failed")
+			return
 		}
-	} else {
-		job.Status = StatusCompleted
-		job.CompletedAt = time.Now()
-		job.Progress = 1.0
+
+		job.Status = StatusFailed
+		job.Error = err.Error()
 		job.UpdatedAt = time.Now()
 		m.queue.UpdateJob(ctx, job)
-		atomic.AddInt64(&m.stats.JobsProcessed, 1)
+		atomic.AddInt64(&m.stats.JobsFailed, 1)
 
-		log.Debug().
+		log.Error().
+			Err(err).
 			Str("job_id", job.ID).
 			Str("job_type", job.Type).
-			Msg("job completed successfully")
+			Int("attempt", job.Attempts).
+			Msg("job failed")
+		return
 	}
+
+	job.Status = StatusCompleted
+	job.CompletedAt = time.Now()
+	job.Progress = 1.0
+	job.UpdatedAt = time.Now()
+	m.queue.UpdateJob(ctx, job)
+	atomic.AddInt64(&m.stats.JobsProcessed, 1)
+
+	log.Debug().
+		Str("job_id", job.ID).
+		Str("job_type", job.Type).
+		Msg("job completed successfully")
 }
 
 // calculateRetryDelay calculates the retry delay with exponential backoff
@@ -456,4 +457,28 @@ type JobProgress struct {
 	JobID    string  `json:"job_id"`
 	Progress float64 `json:"progress"`
 	Message  string  `json:"message,omitempty"`
+}
+
+// WithRabbitMQ sets the queue to use RabbitMQ with the given configuration
+func (m *Manager) WithRabbitMQ(config RabbitMQConfig) *Manager {
+	if queue, err := NewRabbitMQQueue(config); err == nil {
+		m.queue = queue
+	}
+	return m
+}
+
+// WithRabbitMQFromURL sets the queue to use RabbitMQ with the given URL
+func (m *Manager) WithRabbitMQFromURL(url string) *Manager {
+	if queue, err := NewRabbitMQQueueFromURL(url); err == nil {
+		m.queue = queue
+	}
+	return m
+}
+
+// WithDefaultRabbitMQ sets the queue to use RabbitMQ with default settings
+func (m *Manager) WithDefaultRabbitMQ() *Manager {
+	if queue, err := NewDefaultRabbitMQQueue(); err == nil {
+		m.queue = queue
+	}
+	return m
 }
