@@ -1,6 +1,6 @@
 // Package queue provides a comprehensive task queue and background job processing system.
 //
-// It supports in-memory and Redis-backed queues with features like:
+// It supports in-memory, Redis-backed, and RabbitMQ queues with features like:
 //   - Priority-based job scheduling
 //   - Worker pool management
 //   - Retry mechanisms with exponential backoff
@@ -9,6 +9,52 @@
 //   - Graceful shutdown handling
 //   - Job progress tracking
 //   - Comprehensive error handling
+//   - RabbitMQ support with persistent message delivery
+//   - Scheduled job execution
+//
+// Example:
+//
+//	package main
+//
+//	import (
+//		"context"
+//		"fmt"
+//		"time"
+//
+//		"github.com/Valentin-Kaiser/go-core/queue"
+//	)
+//
+//	func main() {
+//		// Create a new queue manager
+//		manager := queue.NewManager()
+//
+//		// Register a job handler
+//		manager.RegisterHandler("email", func(ctx context.Context, job *queue.Job) error {
+//			fmt.Printf("Processing email job: %s\n", job.ID)
+//			return nil
+//		})
+//
+//		// Start the manager
+//		if err := manager.Start(context.Background()); err != nil {
+//			panic(err)
+//		}
+//		defer manager.Stop()
+//
+//		// Enqueue a job
+//		job := queue.NewJob("email").
+//			WithPayload(map[string]interface{}{
+//				"to":      "user@example.com",
+//				"subject": "Welcome!",
+//			}).
+//			Build()
+//
+//		if err := manager.Enqueue(context.Background(), job); err != nil {
+//			panic(err)
+//		}
+//
+//		// Wait for processing
+//		time.Sleep(time.Second)
+//	}
 package queue
 
 import (

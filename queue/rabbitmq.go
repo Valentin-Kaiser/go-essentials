@@ -1,15 +1,3 @@
-// Package queue provides RabbitMQ support for the queue system.
-// RabbitMQ implementation offers persistent message delivery, priority queues,
-// and scheduled job processing using AMQP protocol.
-//
-// Features:
-// - Persistent message delivery
-// - Priority-based job scheduling
-// - Scheduled job execution using TTL and dead letter exchanges
-// - Message acknowledgment for reliable processing
-// - Connection management with reconnection support
-// - Queue administration operations
-
 package queue
 
 import (
