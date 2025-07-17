@@ -9,6 +9,25 @@ import (
 	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
+var (
+	presets = map[string]string{
+		"@yearly":   "0 0 0 1 1 *", // Run once a year, midnight, Jan. 1st
+		"@annually": "0 0 0 1 1 *", // Alias for @yearly
+		"@monthly":  "0 0 0 1 * *", // Run once a month, midnight, first of month
+		"@weekly":   "0 0 0 * * 0", // Run once a week, midnight between Sat/Sun
+		"@daily":    "0 0 0 * * *", // Run once a day, midnight
+		"@midnight": "0 0 0 * * *", // Alias for @daily
+		"@hourly":   "0 0 * * * *", // Run once an hour, beginning of hour
+	}
+	months = map[string]int{
+		"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+		"JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+	}
+	days = map[string]int{
+		"SUN": 0, "MON": 1, "TUE": 2, "WED": 3, "THU": 4, "FRI": 5, "SAT": 6,
+	}
+)
+
 // CronField represents a field in a cron expression
 type CronField struct {
 	Min, Max int
@@ -33,9 +52,12 @@ func (s *TaskScheduler) validateCronSpec(cronSpec string) error {
 
 // parseCronSpec parses a cron specification
 func (s *TaskScheduler) parseCronSpec(cronSpec string) (*CronExpression, error) {
+	if predefined, exists := presets[cronSpec]; exists {
+		return s.parseCronSpec(predefined)
+	}
+
 	fields := strings.Fields(cronSpec)
 
-	// Support both 5-field and 6-field cron expressions
 	if len(fields) != 5 && len(fields) != 6 {
 		return nil, apperror.NewError("cron expression must have exactly 5 fields (minute hour day month day-of-week) or 6 fields (second minute hour day month day-of-week)")
 	}
@@ -44,7 +66,6 @@ func (s *TaskScheduler) parseCronSpec(cronSpec string) (*CronExpression, error) 
 	var err error
 	fieldOffset := 0
 
-	// Parse optional seconds field (0-59)
 	if len(fields) == 6 {
 		secondField, err := s.parseCronField(fields[0], 0, 59)
 		if err != nil {
@@ -54,32 +75,27 @@ func (s *TaskScheduler) parseCronSpec(cronSpec string) (*CronExpression, error) 
 		fieldOffset = 1
 	}
 
-	// Parse minute field (0-59)
 	expr.Minute, err = s.parseCronField(fields[fieldOffset], 0, 59)
 	if err != nil {
 		return nil, fmt.Errorf("invalid minute field: %v", err)
 	}
 
-	// Parse hour field (0-23)
 	expr.Hour, err = s.parseCronField(fields[fieldOffset+1], 0, 23)
 	if err != nil {
 		return nil, fmt.Errorf("invalid hour field: %v", err)
 	}
 
-	// Parse day field (1-31)
-	expr.Day, err = s.parseCronField(fields[fieldOffset+2], 1, 31)
+	expr.Day, err = s.parseCronFieldWithNames(fields[fieldOffset+2], 1, 31, nil)
 	if err != nil {
 		return nil, fmt.Errorf("invalid day field: %v", err)
 	}
 
-	// Parse month field (1-12)
-	expr.Month, err = s.parseCronField(fields[fieldOffset+3], 1, 12)
+	expr.Month, err = s.parseCronFieldWithNames(fields[fieldOffset+3], 1, 12, months)
 	if err != nil {
 		return nil, fmt.Errorf("invalid month field: %v", err)
 	}
 
-	// Parse day-of-week field (0-6, 0 = Sunday)
-	expr.DayOfWeek, err = s.parseCronField(fields[fieldOffset+4], 0, 6)
+	expr.DayOfWeek, err = s.parseCronFieldWithNames(fields[fieldOffset+4], 0, 6, days)
 	if err != nil {
 		return nil, fmt.Errorf("invalid day-of-week field: %v", err)
 	}
@@ -111,6 +127,51 @@ func (s *TaskScheduler) parseCronField(field string, min, max int) (CronField, e
 	}
 
 	return s.parseSingleField(field, min, max, cronField)
+}
+
+// parseCronFieldWithNames parses a cron field that supports named values
+func (s *TaskScheduler) parseCronFieldWithNames(field string, min, max int, nameMap map[string]int) (CronField, error) {
+	cronField := CronField{Min: min, Max: max}
+
+	// Handle ? character (equivalent to *)
+	if field == "?" {
+		field = "*"
+	}
+
+	if field == "*" {
+		for i := min; i <= max; i++ {
+			cronField.Values = append(cronField.Values, i)
+		}
+		return cronField, nil
+	}
+
+	normalizedField := s.normalizeFieldNames(field, nameMap)
+	if strings.Contains(normalizedField, "/") {
+		return s.parseStepField(normalizedField, min, max, cronField)
+	}
+
+	if strings.Contains(normalizedField, "-") {
+		return s.parseRangeField(normalizedField, min, max, cronField)
+	}
+
+	if strings.Contains(normalizedField, ",") {
+		return s.parseListField(normalizedField, min, max, cronField)
+	}
+
+	return s.parseSingleField(normalizedField, min, max, cronField)
+}
+
+// normalizeFieldNames converts named values to numeric values
+func (s *TaskScheduler) normalizeFieldNames(field string, nameMap map[string]int) string {
+	if nameMap == nil {
+		return field
+	}
+
+	result := field
+	for name, value := range nameMap {
+		result = strings.ReplaceAll(result, name, strconv.Itoa(value))
+	}
+	return result
 }
 
 // parseStepField parses a step field (e.g., "*/5", "1-10/2")
