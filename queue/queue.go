@@ -1,7 +1,7 @@
 // Package queue provides a comprehensive task queue and background job processing system
 // with advanced scheduling capabilities.
 //
-// It supports in-memory, Redis-backed, and RabbitMQ queues with features like:
+// It supports in-memory, Redis, and RabbitMQ queues with features like:
 //   - Priority-based job scheduling
 //   - Worker pool management
 //   - Retry mechanisms with exponential backoff
@@ -122,13 +122,11 @@ package queue
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
-	"github.com/Valentin-Kaiser/go-core/interruption"
 	"github.com/rs/zerolog/log"
 )
 
@@ -278,7 +276,6 @@ func (m *Manager) Start(ctx context.Context) error {
 		go m.worker(ctx, i)
 	}
 
-	interruption.OnSignal(m.Stop, os.Interrupt)
 	return nil
 }
 

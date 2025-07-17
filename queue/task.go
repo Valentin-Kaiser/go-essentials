@@ -3,14 +3,11 @@ package queue
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
-	"github.com/Valentin-Kaiser/go-core/interruption"
 	"github.com/rs/zerolog/log"
 )
 
@@ -286,17 +283,6 @@ func (s *TaskScheduler) Start(ctx context.Context) error {
 	go s.schedulerLoop()
 
 	log.Info().Msg("Task scheduler started")
-	go func() {
-		err := interruption.OnSignal(func() error {
-			log.Info().Msg("Received interruption signal, stopping task scheduler...")
-			s.Stop()
-			return nil
-		}, os.Interrupt, syscall.SIGTERM)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to register signal handler")
-		}
-	}()
-
 	return nil
 }
 
