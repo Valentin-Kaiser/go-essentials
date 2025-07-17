@@ -48,7 +48,9 @@ func (rq *RedisQueue) Enqueue(ctx context.Context, job *Job) error {
 			Score:  float64(job.ScheduleAt.Unix()),
 			Member: job.ID,
 		})
-	} else {
+	}
+
+	if !job.IsScheduled() {
 		pipe.ZAdd(ctx, rq.pendingKey(), redis.Z{
 			Score:  float64(job.Priority),
 			Member: job.ID,

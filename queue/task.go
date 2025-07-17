@@ -445,10 +445,12 @@ func (s *TaskScheduler) runTask(task *Task) {
 						Err(calcErr).
 						Str("task_name", task.Name).
 						Msg("Failed to calculate next cron run time")
-				} else {
+				}
+				if calcErr == nil {
 					task.NextRun = nextRun
 				}
-			} else {
+			}
+			if task.Type == TaskTypeInterval {
 				task.NextRun = time.Now().Add(task.Interval)
 			}
 			s.tasksMutex.Unlock()
@@ -491,10 +493,12 @@ func (s *TaskScheduler) runTask(task *Task) {
 				Err(calcErr).
 				Str("task_name", task.Name).
 				Msg("Failed to calculate next cron run time")
-		} else {
+		}
+		if calcErr == nil {
 			task.NextRun = nextRun
 		}
-	} else {
+	}
+	if task.Type == TaskTypeInterval {
 		task.NextRun = time.Now().Add(task.Interval)
 	}
 	s.tasksMutex.Unlock()

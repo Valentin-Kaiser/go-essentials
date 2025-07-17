@@ -314,9 +314,8 @@ func (rq *RabbitMQQueue) UpdateJob(ctx context.Context, job *Job) error {
 				case StatusFailed:
 					if job.Attempts >= job.MaxAttempts {
 						return rq.channel.Ack(deliveryTag, false)
-					} else {
-						return rq.channel.Nack(deliveryTag, false, true)
 					}
+					return rq.channel.Nack(deliveryTag, false, true)
 				case StatusRetrying:
 					return rq.channel.Nack(deliveryTag, false, true)
 				}

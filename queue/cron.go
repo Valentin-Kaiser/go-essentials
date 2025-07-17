@@ -85,86 +85,107 @@ func (s *TaskScheduler) parseCronField(field string, min, max int) (CronField, e
 	}
 
 	if strings.Contains(field, "/") {
-		parts := strings.Split(field, "/")
-		if len(parts) != 2 {
-			return cronField, apperror.NewError("invalid step format")
-		}
-
-		step, err := strconv.Atoi(parts[1])
-		if err != nil || step <= 0 {
-			return cronField, apperror.NewError("invalid step value")
-		}
-
-		var start, end int
-		if parts[0] == "*" {
-			start, end = min, max
-		} else if strings.Contains(parts[0], "-") {
-			rangeParts := strings.Split(parts[0], "-")
-			if len(rangeParts) != 2 {
-				return cronField, apperror.NewError("invalid range format")
-			}
-			start, err = strconv.Atoi(rangeParts[0])
-			if err != nil || start < min || start > max {
-				return cronField, apperror.NewError("invalid range start")
-			}
-			end, err = strconv.Atoi(rangeParts[1])
-			if err != nil || end < min || end > max || end < start {
-				return cronField, apperror.NewError("invalid range end")
-			}
-		} else {
-			start, err = strconv.Atoi(parts[0])
-			if err != nil || start < min || start > max {
-				return cronField, apperror.NewError("invalid step start")
-			}
-			end = max
-		}
-
-		for i := start; i <= end; i += step {
-			cronField.Values = append(cronField.Values, i)
-		}
-		return cronField, nil
+		return s.parseStepField(field, min, max, cronField)
 	}
 
 	if strings.Contains(field, "-") {
-		parts := strings.Split(field, "-")
-		if len(parts) != 2 {
-			return cronField, apperror.NewError("invalid range format")
-		}
-
-		start, err := strconv.Atoi(parts[0])
-		if err != nil || start < min || start > max {
-			return cronField, apperror.NewError("invalid range start")
-		}
-
-		end, err := strconv.Atoi(parts[1])
-		if err != nil || end < min || end > max || end < start {
-			return cronField, apperror.NewError("invalid range end")
-		}
-
-		for i := start; i <= end; i++ {
-			cronField.Values = append(cronField.Values, i)
-		}
-		return cronField, nil
+		return s.parseRangeField(field, min, max, cronField)
 	}
 
 	if strings.Contains(field, ",") {
-		parts := strings.Split(field, ",")
-		for _, part := range parts {
-			value, err := strconv.Atoi(strings.TrimSpace(part))
-			if err != nil || value < min || value > max {
-				return cronField, apperror.NewError("invalid value in list")
-			}
-			cronField.Values = append(cronField.Values, value)
-		}
-		return cronField, nil
+		return s.parseListField(field, min, max, cronField)
 	}
 
+	return s.parseSingleField(field, min, max, cronField)
+}
+
+// parseStepField parses a step field (e.g., "*/5", "1-10/2")
+func (s *TaskScheduler) parseStepField(field string, min, max int, cronField CronField) (CronField, error) {
+	parts := strings.Split(field, "/")
+	if len(parts) != 2 {
+		return cronField, apperror.NewError("invalid step format")
+	}
+
+	step, err := strconv.Atoi(parts[1])
+	if err != nil || step <= 0 {
+		return cronField, apperror.NewError("invalid step value")
+	}
+
+	var start, end int
+	if parts[0] == "*" {
+		start, end = min, max
+	}
+	if parts[0] != "*" && strings.Contains(parts[0], "-") {
+		rangeParts := strings.Split(parts[0], "-")
+		if len(rangeParts) != 2 {
+			return cronField, apperror.NewError("invalid range format")
+		}
+		start, err = strconv.Atoi(rangeParts[0])
+		if err != nil || start < min || start > max {
+			return cronField, apperror.NewError("invalid range start")
+		}
+		end, err = strconv.Atoi(rangeParts[1])
+		if err != nil || end < min || end > max || end < start {
+			return cronField, apperror.NewError("invalid range end")
+		}
+	}
+	if parts[0] != "*" && !strings.Contains(parts[0], "-") {
+		start, err = strconv.Atoi(parts[0])
+		if err != nil || start < min || start > max {
+			return cronField, apperror.NewError("invalid step start")
+		}
+		end = max
+	}
+
+	for i := start; i <= end; i += step {
+		cronField.Values = append(cronField.Values, i)
+	}
+	return cronField, nil
+}
+
+// parseRangeField parses a range field (e.g., "1-5")
+func (s *TaskScheduler) parseRangeField(field string, min, max int, cronField CronField) (CronField, error) {
+	parts := strings.Split(field, "-")
+	if len(parts) != 2 {
+		return cronField, apperror.NewError("invalid range format")
+	}
+
+	start, err := strconv.Atoi(parts[0])
+	if err != nil || start < min || start > max {
+		return cronField, apperror.NewError("invalid range start")
+	}
+
+	end, err := strconv.Atoi(parts[1])
+	if err != nil || end < min || end > max || end < start {
+		return cronField, apperror.NewError("invalid range end")
+	}
+
+	for i := start; i <= end; i++ {
+		cronField.Values = append(cronField.Values, i)
+	}
+	return cronField, nil
+}
+
+// parseListField parses a list field (e.g., "1,3,5")
+func (s *TaskScheduler) parseListField(field string, min, max int, cronField CronField) (CronField, error) {
+	parts := strings.Split(field, ",")
+	for _, part := range parts {
+		value, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || value < min || value > max {
+			return cronField, apperror.NewError("invalid value in list")
+		}
+		cronField.Values = append(cronField.Values, value)
+	}
+	return cronField, nil
+}
+
+// parseSingleField parses a single field (e.g., "5")
+func (s *TaskScheduler) parseSingleField(field string, min, max int, cronField CronField) (CronField, error) {
 	value, err := strconv.Atoi(field)
 	if err != nil || value < min || value > max {
 		return cronField, apperror.NewError("invalid single value")
 	}
 	cronField.Values = append(cronField.Values, value)
-
 	return cronField, nil
 }
 
