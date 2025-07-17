@@ -1,12 +1,25 @@
 // Package queue provides background task execution capabilities.
 //
 // This package extends the queue system with background task support for:
-//   - Cron-based scheduling (using cron expressions)
+//   - Cron-based scheduling (using cron expressions with optional seconds support)
 //   - Interval-based scheduling (using time.Duration)
 //   - Task registration and management
 //   - Graceful shutdown handling
 //   - Error recovery and retries
 //   - Context-aware execution
+//
+// Cron Expression Format:
+//   - 5 fields: minute hour day month day-of-week (traditional format)
+//   - 6 fields: second minute hour day month day-of-week (with seconds support)
+//
+// Examples:
+//   - "* * * * *"       - Every minute (5 fields)
+//   - "*/30 * * * *"    - Every 30 minutes (5 fields)
+//   - "0 12 * * *"      - Daily at noon (5 fields)
+//   - "* * * * * *"     - Every second (6 fields)
+//   - "*/30 * * * * *"  - Every 30 seconds (6 fields)
+//   - "0 0 12 * * *"    - Daily at noon (6 fields)
+//   - "30 0 12 * * *"   - Daily at 12:00:30 (6 fields)
 //
 // Example usage:
 //
@@ -24,9 +37,15 @@
 //		// Create a new task scheduler
 //		scheduler := queue.NewTaskScheduler()
 //
-//		// Register a cron-based task
+//		// Register a cron-based task (5 fields - traditional)
 //		scheduler.RegisterCronTask("cleanup", "0 0 * * *", func(ctx context.Context) error {
 //			fmt.Println("Running daily cleanup task")
+//			return nil
+//		})
+//
+//		// Register a cron-based task with seconds (6 fields)
+//		scheduler.RegisterCronTask("frequent", "*/30 * * * * *", func(ctx context.Context) error {
+//			fmt.Println("Running every 30 seconds")
 //			return nil
 //		})
 //

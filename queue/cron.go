@@ -17,11 +17,12 @@ type CronField struct {
 
 // CronExpression represents a parsed cron expression
 type CronExpression struct {
-	Minute    CronField
-	Hour      CronField
-	Day       CronField
-	Month     CronField
-	DayOfWeek CronField
+	Second    *CronField // Optional seconds field (0-59)
+	Minute    CronField  // Minute field (0-59)
+	Hour      CronField  // Hour field (0-23)
+	Day       CronField  // Day field (1-31)
+	Month     CronField  // Month field (1-12)
+	DayOfWeek CronField  // Day of week field (0-6, 0 = Sunday)
 }
 
 // validateCronSpec validates a cron specification
@@ -33,39 +34,52 @@ func (s *TaskScheduler) validateCronSpec(cronSpec string) error {
 // parseCronSpec parses a cron specification
 func (s *TaskScheduler) parseCronSpec(cronSpec string) (*CronExpression, error) {
 	fields := strings.Fields(cronSpec)
-	if len(fields) != 5 {
-		return nil, apperror.NewError("cron expression must have exactly 5 fields (minute hour day month day-of-week)")
+
+	// Support both 5-field and 6-field cron expressions
+	if len(fields) != 5 && len(fields) != 6 {
+		return nil, apperror.NewError("cron expression must have exactly 5 fields (minute hour day month day-of-week) or 6 fields (second minute hour day month day-of-week)")
 	}
 
 	expr := &CronExpression{}
 	var err error
+	fieldOffset := 0
+
+	// Parse optional seconds field (0-59)
+	if len(fields) == 6 {
+		secondField, err := s.parseCronField(fields[0], 0, 59)
+		if err != nil {
+			return nil, fmt.Errorf("invalid second field: %v", err)
+		}
+		expr.Second = &secondField
+		fieldOffset = 1
+	}
 
 	// Parse minute field (0-59)
-	expr.Minute, err = s.parseCronField(fields[0], 0, 59)
+	expr.Minute, err = s.parseCronField(fields[fieldOffset], 0, 59)
 	if err != nil {
 		return nil, fmt.Errorf("invalid minute field: %v", err)
 	}
 
 	// Parse hour field (0-23)
-	expr.Hour, err = s.parseCronField(fields[1], 0, 23)
+	expr.Hour, err = s.parseCronField(fields[fieldOffset+1], 0, 23)
 	if err != nil {
 		return nil, fmt.Errorf("invalid hour field: %v", err)
 	}
 
 	// Parse day field (1-31)
-	expr.Day, err = s.parseCronField(fields[2], 1, 31)
+	expr.Day, err = s.parseCronField(fields[fieldOffset+2], 1, 31)
 	if err != nil {
 		return nil, fmt.Errorf("invalid day field: %v", err)
 	}
 
 	// Parse month field (1-12)
-	expr.Month, err = s.parseCronField(fields[3], 1, 12)
+	expr.Month, err = s.parseCronField(fields[fieldOffset+3], 1, 12)
 	if err != nil {
 		return nil, fmt.Errorf("invalid month field: %v", err)
 	}
 
 	// Parse day-of-week field (0-6, 0 = Sunday)
-	expr.DayOfWeek, err = s.parseCronField(fields[4], 0, 6)
+	expr.DayOfWeek, err = s.parseCronField(fields[fieldOffset+4], 0, 6)
 	if err != nil {
 		return nil, fmt.Errorf("invalid day-of-week field: %v", err)
 	}
@@ -114,6 +128,10 @@ func (s *TaskScheduler) parseStepField(field string, min, max int, cronField Cro
 	var start, end int
 	if parts[0] == "*" {
 		start, end = min, max
+		for i := start; i <= end; i += step {
+			cronField.Values = append(cronField.Values, i)
+		}
+		return cronField, nil
 	}
 	if parts[0] != "*" && strings.Contains(parts[0], "-") {
 		rangeParts := strings.Split(parts[0], "-")
@@ -128,6 +146,10 @@ func (s *TaskScheduler) parseStepField(field string, min, max int, cronField Cro
 		if err != nil || end < min || end > max || end < start {
 			return cronField, apperror.NewError("invalid range end")
 		}
+		for i := start; i <= end; i += step {
+			cronField.Values = append(cronField.Values, i)
+		}
+		return cronField, nil
 	}
 	if parts[0] != "*" && !strings.Contains(parts[0], "-") {
 		start, err = strconv.Atoi(parts[0])
@@ -135,10 +157,10 @@ func (s *TaskScheduler) parseStepField(field string, min, max int, cronField Cro
 			return cronField, apperror.NewError("invalid step start")
 		}
 		end = max
-	}
-
-	for i := start; i <= end; i += step {
-		cronField.Values = append(cronField.Values, i)
+		for i := start; i <= end; i += step {
+			cronField.Values = append(cronField.Values, i)
+		}
+		return cronField, nil
 	}
 	return cronField, nil
 }
@@ -196,14 +218,31 @@ func (s *TaskScheduler) calculateNextCronRun(cronSpec string, after time.Time) (
 		return time.Time{}, err
 	}
 
-	t := after.Truncate(time.Minute).Add(time.Minute)
+	var t time.Time
+	var increment time.Duration
+
+	// If seconds are specified, truncate to second precision and increment by second
+	if expr.Second != nil {
+		t = after.Truncate(time.Second).Add(time.Second)
+		increment = time.Second
+	}
+	if expr.Second == nil {
+		// Otherwise, truncate to minute precision and increment by minute
+		t = after.Truncate(time.Minute).Add(time.Minute)
+		increment = time.Minute
+	}
 
 	// Find the next matching time (within reasonable limits)
-	for attempts := 0; attempts < 366*24*60; attempts++ { // Max 1 year
+	maxAttempts := 366 * 24 * 60 // Max 1 year for minute-based
+	if expr.Second != nil {
+		maxAttempts = 366 * 24 * 60 * 60 // Max 1 year for second-based
+	}
+
+	for attempts := 0; attempts < maxAttempts; attempts++ {
 		if s.cronMatches(expr, t) {
 			return t, nil
 		}
-		t = t.Add(time.Minute)
+		t = t.Add(increment)
 	}
 
 	return time.Time{}, apperror.NewError("could not find next run time within reasonable limits")
@@ -211,6 +250,12 @@ func (s *TaskScheduler) calculateNextCronRun(cronSpec string, after time.Time) (
 
 // cronMatches checks if a time matches a cron expression
 func (s *TaskScheduler) cronMatches(expr *CronExpression, t time.Time) bool {
+	if expr.Second != nil {
+		if !s.fieldMatches(*expr.Second, t.Second()) {
+			return false
+		}
+	}
+
 	if !s.fieldMatches(expr.Minute, t.Minute()) {
 		return false
 	}

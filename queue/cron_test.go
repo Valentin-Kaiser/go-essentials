@@ -20,8 +20,10 @@ func TestCronSpec_Validation(t *testing.T) {
 		{"valid range", "0-5 * * * *", true},
 		{"valid list", "0,15,30,45 * * * *", true},
 		{"valid complex", "0,15,30,45 9-17 * * 1-5", true},
+		{"valid with seconds", "* * * * * *", true},
+		{"valid with seconds specific", "30 0 12 * * *", true},
 		{"invalid too few fields", "* * *", false},
-		{"invalid too many fields", "* * * * * *", false},
+		{"invalid too many fields", "* * * * * * *", false},
 		{"invalid minute range", "60 * * * *", false},
 		{"invalid hour range", "0 25 * * *", false},
 		{"invalid day range", "0 0 32 * *", false},
@@ -236,6 +238,242 @@ func TestCronExpression_ComplexSchedules(t *testing.T) {
 			_, err = scheduler.calculateNextCronRun(tc.spec, time.Now())
 			if err != nil {
 				t.Errorf("failed to calculate next run for '%s': %v", tc.spec, err)
+			}
+		})
+	}
+}
+
+func TestCronWithSeconds(t *testing.T) {
+	scheduler := NewTaskScheduler()
+
+	tests := []struct {
+		name     string
+		cronSpec string
+		wantErr  bool
+		desc     string
+	}{
+		{
+			name:     "every_second",
+			cronSpec: "* * * * * *",
+			wantErr:  false,
+			desc:     "Every second",
+		},
+		{
+			name:     "every_30_seconds",
+			cronSpec: "*/30 * * * * *",
+			wantErr:  false,
+			desc:     "Every 30 seconds",
+		},
+		{
+			name:     "specific_second",
+			cronSpec: "15 * * * * *",
+			wantErr:  false,
+			desc:     "Every minute at 15 seconds",
+		},
+		{
+			name:     "every_minute_at_0_seconds",
+			cronSpec: "0 * * * * *",
+			wantErr:  false,
+			desc:     "Every minute at 0 seconds",
+		},
+		{
+			name:     "daily_at_noon_30_seconds",
+			cronSpec: "30 0 12 * * *",
+			wantErr:  false,
+			desc:     "Daily at 12:00:30",
+		},
+		{
+			name:     "backward_compatibility_5_fields",
+			cronSpec: "0 12 * * *",
+			wantErr:  false,
+			desc:     "Daily at 12:00 (5 fields, no seconds)",
+		},
+		{
+			name:     "invalid_too_many_fields",
+			cronSpec: "0 0 0 12 * * *",
+			wantErr:  true,
+			desc:     "Too many fields",
+		},
+		{
+			name:     "invalid_too_few_fields",
+			cronSpec: "0 12 * *",
+			wantErr:  true,
+			desc:     "Too few fields",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := scheduler.validateCronSpec(tt.cronSpec)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateCronSpec() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCronSecondsFieldParsing(t *testing.T) {
+	scheduler := NewTaskScheduler()
+
+	tests := []struct {
+		name       string
+		cronSpec   string
+		wantErr    bool
+		hasSeconds bool
+	}{
+		{
+			name:       "six_fields_with_seconds",
+			cronSpec:   "0 0 12 * * *",
+			wantErr:    false,
+			hasSeconds: true,
+		},
+		{
+			name:       "five_fields_without_seconds",
+			cronSpec:   "0 12 * * *",
+			wantErr:    false,
+			hasSeconds: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := scheduler.parseCronSpec(tt.cronSpec)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseCronSpec() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr {
+				hasSeconds := expr.Second != nil
+				if hasSeconds != tt.hasSeconds {
+					t.Errorf("parseCronSpec() hasSeconds = %v, want %v", hasSeconds, tt.hasSeconds)
+				}
+			}
+		})
+	}
+}
+
+func TestCronSecondsMatching(t *testing.T) {
+	scheduler := NewTaskScheduler()
+
+	tests := []struct {
+		name     string
+		cronSpec string
+		testTime time.Time
+		want     bool
+	}{
+		{
+			name:     "every_second_matches",
+			cronSpec: "* * * * * *",
+			testTime: time.Date(2023, 7, 15, 12, 30, 45, 0, time.UTC),
+			want:     true,
+		},
+		{
+			name:     "specific_second_matches",
+			cronSpec: "45 * * * * *",
+			testTime: time.Date(2023, 7, 15, 12, 30, 45, 0, time.UTC),
+			want:     true,
+		},
+		{
+			name:     "specific_second_no_match",
+			cronSpec: "30 * * * * *",
+			testTime: time.Date(2023, 7, 15, 12, 30, 45, 0, time.UTC),
+			want:     false,
+		},
+		{
+			name:     "every_30_seconds_matches",
+			cronSpec: "*/30 * * * * *",
+			testTime: time.Date(2023, 7, 15, 12, 30, 30, 0, time.UTC),
+			want:     true,
+		},
+		{
+			name:     "every_30_seconds_no_match",
+			cronSpec: "*/30 * * * * *",
+			testTime: time.Date(2023, 7, 15, 12, 30, 25, 0, time.UTC),
+			want:     false,
+		},
+		{
+			name:     "backward_compatibility_5_fields",
+			cronSpec: "30 12 * * *",
+			testTime: time.Date(2023, 7, 15, 12, 30, 0, 0, time.UTC),
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := scheduler.parseCronSpec(tt.cronSpec)
+			if err != nil {
+				t.Errorf("parseCronSpec() error = %v", err)
+				return
+			}
+
+			got := scheduler.cronMatches(expr, tt.testTime)
+			if got != tt.want {
+				t.Errorf("cronMatches() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCronSecondsNextRun(t *testing.T) {
+	scheduler := NewTaskScheduler()
+
+	tests := []struct {
+		name     string
+		cronSpec string
+		after    time.Time
+		wantErr  bool
+	}{
+		{
+			name:     "every_second",
+			cronSpec: "* * * * * *",
+			after:    time.Date(2023, 7, 15, 12, 30, 45, 0, time.UTC),
+			wantErr:  false,
+		},
+		{
+			name:     "every_30_seconds",
+			cronSpec: "*/30 * * * * *",
+			after:    time.Date(2023, 7, 15, 12, 30, 25, 0, time.UTC),
+			wantErr:  false,
+		},
+		{
+			name:     "specific_time_with_seconds",
+			cronSpec: "30 0 12 * * *",
+			after:    time.Date(2023, 7, 15, 11, 30, 45, 0, time.UTC),
+			wantErr:  false,
+		},
+		{
+			name:     "backward_compatibility",
+			cronSpec: "0 12 * * *",
+			after:    time.Date(2023, 7, 15, 11, 30, 45, 0, time.UTC),
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nextRun, err := scheduler.calculateNextCronRun(tt.cronSpec, tt.after)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("calculateNextCronRun() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr && !nextRun.After(tt.after) {
+				t.Errorf("calculateNextCronRun() = %v, should be after %v", nextRun, tt.after)
+			}
+
+			// Verify the next run time matches the cron expression
+			if !tt.wantErr {
+				expr, err := scheduler.parseCronSpec(tt.cronSpec)
+				if err != nil {
+					t.Errorf("parseCronSpec() error = %v", err)
+					return
+				}
+
+				if !scheduler.cronMatches(expr, nextRun) {
+					t.Errorf("calculateNextCronRun() returned %v, which doesn't match cron expression %s", nextRun, tt.cronSpec)
+				}
 			}
 		})
 	}
