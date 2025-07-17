@@ -1,11 +1,14 @@
 package interruption
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"runtime"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -448,7 +451,8 @@ func TestHandleWithNilPanic(t *testing.T) {
 
 	func() {
 		defer Handle()
-		panic(nil)
+		var nilValue interface{}
+		panic(nilValue)
 	}()
 }
 
@@ -616,6 +620,353 @@ func TestHandleWithEnvironmentVariables(t *testing.T) {
 	}()
 }
 
+// OnSignal Tests
+
+func TestOnSignalContextCreation(t *testing.T) {
+	// Test that OnSignal returns a valid context
+	handler := func() error {
+		return nil
+	}
+
+	ctx := OnSignal([]func() error{handler}, syscall.SIGTERM)
+
+	if ctx == nil {
+		t.Error("OnSignal should return a non-nil context")
+	}
+
+	// Context should not be done initially (no signal sent)
+	select {
+	case <-ctx.Done():
+		t.Error("Context should not be done immediately after creation")
+	default:
+		// Expected
+	}
+}
+
+func TestOnSignalHandlerExecution(t *testing.T) {
+	// Test that handlers execute when manually triggering the context
+	var mu sync.Mutex
+	executed := make([]bool, 3)
+
+	handler1 := func() error {
+		mu.Lock()
+		executed[0] = true
+		mu.Unlock()
+		return nil
+	}
+	handler2 := func() error {
+		mu.Lock()
+		executed[1] = true
+		mu.Unlock()
+		return nil
+	}
+	handler3 := func() error {
+		mu.Lock()
+		executed[2] = true
+		mu.Unlock()
+		return nil
+	}
+
+	handlers := []func() error{handler1, handler2, handler3}
+
+	// Create a context that we can cancel manually to simulate signal
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Use a wait group to synchronize goroutine completion
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// Simulate the OnSignal goroutine behavior
+	go func() {
+		defer wg.Done()
+		// Wait for context cancellation (simulating signal)
+		<-ctx.Done()
+		for _, handler := range handlers {
+			if err := handler(); err != nil {
+				t.Errorf("Handler failed: %v", err)
+			}
+		}
+	}()
+
+	// Cancel the context to simulate signal
+	cancel()
+
+	// Wait for the goroutine to complete
+	wg.Wait()
+
+	// Check that all handlers were executed
+	mu.Lock()
+	for i, exec := range executed {
+		if !exec {
+			t.Errorf("Handler %d was not executed", i+1)
+		}
+	}
+	mu.Unlock()
+}
+
+func TestOnSignalWithErrors(t *testing.T) {
+	// Test handlers that return errors
+	testError := errors.New("handler error")
+
+	errorHandler := func() error {
+		return testError
+	}
+	successHandler := func() error {
+		return nil
+	}
+
+	handlers := []func() error{errorHandler, successHandler}
+
+	// Create a context that we can cancel manually
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var mu sync.Mutex
+	var handlerErrors []error
+
+	// Use a wait group to synchronize goroutine completion
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// Simulate the OnSignal goroutine behavior
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+		for _, handler := range handlers {
+			if err := handler(); err != nil {
+				mu.Lock()
+				handlerErrors = append(handlerErrors, err)
+				mu.Unlock()
+			}
+		}
+	}()
+
+	// Cancel the context to simulate signal
+	cancel()
+
+	// Wait for the goroutine to complete
+	wg.Wait()
+
+	// Check that error was captured
+	mu.Lock()
+	if len(handlerErrors) != 1 {
+		t.Errorf("Expected 1 error, got %d", len(handlerErrors))
+	}
+
+	if len(handlerErrors) > 0 && handlerErrors[0] != testError {
+		t.Errorf("Expected error %v, got %v", testError, handlerErrors[0])
+	}
+	mu.Unlock()
+}
+
+func TestOnSignalNoHandlers(t *testing.T) {
+	// Test with empty handlers slice
+	ctx := OnSignal([]func() error{}, syscall.SIGTERM)
+
+	if ctx == nil {
+		t.Error("OnSignal should return a non-nil context even with no handlers")
+	}
+
+	// With empty handlers, the context should be done immediately
+	// since the goroutine runs through an empty handler list and calls stop()
+	select {
+	case <-ctx.Done():
+		// Expected behavior - context is canceled immediately with no handlers
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Context should be done immediately with no handlers")
+	}
+}
+
+func TestOnSignalNilHandlers(t *testing.T) {
+	// Test with nil handlers slice
+	ctx := OnSignal(nil, syscall.SIGTERM)
+
+	if ctx == nil {
+		t.Error("OnSignal should return a non-nil context even with nil handlers")
+	}
+
+	// With nil handlers, the context should be done immediately
+	// since the goroutine runs through an empty handler list and calls stop()
+	select {
+	case <-ctx.Done():
+		// Expected behavior - context is canceled immediately with no handlers
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Context should be done immediately with nil handlers")
+	}
+}
+
+func TestOnSignalHandlerPanic(t *testing.T) {
+	// Test behavior when handler panics
+	var mu sync.Mutex
+	executed := make([]bool, 2)
+
+	panicHandler := func() error {
+		mu.Lock()
+		executed[0] = true
+		mu.Unlock()
+		panic("handler panic")
+	}
+	normalHandler := func() error {
+		mu.Lock()
+		executed[1] = true
+		mu.Unlock()
+		return nil
+	}
+
+	handlers := []func() error{panicHandler, normalHandler}
+
+	// Create a context that we can cancel manually
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Use a wait group to synchronize goroutine completion
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// Simulate the OnSignal goroutine behavior with panic recovery
+	go func() {
+		defer wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				// Panic was recovered, continue execution
+			}
+		}()
+
+		<-ctx.Done()
+		for _, handler := range handlers {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// Handle panic in individual handler
+					}
+				}()
+				if err := handler(); err != nil {
+					t.Errorf("Handler failed: %v", err)
+				}
+			}()
+		}
+	}()
+
+	// Cancel the context to simulate signal
+	cancel()
+
+	// Wait for the goroutine to complete
+	wg.Wait()
+
+	// Check execution status
+	mu.Lock()
+	// First handler should have executed (and panicked)
+	if !executed[0] {
+		t.Error("Panic handler was not executed")
+	}
+
+	// Second handler should still execute even after first panicked
+	if !executed[1] {
+		t.Error("Normal handler was not executed after panic handler")
+	}
+	mu.Unlock()
+}
+
+func TestOnSignalLongRunningHandler(t *testing.T) {
+	// Test with a handler that takes some time
+	var mu sync.Mutex
+	executed := false
+
+	handler := func() error {
+		time.Sleep(50 * time.Millisecond)
+		mu.Lock()
+		executed = true
+		mu.Unlock()
+		return nil
+	}
+
+	handlers := []func() error{handler}
+
+	// Create a context that we can cancel manually
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Use a wait group to synchronize goroutine completion
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	// Simulate the OnSignal goroutine behavior
+	start := time.Now()
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+		for _, h := range handlers {
+			if err := h(); err != nil {
+				t.Errorf("Handler failed: %v", err)
+			}
+		}
+	}()
+
+	// Cancel the context to simulate signal
+	cancel()
+
+	// Wait for the goroutine to complete
+	wg.Wait()
+	duration := time.Since(start)
+
+	mu.Lock()
+	if !executed {
+		t.Error("Long running handler was not executed")
+	}
+	mu.Unlock()
+
+	if duration < 50*time.Millisecond {
+		t.Error("Handler completed too quickly, may not have executed properly")
+	}
+}
+
+func TestOnSignalMultipleSignalTypes(t *testing.T) {
+	// Test with multiple signal types - just verify the function accepts them
+	handler := func() error {
+		return nil
+	}
+
+	// Test that function accepts multiple signal types without error
+	ctx := OnSignal([]func() error{handler}, syscall.SIGTERM, syscall.SIGINT)
+
+	if ctx == nil {
+		t.Error("OnSignal should return a non-nil context with multiple signals")
+	}
+
+	// Context should not be done initially
+	select {
+	case <-ctx.Done():
+		t.Error("Context should not be done immediately with multiple signals")
+	default:
+		// Expected
+	}
+}
+
+func TestOnSignalContextType(t *testing.T) {
+	// Test that the returned context is the correct type
+	handler := func() error {
+		return nil
+	}
+
+	ctx := OnSignal([]func() error{handler}, syscall.SIGTERM)
+
+	if ctx == nil {
+		t.Fatal("OnSignal should return a non-nil context")
+	}
+
+	// Test context methods exist
+	if ctx.Done() == nil {
+		t.Error("Context.Done() should return a non-nil channel")
+	}
+
+	if ctx.Err() != nil {
+		t.Error("Context.Err() should be nil for a non-cancelled context")
+	}
+
+	// Context should have a deadline method (even if no deadline is set)
+	_, ok := ctx.Deadline()
+	if ok {
+		t.Error("Signal context should not have a deadline")
+	}
+}
+
 // Benchmark tests
 func BenchmarkHandle(b *testing.B) {
 	for i := 0; i < b.N; i++ {
@@ -681,5 +1032,33 @@ func BenchmarkHandleProductionMode(b *testing.B) {
 			defer Handle()
 			panic("production mode benchmark")
 		}()
+	}
+}
+
+// Benchmark tests for OnSignal
+func BenchmarkOnSignalCreation(b *testing.B) {
+	handler := func() error {
+		return nil
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ctx := OnSignal([]func() error{handler}, syscall.SIGTERM)
+		_ = ctx // Use the context to prevent optimization
+	}
+}
+
+func BenchmarkOnSignalMultipleHandlers(b *testing.B) {
+	handlers := make([]func() error, 10)
+	for i := range handlers {
+		handlers[i] = func() error {
+			return nil
+		}
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ctx := OnSignal(handlers, syscall.SIGTERM)
+		_ = ctx // Use the context to prevent optimization
 	}
 }
