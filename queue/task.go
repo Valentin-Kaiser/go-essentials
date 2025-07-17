@@ -170,11 +170,6 @@ func (s *TaskScheduler) RegisterCronTaskWithOptions(name, cronSpec string, fn Ta
 		timeout = options.Timeout
 	}
 
-	enabled := true
-	if options.Enabled {
-		enabled = options.Enabled
-	}
-
 	task := &Task{
 		ID:         generateTaskID(),
 		Name:       name,
@@ -184,7 +179,7 @@ func (s *TaskScheduler) RegisterCronTaskWithOptions(name, cronSpec string, fn Ta
 		MaxRetries: maxRetries,
 		RetryDelay: retryDelay,
 		Timeout:    timeout,
-		Enabled:    enabled,
+		Enabled:    options.Enabled,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}
@@ -240,11 +235,6 @@ func (s *TaskScheduler) RegisterIntervalTaskWithOptions(name string, interval ti
 		timeout = options.Timeout
 	}
 
-	enabled := true
-	if options.Enabled {
-		enabled = options.Enabled
-	}
-
 	task := &Task{
 		ID:         generateTaskID(),
 		Name:       name,
@@ -255,7 +245,7 @@ func (s *TaskScheduler) RegisterIntervalTaskWithOptions(name string, interval ti
 		MaxRetries: maxRetries,
 		RetryDelay: retryDelay,
 		Timeout:    timeout,
-		Enabled:    enabled,
+		Enabled:    options.Enabled,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}

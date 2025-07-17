@@ -451,8 +451,8 @@ func TestHandleWithNilPanic(t *testing.T) {
 
 	func() {
 		defer Handle()
-		var nilValue interface{}
-		panic(nilValue)
+		var nilPtr *int
+		panic(nilPtr)
 	}()
 }
 
