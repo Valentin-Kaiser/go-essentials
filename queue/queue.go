@@ -1,4 +1,5 @@
-// Package queue provides a comprehensive task queue and background job processing system.
+// Package queue provides a comprehensive task queue and background job processing system
+// with advanced scheduling capabilities.
 //
 // It supports in-memory, Redis-backed, and RabbitMQ queues with features like:
 //   - Priority-based job scheduling
@@ -11,8 +12,13 @@
 //   - Comprehensive error handling
 //   - RabbitMQ support with persistent message delivery
 //   - Scheduled job execution
+//   - Cron-based scheduling (using enhanced cron expressions with optional seconds support)
+//   - Interval-based scheduling (using time.Duration)
+//   - Task registration and management
+//   - Error recovery and retries
+//   - Context-aware execution
 //
-// Example:
+// Queue Manager Example:
 //
 //	package main
 //
@@ -54,6 +60,62 @@
 //
 //		// Wait for processing
 //		time.Sleep(time.Second)
+//	}
+//
+// Task Scheduler Example:
+//
+//	package main
+//
+//	import (
+//		"context"
+//		"fmt"
+//		"time"
+//
+//		"github.com/Valentin-Kaiser/go-core/queue"
+//	)
+//
+//	func main() {
+//		// Create a new task scheduler
+//		scheduler := queue.NewTaskScheduler()
+//
+//		// Register a cron-based task (5 fields - traditional)
+//		scheduler.RegisterCronTask("cleanup", "0 0 * * *", func(ctx context.Context) error {
+//			fmt.Println("Running daily cleanup task")
+//			return nil
+//		})
+//
+//		// Register a cron-based task with seconds (6 fields)
+//		scheduler.RegisterCronTask("frequent", "*/30 * * * * *", func(ctx context.Context) error {
+//			fmt.Println("Running every 30 seconds")
+//			return nil
+//		})
+//
+//		// Register a predefined expression
+//		scheduler.RegisterCronTask("hourly", "@hourly", func(ctx context.Context) error {
+//			fmt.Println("Running every hour")
+//			return nil
+//		})
+//
+//		// Register a task with named months and days
+//		scheduler.RegisterCronTask("weekday", "0 0 9 * * MON-FRI", func(ctx context.Context) error {
+//			fmt.Println("Running on weekdays at 9 AM")
+//			return nil
+//		})
+//
+//		// Register an interval-based task
+//		scheduler.RegisterIntervalTask("health-check", time.Minute*5, func(ctx context.Context) error {
+//			fmt.Println("Running health check")
+//			return nil
+//		})
+//
+//		// Start the scheduler
+//		if err := scheduler.Start(context.Background()); err != nil {
+//			panic(err)
+//		}
+//		defer scheduler.Stop()
+//
+//		// Keep the program running
+//		select {}
 //	}
 package queue
 
