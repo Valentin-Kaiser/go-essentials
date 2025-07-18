@@ -147,7 +147,7 @@ func Connect(interval time.Duration, config Config) {
 	go func() {
 		for {
 			func() {
-				defer interruption.Handle()
+				defer interruption.Catch()
 				defer time.Sleep(interval)
 
 				// If we are not connected to the database, try to connect

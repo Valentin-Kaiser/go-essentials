@@ -9,6 +9,7 @@ import (
 )
 
 func TestNewError(t *testing.T) {
+	t.Parallel()
 	msg := "test error message"
 	err := NewError(msg)
 
@@ -26,6 +27,7 @@ func TestNewError(t *testing.T) {
 }
 
 func TestNewErrorf(t *testing.T) {
+	t.Parallel()
 	format := "test error with number %d and string %s"
 	err := NewErrorf(format, 42, "hello")
 
@@ -265,7 +267,7 @@ func TestErrorImplementsErrorInterface(t *testing.T) {
 // Benchmark tests
 func BenchmarkNewError(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		NewError("benchmark error")
+		_ = NewError("benchmark error")
 	}
 }
 
@@ -274,7 +276,7 @@ func BenchmarkWrap(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		Wrap(baseErr)
+		_ = Wrap(baseErr)
 	}
 }
 

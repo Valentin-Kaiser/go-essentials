@@ -11,16 +11,18 @@ import (
 // TestCacheControlHeaders tests that the enhanced cache control headers are properly set
 func TestCacheControlHeaders(t *testing.T) {
 	// Create a test handler
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			t.Logf("Failed to write response: %v", err)
+		}
 	})
 
 	// Apply the security middleware
 	middlewareHandler := securityHeaderMiddleware(handler)
 
 	// Create a request
-	req, err := http.NewRequest("GET", "/", nil)
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,16 +55,18 @@ func TestCacheControlHeaders(t *testing.T) {
 // TestETagValidation tests that If-None-Match header validation works correctly
 func TestETagValidation(t *testing.T) {
 	// Create a test handler
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			t.Logf("Failed to write response: %v", err)
+		}
 	})
 
 	// Apply the security middleware
 	middlewareHandler := securityHeaderMiddleware(handler)
 
 	// Test case 1: Request with matching ETag (unquoted)
-	req1, err := http.NewRequest("GET", "/", nil)
+	req1, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +80,7 @@ func TestETagValidation(t *testing.T) {
 	}
 
 	// Test case 2: Request with matching ETag (quoted)
-	req2, err := http.NewRequest("GET", "/", nil)
+	req2, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +94,7 @@ func TestETagValidation(t *testing.T) {
 	}
 
 	// Test case 3: Request with non-matching ETag
-	req3, err := http.NewRequest("GET", "/", nil)
+	req3, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +108,7 @@ func TestETagValidation(t *testing.T) {
 	}
 
 	// Test case 4: Request without If-None-Match header
-	req4, err := http.NewRequest("GET", "/", nil)
+	req4, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,16 +129,18 @@ func TestCustomCacheControlHeaders(t *testing.T) {
 	}
 
 	// Create a test handler
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			t.Logf("Failed to write response: %v", err)
+		}
 	})
 
 	// Apply the security middleware with custom cache control
 	middlewareHandler := securityHeaderMiddlewareWithServer(server)(handler)
 
 	// Create a request
-	req, err := http.NewRequest("GET", "/", nil)
+	req, err := http.NewRequest(http.MethodGet, "/", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

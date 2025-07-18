@@ -303,7 +303,7 @@ func TestLoggerWriteWithLevel(t *testing.T) {
 	}
 }
 
-func TestLoggerStop(t *testing.T) {
+func TestLoggerStop(_ *testing.T) {
 	logger := Logger()
 
 	// Test Stop without file (should not panic)
@@ -314,7 +314,7 @@ func TestLoggerStop(t *testing.T) {
 	logger.Stop()
 }
 
-func TestLoggerRotate(t *testing.T) {
+func TestLoggerRotate(_ *testing.T) {
 	logger := Logger().WithLogFile()
 
 	// Test Rotate (should not panic)
@@ -375,7 +375,7 @@ func TestLoggerChaining(t *testing.T) {
 	}
 }
 
-func TestLoggerImplementsWriter(t *testing.T) {
+func TestLoggerImplementsWriter(_ *testing.T) {
 	var _ io.Writer = Logger()
 }
 
@@ -463,7 +463,9 @@ func BenchmarkLoggerWrite(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Write(message)
+		if _, err := logger.Write(message); err != nil {
+			b.Logf("Failed to write log: %v", err)
+		}
 	}
 }
 

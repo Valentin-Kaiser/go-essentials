@@ -10,6 +10,7 @@ import (
 )
 
 func TestConfig_Validate(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name   string
 		config Config
@@ -156,7 +157,7 @@ func TestConnected(t *testing.T) {
 
 func TestExecuteWithoutConnection(t *testing.T) {
 	// Test Execute when not connected
-	err := Execute(func(db *gorm.DB) error {
+	err := Execute(func(_ *gorm.DB) error {
 		return nil
 	})
 
@@ -251,7 +252,7 @@ func TestConnectWithSQLiteConfig(t *testing.T) {
 	// due to the asynchronous nature of the connection management
 }
 
-func TestRegisterSchema(t *testing.T) {
+func TestRegisterSchema(_ *testing.T) {
 	// Test schema registration
 	type TestModel struct {
 		ID   uint   `gorm:"primaryKey"`
@@ -270,7 +271,7 @@ func TestRegisterSchema(t *testing.T) {
 	RegisterSchema(&TestModel{}, &AnotherModel{})
 }
 
-func TestRegisterMigrationStep(t *testing.T) {
+func TestRegisterMigrationStep(_ *testing.T) {
 	// Test migration step registration
 	v := version.Version{
 		GitTag:    "v1.0.0",
@@ -278,7 +279,7 @@ func TestRegisterMigrationStep(t *testing.T) {
 	}
 
 	// This should not panic
-	RegisterMigrationStep(v, func(db *gorm.DB) error {
+	RegisterMigrationStep(v, func(_ *gorm.DB) error {
 		return nil
 	})
 
@@ -286,7 +287,7 @@ func TestRegisterMigrationStep(t *testing.T) {
 	RegisterMigrationStep(version.Version{
 		GitTag:    "v1.0.1",
 		GitCommit: "def456",
-	}, func(db *gorm.DB) error {
+	}, func(_ *gorm.DB) error {
 		return errors.New("migration failed")
 	})
 }
@@ -295,7 +296,7 @@ func TestRegisterOnConnectHandler(t *testing.T) {
 	// Test OnConnect handler registration
 	var handlerCalled bool
 
-	RegisterOnConnectHandler(func(db *gorm.DB, config Config) error {
+	RegisterOnConnectHandler(func(_ *gorm.DB, _ Config) error {
 		handlerCalled = true
 		return nil
 	})
@@ -306,7 +307,7 @@ func TestRegisterOnConnectHandler(t *testing.T) {
 	}
 
 	// Test handler with error
-	RegisterOnConnectHandler(func(db *gorm.DB, config Config) error {
+	RegisterOnConnectHandler(func(_ *gorm.DB, _ Config) error {
 		return errors.New("handler error")
 	})
 }
@@ -391,7 +392,7 @@ func BenchmarkConfigValidate(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		config.Validate()
+		_ = config.Validate()
 	}
 }
 
@@ -403,7 +404,7 @@ func BenchmarkConnected(b *testing.B) {
 
 func BenchmarkExecuteError(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		Execute(func(db *gorm.DB) error {
+		_ = Execute(func(_ *gorm.DB) error {
 			return nil
 		})
 	}
