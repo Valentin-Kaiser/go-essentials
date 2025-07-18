@@ -298,7 +298,7 @@ func TestServerWithWebSocket(t *testing.T) {
 	server := New()
 
 	wsHandler := func(_ http.ResponseWriter, _ *http.Request, conn *websocket.Conn) {
-		defer apperror.Handle(conn.Close(), "failed to close websocket connection")
+		defer apperror.Catch(conn.Close(), "failed to close websocket connection")
 		// Echo server
 		for {
 			messageType, message, err := conn.ReadMessage()

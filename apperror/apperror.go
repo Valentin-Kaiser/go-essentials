@@ -214,39 +214,40 @@ func Parse(str string) Error {
 	return e
 }
 
-// Handle is a utility function to handle error checks for example in deferred functions
+// Handle is a utility function to handle error checks
 // It takes an error and a message, and if the error is not nil,
 // it formats the message and panics with the error details.
-// defer apperror.Handle(funcWithError(), "an error occurred")
 func Handle(err error, msg string) {
 	if ErrorHandler != nil {
 		ErrorHandler(err, msg)
 	}
 }
 
-// HandleFunc is a utility function to handle deferred error checks
-// It takes a function that returns an error and a message.
-func HandleFunc(f func() error, msg string) {
-	if ErrorHandler != nil {
-		ErrorHandler(f(), msg)
-	}
-}
-
-// HandleCustom is a utility function to handle deferred error checks with a custom handler
-// It takes a function that returns an error, a message, and a custom handler.
-func HandleCustom(f func() error, msg string, handler func(error, string)) {
+// HandleCustom is a utility function to handle error checks with a custom handler
+// It takes an error, a message, and a custom handler.
+func HandleCustom(err error, msg string, handler func(error, string)) {
 	if handler != nil {
-		handler(f(), msg)
+		handler(err, msg)
 		return
 	}
 	if ErrorHandler != nil {
+		ErrorHandler(err, msg)
+	}
+}
+
+// Catch is a utility function to handle error checks for example in deferred functions
+// It takes an error and a message, and if the error is not nil,
+// it formats the message and panics with the error details.
+// defer apperror.Catch(funcWithError(), "an error occurred")
+func Catch(f func() error, msg string) {
+	if ErrorHandler != nil {
 		ErrorHandler(f(), msg)
 	}
 }
 
-// HandleFuncCustom is a utility function to handle deferred error checks with a custom handler
+// CatchCustom is a utility function to handle deferred error checks with a custom handler
 // It takes a function that returns an error, a message, and a custom handler.
-func HandleFuncCustom(f func() error, msg string, handler func(error, string)) {
+func CatchCustom(f func() error, msg string, handler func(error, string)) {
 	if handler != nil {
 		handler(f(), msg)
 		return

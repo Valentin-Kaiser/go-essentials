@@ -51,9 +51,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Handle is a function that handles panics in the application
+// Catch is a function that handles panics in the application
 // It recovers from the panic and logs the error message along with the stack trace
-func Handle() {
+func Catch() {
 	if err := recover(); err != nil {
 		caller := "unknown"
 		line := 0
@@ -96,7 +96,7 @@ func OnSignal(handlers []func() error, signals ...os.Signal) context.Context {
 		// Execute all handlers with panic recovery
 		for _, handler := range handlers {
 			func() {
-				defer Handle()
+				defer Catch()
 				if err := handler(); err != nil {
 					log.Error().Err(err).Msgf("[Signal] handler failed: %v", err)
 				}

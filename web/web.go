@@ -145,7 +145,7 @@ func New() *Server {
 // Start starts the web server
 // All middlewares and handlers that should be registered must be registered before calling this function
 func (s *Server) Start() *Server {
-	defer interruption.Handle()
+	defer interruption.Catch()
 
 	if s.Error != nil {
 		return s
@@ -206,7 +206,7 @@ func (s *Server) Start() *Server {
 // StartAsync starts the web server asynchronously
 // It will return immediately and the server will run in the background
 func (s *Server) StartAsync(done chan error) {
-	defer interruption.Handle()
+	defer interruption.Catch()
 
 	if s.Error != nil {
 		done <- s.Error
@@ -228,7 +228,7 @@ func (s *Server) StartAsync(done chan error) {
 // Stop stops the web server
 // Close does not attempt to close any hijacked connections, such as WebSockets.
 func (s *Server) Stop() error {
-	defer interruption.Handle()
+	defer interruption.Catch()
 
 	s.mutex.RLock()
 	server := s.server
@@ -249,7 +249,7 @@ func (s *Server) Stop() error {
 // It will wait for all active connections to finish before shutting down
 // Make sure the program doesn't exit and waits instead for Shutdown to return
 func (s *Server) Shutdown() error {
-	defer interruption.Handle()
+	defer interruption.Catch()
 
 	s.mutex.RLock()
 	server := s.server
@@ -273,7 +273,7 @@ func (s *Server) Shutdown() error {
 // Restart gracefully shuts down the web server and starts it again
 // It will wait for all active connections to finish before shutting down
 func (s *Server) Restart() error {
-	defer interruption.Handle()
+	defer interruption.Catch()
 
 	s.mutex.RLock()
 	server := s.server
@@ -301,7 +301,7 @@ func (s *Server) Restart() error {
 // RestartAsync gracefully shuts down the web server and starts it again asynchronously
 // It will wait for all active connections to finish before shutting down
 func (s *Server) RestartAsync(done chan error) {
-	defer interruption.Handle()
+	defer interruption.Catch()
 
 	s.mutex.RLock()
 	server := s.server

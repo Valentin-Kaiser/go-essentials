@@ -25,7 +25,7 @@ func TestHandle(t *testing.T) {
 
 	// Test normal execution (no panic)
 	func() {
-		defer Handle()
+		defer Catch()
 		// Normal code that doesn't panic
 	}()
 }
@@ -37,7 +37,7 @@ func TestHandleWithPanic(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Handle()
+				Catch()
 			}
 			handled = true
 		}()
@@ -68,7 +68,7 @@ func TestHandleWithDifferentPanicTypes(t *testing.T) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						Handle()
+						Catch()
 					}
 					handled = true
 				}()
@@ -95,7 +95,7 @@ func TestHandleInDebugMode(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Handle()
+				Catch()
 			}
 			handled = true
 		}()
@@ -120,7 +120,7 @@ func TestHandleInProductionMode(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Handle()
+				Catch()
 			}
 			handled = true
 		}()
@@ -139,7 +139,7 @@ func TestHandleNested(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Handle()
+				Catch()
 			}
 			outerHandled = true
 		}()
@@ -147,7 +147,7 @@ func TestHandleNested(t *testing.T) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					Handle()
+					Catch()
 				}
 				innerHandled = true
 			}()
@@ -173,7 +173,7 @@ func TestHandleMultiple(t *testing.T) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					Handle()
+					Catch()
 				}
 				handled = true
 			}()
@@ -191,7 +191,7 @@ func TestHandleWithoutPanic(t *testing.T) {
 	var normalExecution bool
 
 	func() {
-		defer Handle()
+		defer Catch()
 		normalExecution = true
 	}()
 
@@ -207,7 +207,7 @@ func TestHandleInGoroutine(t *testing.T) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Handle()
+				Catch()
 			}
 			done <- true
 		}()
@@ -251,7 +251,7 @@ func TestHandleWithDetailedPanicTypes(t *testing.T) {
 			}()
 
 			func() {
-				defer Handle()
+				defer Catch()
 				panic(tt.panicData)
 			}()
 		})
@@ -274,7 +274,7 @@ func TestHandleWithCallStack(t *testing.T) {
 		}()
 
 		func() {
-			defer Handle()
+			defer Catch()
 			panic("debug mode panic")
 		}()
 	}()
@@ -290,7 +290,7 @@ func TestHandleWithCallStack(t *testing.T) {
 		}()
 
 		func() {
-			defer Handle()
+			defer Catch()
 			panic("production mode panic")
 		}()
 	}()
@@ -311,7 +311,7 @@ func TestHandleWithGoroutineStack(t *testing.T) {
 		}()
 
 		func() {
-			defer Handle()
+			defer Catch()
 			panic("goroutine panic")
 		}()
 	}()
@@ -336,7 +336,7 @@ func TestHandleWithRecursivePanic(t *testing.T) {
 			}
 		}()
 
-		defer Handle()
+		defer Catch()
 
 		depth++
 		if depth < maxDepth {
@@ -359,7 +359,7 @@ func TestHandleCallerInformation(t *testing.T) {
 		{
 			"direct call",
 			func() {
-				defer Handle()
+				defer Catch()
 				panic("direct panic")
 			},
 		},
@@ -367,7 +367,7 @@ func TestHandleCallerInformation(t *testing.T) {
 			"nested call",
 			func() {
 				func() {
-					defer Handle()
+					defer Catch()
 					panic("nested panic")
 				}()
 			},
@@ -376,7 +376,7 @@ func TestHandleCallerInformation(t *testing.T) {
 			"anonymous function",
 			func() {
 				func() {
-					defer Handle()
+					defer Catch()
 					panic("anonymous panic")
 				}()
 			},
@@ -407,7 +407,7 @@ func TestHandleWithRuntimeCallerFailure(t *testing.T) {
 	}()
 
 	func() {
-		defer Handle()
+		defer Catch()
 		panic("test runtime caller failure scenario")
 	}()
 }
@@ -435,7 +435,7 @@ func TestHandleInDifferentDebugModes(t *testing.T) {
 			}()
 
 			func() {
-				defer Handle()
+				defer Catch()
 				panic("panic in " + mode.name)
 			}()
 		})
@@ -450,7 +450,7 @@ func TestHandleWithNilPanic(t *testing.T) {
 	}()
 
 	func() {
-		defer Handle()
+		defer Catch()
 		var nilPtr *int
 		panic(nilPtr)
 	}()
@@ -470,7 +470,7 @@ func TestHandleWithLargePanicData(t *testing.T) {
 	}
 
 	func() {
-		defer Handle()
+		defer Catch()
 		panic(largeData)
 	}()
 }
@@ -485,7 +485,7 @@ func TestHandleFilePathProcessing(t *testing.T) {
 
 	// Create a scenario with nested directory structure
 	func() {
-		defer Handle()
+		defer Catch()
 		panic("file path processing test")
 	}()
 }
@@ -501,7 +501,7 @@ func TestHandleWithOSSignals(t *testing.T) {
 	}()
 
 	func() {
-		defer Handle()
+		defer Catch()
 		// Simulate some OS-related panic
 		panic("simulated OS signal panic")
 	}()
@@ -516,7 +516,7 @@ func TestHandleMemoryPressure(t *testing.T) {
 	}()
 
 	func() {
-		defer Handle()
+		defer Catch()
 		// Simulate out of memory scenario
 		panic("runtime: out of memory")
 	}()
@@ -537,15 +537,15 @@ func TestMultipleHandleRegistrations(t *testing.T) {
 
 	func() {
 		defer func() { counter++ }()
-		defer Handle()
+		defer Catch()
 
 		func() {
 			defer func() { counter++ }()
-			defer Handle()
+			defer Catch()
 
 			func() {
 				defer func() { counter++ }()
-				defer Handle()
+				defer Catch()
 				panic("nested handle test")
 			}()
 		}()
@@ -559,7 +559,7 @@ func TestHandlePerformance(t *testing.T) {
 	start := time.Now()
 	for i := 0; i < iterations; i++ {
 		func() {
-			defer Handle()
+			defer Catch()
 			panic("performance test")
 		}()
 	}
@@ -590,7 +590,7 @@ func TestHandleRuntimeCharacteristics(t *testing.T) {
 			}()
 
 			func() {
-				defer Handle()
+				defer Catch()
 				panic(fmt.Sprintf("panic with GOMAXPROCS=%d", procs))
 			}()
 		})
@@ -618,7 +618,7 @@ func TestHandleWithEnvironmentVariables(t *testing.T) {
 	}()
 
 	func() {
-		defer Handle()
+		defer Catch()
 		panic("environment variable test")
 	}()
 }
@@ -830,7 +830,7 @@ func TestOnSignalHandlerPanic(t *testing.T) {
 		<-ctx.Done()
 		for _, handler := range handlers {
 			func() {
-				defer Handle()
+				defer Catch()
 				if err := handler(); err != nil {
 					t.Errorf("Handler failed: %v", err)
 				}
@@ -964,7 +964,7 @@ func TestOnSignalContextType(t *testing.T) {
 func BenchmarkHandle(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer Handle()
+			defer Catch()
 			panic("benchmark test")
 		}()
 	}
@@ -979,7 +979,7 @@ func BenchmarkHandleWithLargeStack(b *testing.B) {
 				if depth > 0 {
 					deepCall(depth - 1)
 				} else {
-					defer Handle()
+					defer Catch()
 					panic("deep stack benchmark")
 				}
 			}
@@ -996,7 +996,7 @@ func BenchmarkHandleDebugMode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer Handle()
+			defer Catch()
 			panic("debug mode benchmark")
 		}()
 	}
@@ -1009,7 +1009,7 @@ func BenchmarkHandleProductionMode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer Handle()
+			defer Catch()
 			panic("production mode benchmark")
 		}()
 	}
