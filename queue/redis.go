@@ -18,7 +18,14 @@ type RedisQueue struct {
 	closed    bool
 }
 
-// NewRedisQueue creates a new Redis-backed queue
+// NewRedisQueue creates a new Redis-backed queue.
+// 
+// Parameters:
+// - client: A Redis client implementing the redis.Cmdable interface, used to interact with the Redis database.
+// - keyPrefix: A string used as a prefix for all Redis keys created by the queue. If an empty string is provided, the default prefix "queue" is used.
+// 
+// Purpose:
+// This function initializes a RedisQueue instance, which provides methods for enqueueing, dequeueing, and scheduling jobs in a Redis-backed job queue.
 func NewRedisQueue(client redis.Cmdable, keyPrefix string) *RedisQueue {
 	if keyPrefix == "" {
 		keyPrefix = "queue"
