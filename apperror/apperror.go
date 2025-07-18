@@ -52,6 +52,17 @@ var (
 	ErrorTraceFormat = "%s | %s"
 	// FullFormat is the format for displaying the error message with a stack trace and additional errors
 	FullFormat = "%s | %s [%s]"
+
+	// ErrorHandler is a function that handles deferred error checks
+	ErrorHandler = func(err error, msg string) {
+		if err == nil {
+			return
+		}
+		if flag.Debug {
+			panic(fmt.Sprintf(FullFormat, strings.Join(trace(Error{Message: msg}), TraceDelimiter), msg, err.Error()))
+		}
+		panic(fmt.Sprintf(ErrorFormat, msg, err.Error()))
+	}
 )
 
 // Error represents an application error with a stack trace and additional errors
@@ -201,6 +212,48 @@ func Parse(str string) Error {
 
 	e.Trace = trace(e)
 	return e
+}
+
+// Handle is a utility function to handle error checks for example in deferred functions
+// It takes an error and a message, and if the error is not nil,
+// it formats the message and panics with the error details.
+// defer apperror.Handle(funcWithError(), "an error occurred")
+func Handle(err error, msg string) {
+	if ErrorHandler != nil {
+		ErrorHandler(err, msg)
+	}
+}
+
+// HandleFunc is a utility function to handle deferred error checks
+// It takes a function that returns an error and a message.
+func HandleFunc(f func() error, msg string) {
+	if ErrorHandler != nil {
+		ErrorHandler(f(), msg)
+	}
+}
+
+// HandleCustom is a utility function to handle deferred error checks with a custom handler
+// It takes a function that returns an error, a message, and a custom handler.
+func HandleCustom(f func() error, msg string, handler func(error, string)) {
+	if handler != nil {
+		handler(f(), msg)
+		return
+	}
+	if ErrorHandler != nil {
+		ErrorHandler(f(), msg)
+	}
+}
+
+// HandleFuncCustom is a utility function to handle deferred error checks with a custom handler
+// It takes a function that returns an error, a message, and a custom handler.
+func HandleFuncCustom(f func() error, msg string, handler func(error, string)) {
+	if handler != nil {
+		handler(f(), msg)
+		return
+	}
+	if ErrorHandler != nil {
+		ErrorHandler(f(), msg)
+	}
 }
 
 // trace generates a stack trace for the error
