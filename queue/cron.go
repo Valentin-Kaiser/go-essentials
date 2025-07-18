@@ -45,7 +45,21 @@ type CronExpression struct {
 	DayOfWeek CronField  // Day of week field (0-6, 0 = Sunday)
 }
 
-// validateCronSpec validates a cron specification
+// validateCronSpec validates a cron specification.
+// 
+// Purpose:
+// This function checks whether the provided cron specification is valid.
+// It supports both standard cron formats (5 or 6 fields) and predefined expressions.
+// 
+// Supported formats:
+// - Standard cron expressions with 5 fields (minute, hour, day, month, day of week).
+// - Extended cron expressions with 6 fields (second, minute, hour, day, month, day of week).
+// - Predefined expressions such as "@yearly", "@daily", "@hourly", etc., which are mapped to standard cron strings.
+// 
+// Validation rules:
+// - Ensures the cron syntax is correct.
+// - Maps predefined expressions to their equivalent cron strings.
+// - Delegates parsing and validation to the parseCronSpec function.
 func (s *TaskScheduler) validateCronSpec(cronSpec string) error {
 	_, err := s.parseCronSpec(cronSpec)
 	return err
