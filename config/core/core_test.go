@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,10 +24,10 @@ type TestConfig struct {
 
 func (c *TestConfig) Validate() error {
 	if c.ApplicationName == "" {
-		return fmt.Errorf("application_name cannot be empty")
+		return errors.New("application_name cannot be empty")
 	}
 	if c.ServerPort <= 0 || c.ServerPort > 65535 {
-		return fmt.Errorf("server_port must be between 1 and 65535")
+		return errors.New("server_port must be between 1 and 65535")
 	}
 	return nil
 }
@@ -37,7 +38,7 @@ type TestConfigWithError struct {
 }
 
 func (c *TestConfigWithError) Validate() error {
-	return fmt.Errorf("always invalid")
+	return errors.New("always invalid")
 }
 
 func TestRegisterConfigBasic(t *testing.T) {
@@ -109,7 +110,7 @@ func TestConfigWithErrorValidation(t *testing.T) {
 	}
 }
 
-func TestConfigInterface(t *testing.T) {
+func TestConfigInterface(_ *testing.T) {
 	// Test that our test configs implement the Config interface
 	var _ Config = &TestConfig{}
 	var _ Config = &TestConfigWithError{}
@@ -144,20 +145,20 @@ func TestFileOperations(t *testing.T) {
 
 	// Test creating directory structure
 	subDir := filepath.Join(tempDir, "subdir")
-	err := os.MkdirAll(subDir, 0755)
+	err := os.MkdirAll(subDir, 0750)
 	if err != nil {
 		t.Errorf("Failed to create subdirectory: %v", err)
 	}
 
 	// Test file creation
 	testFile := filepath.Join(tempDir, "test.yaml")
-	err = os.WriteFile(testFile, []byte("test: value"), 0644)
+	err = os.WriteFile(testFile, []byte("test: value"), 0600)
 	if err != nil {
 		t.Errorf("Failed to create test file: %v", err)
 	}
 
 	// Test file reading
-	content, err := os.ReadFile(testFile)
+	content, err := os.ReadFile(filepath.Clean(testFile))
 	if err != nil {
 		t.Errorf("Failed to read test file: %v", err)
 	}
@@ -167,7 +168,7 @@ func TestFileOperations(t *testing.T) {
 	}
 }
 
-func TestGetWithoutRegistration(t *testing.T) {
+func TestGetWithoutRegistration(_ *testing.T) {
 	// Test Get() when no config is registered
 	// This should return nil or the previously registered config
 	result := Get()
@@ -176,18 +177,18 @@ func TestGetWithoutRegistration(t *testing.T) {
 	_ = result
 }
 
-func TestPackageConstants(t *testing.T) {
+func TestPackageConstants(_ *testing.T) {
 	// Test that we can access package-level functions
 	_ = Get()
 
 	// Test that we can call OnChange (should not panic)
-	OnChange(func(c Config) error {
+	OnChange(func(_ Config) error {
 		return nil
 	})
 }
 
 // Test concurrent access safety
-func TestConcurrentAccess(t *testing.T) {
+func TestConcurrentAccess(_ *testing.T) {
 	done := make(chan bool, 10)
 
 	// Test concurrent Get operations
@@ -274,10 +275,10 @@ type ServerConfig struct {
 
 func (c *ServerConfig) Validate() error {
 	if c.Host == "" {
-		return fmt.Errorf("host cannot be empty")
+		return errors.New("host cannot be empty")
 	}
 	if c.Port <= 0 {
-		return fmt.Errorf("port must be positive")
+		return errors.New("port must be positive")
 	}
 	return nil
 }
@@ -289,7 +290,7 @@ type DatabaseConfig struct {
 
 func (c *DatabaseConfig) Validate() error {
 	if c.URL == "" {
-		return fmt.Errorf("url cannot be empty")
+		return errors.New("url cannot be empty")
 	}
 	return nil
 }
@@ -332,22 +333,21 @@ func (c *UniquePointerConfig) Validate() error {
 
 // Test struct with various types
 type ComplexConfig struct {
-	StringVal    string   `yaml:"string_val" usage:"String value"`
-	IntVal       int      `yaml:"int_val" usage:"Int value"`
-	UintVal      uint     `yaml:"uint_val" usage:"Uint value"`
-	Int8Val      int8     `yaml:"int8_val" usage:"Int8 value"`
-	Uint8Val     uint8    `yaml:"uint8_val" usage:"Uint8 value"`
-	Int16Val     int16    `yaml:"int16_val" usage:"Int16 value"`
-	Uint16Val    uint16   `yaml:"uint16_val" usage:"Uint16 value"`
-	Int32Val     int32    `yaml:"int32_val" usage:"Int32 value"`
-	Uint32Val    uint32   `yaml:"uint32_val" usage:"Uint32 value"`
-	Int64Val     int64    `yaml:"int64_val" usage:"Int64 value"`
-	Uint64Val    uint64   `yaml:"uint64_val" usage:"Uint64 value"`
-	Float32Val   float32  `yaml:"float32_val" usage:"Float32 value"`
-	Float64Val   float64  `yaml:"float64_val" usage:"Float64 value"`
-	BoolVal      bool     `yaml:"bool_val" usage:"Bool value"`
-	StringSlice  []string `yaml:"string_slice" usage:"String slice"`
-	privateField string   // Should be ignored
+	StringVal   string   `yaml:"string_val" usage:"String value"`
+	IntVal      int      `yaml:"int_val" usage:"Int value"`
+	UintVal     uint     `yaml:"uint_val" usage:"Uint value"`
+	Int8Val     int8     `yaml:"int8_val" usage:"Int8 value"`
+	Uint8Val    uint8    `yaml:"uint8_val" usage:"Uint8 value"`
+	Int16Val    int16    `yaml:"int16_val" usage:"Int16 value"`
+	Uint16Val   uint16   `yaml:"uint16_val" usage:"Uint16 value"`
+	Int32Val    int32    `yaml:"int32_val" usage:"Int32 value"`
+	Uint32Val   uint32   `yaml:"uint32_val" usage:"Uint32 value"`
+	Int64Val    int64    `yaml:"int64_val" usage:"Int64 value"`
+	Uint64Val   uint64   `yaml:"uint64_val" usage:"Uint64 value"`
+	Float32Val  float32  `yaml:"float32_val" usage:"Float32 value"`
+	Float64Val  float64  `yaml:"float64_val" usage:"Float64 value"`
+	BoolVal     bool     `yaml:"bool_val" usage:"Bool value"`
+	StringSlice []string `yaml:"string_slice" usage:"String slice"`
 }
 
 func (c *ComplexConfig) Validate() error {
@@ -566,7 +566,10 @@ func TestWriteConfig(t *testing.T) {
 	}
 
 	// Verify the config was updated
-	current := Get().(*TestConfig)
+	current, ok := Get().(*TestConfig)
+	if !ok {
+		t.Fatal("Expected config to be *TestConfig")
+	}
 	if current.ApplicationName != "updated-app" {
 		t.Error("Config should have been updated")
 	}
@@ -613,7 +616,7 @@ func TestOnChangeCallbacks(t *testing.T) {
 	}
 
 	callbackCalled := false
-	OnChange(func(c Config) error {
+	OnChange(func(_ Config) error {
 		callbackCalled = true
 		return nil
 	})
@@ -650,8 +653,8 @@ func TestOnChangeCallbackError(t *testing.T) {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
 
-	OnChange(func(c Config) error {
-		return fmt.Errorf("callback error")
+	OnChange(func(_ Config) error {
+		return errors.New("callback error")
 	})
 
 	// Trigger a change
@@ -693,7 +696,7 @@ func TestWatchConfigFile(t *testing.T) {
 	}
 
 	watchCalled := make(chan bool, 1)
-	Watch(func(e fsnotify.Event) {
+	Watch(func(_ fsnotify.Event) {
 		select {
 		case watchCalled <- true:
 		default:
@@ -721,7 +724,7 @@ func TestConcurrentConfigOperations(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	errors := make(chan error, 10)
+	errs := make(chan error, 10)
 
 	// Test concurrent reads
 	for i := 0; i < 5; i++ {
@@ -730,7 +733,7 @@ func TestConcurrentConfigOperations(t *testing.T) {
 			defer wg.Done()
 			config := Get()
 			if config == nil {
-				errors <- fmt.Errorf("Get() returned nil")
+				errs <- errors.New("Get() returned nil")
 			}
 		}()
 	}
@@ -747,15 +750,15 @@ func TestConcurrentConfigOperations(t *testing.T) {
 				DatabaseURL:     "sqlite:///test.db",
 			}
 			if err := Write(newCfg); err != nil {
-				errors <- err
+				errs <- err
 			}
 		}(i)
 	}
 
 	wg.Wait()
-	close(errors)
+	close(errs)
 
-	for err := range errors {
+	for err := range errs {
 		t.Errorf("Concurrent operation failed: %v", err)
 	}
 }
@@ -846,7 +849,9 @@ func BenchmarkRegisterConfig(b *testing.B) {
 			EnableVerbose:   false,
 			DatabaseURL:     "sqlite:///test.db",
 		}
-		RegisterConfig(fmt.Sprintf("benchmark-%d", i), cfg)
+		if err := RegisterConfig(fmt.Sprintf("benchmark-%d", i), cfg); err != nil {
+			b.Logf("Failed to register config: %v", err)
+		}
 	}
 }
 
@@ -876,7 +881,9 @@ func BenchmarkWrite(b *testing.B) {
 			EnableVerbose:   i%2 == 0,
 			DatabaseURL:     "sqlite:///test.db",
 		}
-		Write(newCfg)
+		if err := Write(newCfg); err != nil {
+			b.Logf("Failed to write config: %v", err)
+		}
 	}
 }
 
@@ -906,6 +913,8 @@ func BenchmarkRead(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Read()
+		if err := Read(); err != nil {
+			b.Logf("Failed to read config: %v", err)
+		}
 	}
 }

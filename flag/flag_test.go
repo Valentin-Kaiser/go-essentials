@@ -24,7 +24,7 @@ func TestDefaultFlags(t *testing.T) {
 	}
 }
 
-func TestRegisterFlag(t *testing.T) {
+func TestRegisterFlag(_ *testing.T) {
 	// Test registering a string flag
 	var stringFlag string
 	RegisterFlag("test-string", &stringFlag, "A test string flag")
@@ -115,7 +115,7 @@ func TestRegisterFlagUnsupportedType(t *testing.T) {
 	RegisterFlag("unsupported", &testFlag, "An unsupported type flag")
 }
 
-func TestInit(t *testing.T) {
+func TestInit(_ *testing.T) {
 	// Save original args
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
@@ -131,14 +131,14 @@ func TestInit(t *testing.T) {
 	Init()
 }
 
-func TestPrint(t *testing.T) {
+func TestPrint(_ *testing.T) {
 	// Test that Print doesn't panic
 	// We can't easily test the output, but we can ensure it doesn't crash
 	Print()
 }
 
 // Test flag registration with default values
-func TestRegisterFlagWithDefaults(t *testing.T) {
+func TestRegisterFlagWithDefaults(_ *testing.T) {
 	var stringFlag = "default"
 	RegisterFlag("default-string", &stringFlag, "A string flag with default")
 
@@ -153,7 +153,7 @@ func TestRegisterFlagWithDefaults(t *testing.T) {
 }
 
 // Test integration with actual command line parsing
-func TestCommandLineIntegration(t *testing.T) {
+func TestCommandLineIntegration(_ *testing.T) {
 	// Save original args
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
@@ -182,7 +182,7 @@ func TestCommandLineIntegration(t *testing.T) {
 }
 
 // Test that flags are properly bound to pflag
-func TestFlagBinding(t *testing.T) {
+func TestFlagBinding(_ *testing.T) {
 	var testFlag string
 	RegisterFlag("binding-test", &testFlag, "A binding test flag")
 
