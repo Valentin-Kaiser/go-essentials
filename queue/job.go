@@ -8,15 +8,20 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/rs/zerolog/log"
 )
 
 // Priority defines the priority levels for jobs
 type Priority int
 
 const (
+	// PriorityLow represents the lowest priority level
 	PriorityLow Priority = iota
+	// PriorityNormal represents the normal priority level
 	PriorityNormal
+	// PriorityHigh represents the high priority level
 	PriorityHigh
+	// PriorityCritical represents the critical priority level
 	PriorityCritical
 )
 
@@ -40,12 +45,19 @@ func (p Priority) String() string {
 type Status int
 
 const (
+	// StatusPending indicates the job is pending execution
 	StatusPending Status = iota
+	// StatusRunning indicates the job is currently being executed
 	StatusRunning
+	// StatusCompleted indicates the job has completed successfully
 	StatusCompleted
+	// StatusFailed indicates the job has failed
 	StatusFailed
+	// StatusRetrying indicates the job is scheduled for retry
 	StatusRetrying
+	// StatusScheduled indicates the job is scheduled for future execution
 	StatusScheduled
+	// StatusDeadLetter indicates the job has been moved to dead letter queue
 	StatusDeadLetter
 )
 
@@ -255,7 +267,10 @@ func (bm *BatchManager) DeleteBatch(ctx context.Context, id string) error {
 	}
 
 	for _, jobID := range batch.JobIDs {
-		bm.manager.queue.DeleteJob(ctx, jobID)
+		if err := bm.manager.queue.DeleteJob(ctx, jobID); err != nil {
+			// Log the error but continue with other jobs
+			log.Error().Err(err).Str("job_id", jobID).Msg("Failed to delete job from batch")
+		}
 	}
 
 	delete(bm.batches, id)
@@ -269,15 +284,13 @@ func (bm *BatchManager) generateBatchID() string {
 
 // JobContext provides context for job execution
 type JobContext struct {
-	context.Context
 	Job *Job
 }
 
 // NewJobContext creates a new job context
-func NewJobContext(ctx context.Context, job *Job) *JobContext {
+func NewJobContext(_ context.Context, job *Job) *JobContext {
 	return &JobContext{
-		Context: ctx,
-		Job:     job,
+		Job: job,
 	}
 }
 

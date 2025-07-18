@@ -3,7 +3,6 @@ package queue
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -11,6 +10,9 @@ import (
 	"github.com/Valentin-Kaiser/go-core/apperror"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
+
+// ErrNoJobAvailable is returned when no job is available in the queue
+var ErrNoJobAvailable = apperror.NewError("no job available")
 
 // RabbitMQQueue implements a RabbitMQ-backed job queue
 type RabbitMQQueue struct {
@@ -63,7 +65,7 @@ func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 
 	channel, err := conn.Channel()
 	if err != nil {
-		conn.Close()
+		apperror.Handle(conn.Close(), "failed to close connection")
 		return nil, apperror.Wrap(err)
 	}
 
@@ -77,8 +79,8 @@ func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 		nil,                 // arguments
 	)
 	if err != nil {
-		channel.Close()
-		conn.Close()
+		apperror.Handle(channel.Close(), "failed to close channel")
+		apperror.Handle(conn.Close(), "failed to close connection")
 		return nil, apperror.Wrap(err)
 	}
 
@@ -96,8 +98,8 @@ func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 		queueArgs,         // arguments
 	)
 	if err != nil {
-		channel.Close()
-		conn.Close()
+		apperror.Handle(channel.Close(), "failed to close channel")
+		apperror.Handle(conn.Close(), "failed to close connection")
 		return nil, apperror.Wrap(err)
 	}
 
@@ -109,8 +111,8 @@ func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 		nil,                 // arguments
 	)
 	if err != nil {
-		channel.Close()
-		conn.Close()
+		apperror.Handle(channel.Close(), "failed to close channel")
+		apperror.Handle(conn.Close(), "failed to close connection")
 		return nil, apperror.Wrap(err)
 	}
 
@@ -128,8 +130,8 @@ func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 		},
 	)
 	if err != nil {
-		channel.Close()
-		conn.Close()
+		apperror.Handle(channel.Close(), "failed to close channel")
+		apperror.Handle(conn.Close(), "failed to close connection")
 		return nil, apperror.Wrap(err)
 	}
 
@@ -221,7 +223,7 @@ func (rq *RabbitMQQueue) Enqueue(ctx context.Context, job *Job) error {
 }
 
 // scheduleJob handles scheduled job publishing
-func (rq *RabbitMQQueue) scheduleJob(ctx context.Context, job *Job, message amqp.Publishing) error {
+func (rq *RabbitMQQueue) scheduleJob(ctx context.Context, _ *Job, message amqp.Publishing) error {
 	// For simplicity, we'll publish scheduled jobs immediately
 	// The application-level scheduler will handle the timing
 	return rq.channel.PublishWithContext(
@@ -255,21 +257,21 @@ func (rq *RabbitMQQueue) Dequeue(ctx context.Context, timeout time.Duration) (*J
 		// No message available, wait a bit and try again
 		select {
 		case <-timeoutCtx.Done():
-			return nil, nil // Timeout, no job available
+			return nil, ErrNoJobAvailable // Timeout, no job available
 		case <-time.After(100 * time.Millisecond):
 			msg, ok, err = rq.channel.Get(rq.queueName, false)
 			if err != nil {
 				return nil, apperror.Wrap(err)
 			}
 			if !ok {
-				return nil, nil // Still no message
+				return nil, ErrNoJobAvailable // Still no message
 			}
 		}
 	}
 
 	var job Job
 	if err := json.Unmarshal(msg.Body, &job); err != nil {
-		msg.Nack(false, false)
+		apperror.Handle(msg.Nack(false, false), "failed to nack message")
 		return nil, apperror.Wrap(err)
 	}
 
@@ -279,7 +281,7 @@ func (rq *RabbitMQQueue) Dequeue(ctx context.Context, timeout time.Duration) (*J
 	if job.Metadata == nil {
 		job.Metadata = make(map[string]string)
 	}
-	job.Metadata["delivery_tag"] = fmt.Sprintf("%d", msg.DeliveryTag)
+	job.Metadata["delivery_tag"] = strconv.FormatUint(msg.DeliveryTag, 10)
 
 	rq.jobsMutex.Lock()
 	rq.jobs[job.ID] = &job
@@ -295,7 +297,7 @@ func (rq *RabbitMQQueue) Schedule(ctx context.Context, job *Job) error {
 }
 
 // UpdateJob updates a job's status
-func (rq *RabbitMQQueue) UpdateJob(ctx context.Context, job *Job) error {
+func (rq *RabbitMQQueue) UpdateJob(_ context.Context, job *Job) error {
 	rq.jobsMutex.Lock()
 	defer rq.jobsMutex.Unlock()
 
@@ -327,7 +329,7 @@ func (rq *RabbitMQQueue) UpdateJob(ctx context.Context, job *Job) error {
 }
 
 // GetJob retrieves a job by ID
-func (rq *RabbitMQQueue) GetJob(ctx context.Context, id string) (*Job, error) {
+func (rq *RabbitMQQueue) GetJob(_ context.Context, id string) (*Job, error) {
 	rq.jobsMutex.RLock()
 	defer rq.jobsMutex.RUnlock()
 
@@ -344,7 +346,7 @@ func (rq *RabbitMQQueue) GetJob(ctx context.Context, id string) (*Job, error) {
 }
 
 // GetJobs retrieves jobs by status
-func (rq *RabbitMQQueue) GetJobs(ctx context.Context, status Status, limit int) ([]*Job, error) {
+func (rq *RabbitMQQueue) GetJobs(_ context.Context, status Status, limit int) ([]*Job, error) {
 	rq.jobsMutex.RLock()
 	defer rq.jobsMutex.RUnlock()
 
@@ -369,7 +371,7 @@ func (rq *RabbitMQQueue) GetJobs(ctx context.Context, status Status, limit int) 
 }
 
 // GetStats returns queue statistics
-func (rq *RabbitMQQueue) GetStats(ctx context.Context) (*Stats, error) {
+func (rq *RabbitMQQueue) GetStats(_ context.Context) (*Stats, error) {
 	rq.jobsMutex.RLock()
 	defer rq.jobsMutex.RUnlock()
 
@@ -398,7 +400,7 @@ func (rq *RabbitMQQueue) GetStats(ctx context.Context) (*Stats, error) {
 		stats.TotalJobs++
 	}
 
-	queueInfo, err := rq.channel.QueueInspect(rq.queueName)
+	queueInfo, err := rq.channel.QueueDeclarePassive(rq.queueName, true, false, false, false, nil)
 	if err == nil {
 		stats.QueueSize = int64(queueInfo.Messages)
 	}
@@ -407,7 +409,7 @@ func (rq *RabbitMQQueue) GetStats(ctx context.Context) (*Stats, error) {
 }
 
 // DeleteJob removes a job from the queue
-func (rq *RabbitMQQueue) DeleteJob(ctx context.Context, id string) error {
+func (rq *RabbitMQQueue) DeleteJob(_ context.Context, id string) error {
 	rq.jobsMutex.Lock()
 	defer rq.jobsMutex.Unlock()
 
@@ -431,11 +433,11 @@ func (rq *RabbitMQQueue) Close() error {
 	rq.closed = true
 
 	if rq.channel != nil {
-		rq.channel.Close()
+		apperror.Handle(rq.channel.Close(), "failed to close channel")
 	}
 
 	if rq.conn != nil {
-		rq.conn.Close()
+		apperror.Handle(rq.conn.Close(), "failed to close connection")
 	}
 
 	return nil
@@ -455,10 +457,10 @@ func (rq *RabbitMQQueue) Reconnect(config RabbitMQConfig) error {
 	defer rq.closeMutex.Unlock()
 
 	if rq.channel != nil {
-		rq.channel.Close()
+		apperror.Handle(rq.channel.Close(), "failed to close old channel")
 	}
 	if rq.conn != nil {
-		rq.conn.Close()
+		apperror.Handle(rq.conn.Close(), "failed to close old connection")
 	}
 
 	conn, err := amqp.Dial(config.URL)
@@ -468,7 +470,7 @@ func (rq *RabbitMQQueue) Reconnect(config RabbitMQConfig) error {
 
 	channel, err := conn.Channel()
 	if err != nil {
-		conn.Close()
+		apperror.Handle(conn.Close(), "failed to close connection")
 		return apperror.Wrap(err)
 	}
 
@@ -480,7 +482,7 @@ func (rq *RabbitMQQueue) Reconnect(config RabbitMQConfig) error {
 }
 
 // PurgeQueue removes all messages from the queue
-func (rq *RabbitMQQueue) PurgeQueue(ctx context.Context) error {
+func (rq *RabbitMQQueue) PurgeQueue(_ context.Context) error {
 	rq.closeMutex.RLock()
 	defer rq.closeMutex.RUnlock()
 

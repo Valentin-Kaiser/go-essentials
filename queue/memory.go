@@ -30,7 +30,7 @@ func NewMemoryQueue() *MemoryQueue {
 }
 
 // Enqueue adds a job to the queue
-func (mq *MemoryQueue) Enqueue(ctx context.Context, job *Job) error {
+func (mq *MemoryQueue) Enqueue(_ context.Context, job *Job) error {
 	mq.mutex.Lock()
 	defer mq.mutex.Unlock()
 
@@ -58,7 +58,12 @@ func (mq *MemoryQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job
 	}
 
 	if mq.pendingJobs.Len() > 0 {
-		job := heap.Pop(mq.pendingJobs).(*Job)
+		jobInterface := heap.Pop(mq.pendingJobs)
+		job, ok := jobInterface.(*Job)
+		if !ok {
+			mq.mutex.Unlock()
+			return nil, apperror.NewError("invalid job type in queue")
+		}
 		mq.mutex.Unlock()
 		return job, nil
 	}
@@ -81,7 +86,12 @@ func (mq *MemoryQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job
 			}
 
 			if mq.pendingJobs.Len() > 0 {
-				job := heap.Pop(mq.pendingJobs).(*Job)
+				jobInterface := heap.Pop(mq.pendingJobs)
+				job, ok := jobInterface.(*Job)
+				if !ok {
+					mq.mutex.Unlock()
+					return nil, apperror.NewError("invalid job type in queue")
+				}
 				mq.mutex.Unlock()
 				return job, nil
 			}
@@ -91,7 +101,7 @@ func (mq *MemoryQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job
 }
 
 // Schedule adds a scheduled job to the queue
-func (mq *MemoryQueue) Schedule(ctx context.Context, job *Job) error {
+func (mq *MemoryQueue) Schedule(_ context.Context, job *Job) error {
 	mq.mutex.Lock()
 	defer mq.mutex.Unlock()
 
@@ -105,7 +115,7 @@ func (mq *MemoryQueue) Schedule(ctx context.Context, job *Job) error {
 }
 
 // GetJob retrieves a job by ID
-func (mq *MemoryQueue) GetJob(ctx context.Context, id string) (*Job, error) {
+func (mq *MemoryQueue) GetJob(_ context.Context, id string) (*Job, error) {
 	mq.mutex.RLock()
 	defer mq.mutex.RUnlock()
 
@@ -122,7 +132,7 @@ func (mq *MemoryQueue) GetJob(ctx context.Context, id string) (*Job, error) {
 }
 
 // UpdateJob updates an existing job
-func (mq *MemoryQueue) UpdateJob(ctx context.Context, job *Job) error {
+func (mq *MemoryQueue) UpdateJob(_ context.Context, job *Job) error {
 	mq.mutex.Lock()
 	defer mq.mutex.Unlock()
 
@@ -147,7 +157,7 @@ func (mq *MemoryQueue) UpdateJob(ctx context.Context, job *Job) error {
 }
 
 // DeleteJob removes a job from the queue
-func (mq *MemoryQueue) DeleteJob(ctx context.Context, id string) error {
+func (mq *MemoryQueue) DeleteJob(_ context.Context, id string) error {
 	mq.mutex.Lock()
 	defer mq.mutex.Unlock()
 
@@ -161,7 +171,7 @@ func (mq *MemoryQueue) DeleteJob(ctx context.Context, id string) error {
 }
 
 // GetJobs retrieves jobs by status
-func (mq *MemoryQueue) GetJobs(ctx context.Context, status Status, limit int) ([]*Job, error) {
+func (mq *MemoryQueue) GetJobs(_ context.Context, status Status, limit int) ([]*Job, error) {
 	mq.mutex.RLock()
 	defer mq.mutex.RUnlock()
 
@@ -186,7 +196,7 @@ func (mq *MemoryQueue) GetJobs(ctx context.Context, status Status, limit int) ([
 }
 
 // GetStats returns queue statistics
-func (mq *MemoryQueue) GetStats(ctx context.Context) (*Stats, error) {
+func (mq *MemoryQueue) GetStats(_ context.Context) (*Stats, error) {
 	mq.mutex.RLock()
 	defer mq.mutex.RUnlock()
 
@@ -252,21 +262,25 @@ func (mq *MemoryQueue) notify() {
 // jobHeap implements a priority queue for jobs
 type jobHeap []*Job
 
-func (h jobHeap) Len() int { return len(h) }
+func (h *jobHeap) Len() int { return len(*h) }
 
-func (h jobHeap) Less(i, j int) bool {
+func (h *jobHeap) Less(i, j int) bool {
 	// Higher priority values come first
-	if h[i].Priority != h[j].Priority {
-		return h[i].Priority > h[j].Priority
+	if (*h)[i].Priority != (*h)[j].Priority {
+		return (*h)[i].Priority > (*h)[j].Priority
 	}
 	// If priorities are equal, earlier created jobs come first
-	return h[i].CreatedAt.Before(h[j].CreatedAt)
+	return (*h)[i].CreatedAt.Before((*h)[j].CreatedAt)
 }
 
-func (h jobHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h *jobHeap) Swap(i, j int) { (*h)[i], (*h)[j] = (*h)[j], (*h)[i] }
 
 func (h *jobHeap) Push(x interface{}) {
-	*h = append(*h, x.(*Job))
+	job, ok := x.(*Job)
+	if !ok {
+		panic("expected *Job type")
+	}
+	*h = append(*h, job)
 }
 
 func (h *jobHeap) Pop() interface{} {

@@ -79,7 +79,11 @@ func (rq *RedisQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job,
 		return nil, apperror.Wrap(err)
 	}
 
-	jobData, err := rq.client.HGet(ctx, rq.jobKey(result.Member.(string)), "data").Result()
+	memberStr, ok := result.Member.(string)
+	if !ok {
+		return nil, apperror.NewError("invalid member type in redis result")
+	}
+	jobData, err := rq.client.HGet(ctx, rq.jobKey(memberStr), "data").Result()
 	if err != nil {
 		return nil, apperror.Wrap(err)
 	}
@@ -357,11 +361,11 @@ func (rq *RedisQueue) jobKey(id string) string {
 }
 
 func (rq *RedisQueue) pendingKey() string {
-	return fmt.Sprintf("%s:pending", rq.keyPrefix)
+	return rq.keyPrefix + ":pending"
 }
 
 func (rq *RedisQueue) scheduledKey() string {
-	return fmt.Sprintf("%s:scheduled", rq.keyPrefix)
+	return rq.keyPrefix + ":scheduled"
 }
 
 // MoveScheduledToPending moves scheduled jobs that are ready to be processed

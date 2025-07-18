@@ -3,10 +3,13 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 func TestNewJob(t *testing.T) {
@@ -329,7 +332,7 @@ func TestManager(t *testing.T) {
 	// Register a test handler
 	var handlerCalled bool
 	var mu sync.Mutex
-	manager.RegisterHandler("test", func(ctx context.Context, job *Job) error {
+	manager.RegisterHandler("test", func(_ context.Context, _ *Job) error {
 		mu.Lock()
 		handlerCalled = true
 		mu.Unlock()
@@ -391,14 +394,14 @@ func TestManagerRetry(t *testing.T) {
 	// Register a handler that fails initially
 	var attempts int
 	var mu sync.Mutex
-	manager.RegisterHandler("retry-test", func(ctx context.Context, job *Job) error {
+	manager.RegisterHandler("retry-test", func(_ context.Context, _ *Job) error {
 		mu.Lock()
 		attempts++
 		currentAttempts := attempts
 		mu.Unlock()
 
 		if currentAttempts < 2 {
-			return NewRetryableError(fmt.Errorf("temporary failure"))
+			return NewRetryableError(errors.New("temporary failure"))
 		}
 		return nil
 	})
@@ -453,7 +456,7 @@ func TestManagerScheduled(t *testing.T) {
 	// Register a test handler
 	var handlerCalled bool
 	var mu sync.Mutex
-	manager.RegisterHandler("scheduled-test", func(ctx context.Context, job *Job) error {
+	manager.RegisterHandler("scheduled-test", func(_ context.Context, _ *Job) error {
 		mu.Lock()
 		handlerCalled = true
 		mu.Unlock()
@@ -513,7 +516,7 @@ func TestBatchManager(t *testing.T) {
 	// Register a test handler
 	processedJobs := make(map[string]bool)
 	var processedMutex sync.Mutex
-	manager.RegisterHandler("batch-test", func(ctx context.Context, job *Job) error {
+	manager.RegisterHandler("batch-test", func(_ context.Context, job *Job) error {
 		processedMutex.Lock()
 		processedJobs[job.ID] = true
 		processedMutex.Unlock()
@@ -586,7 +589,7 @@ func TestMiddleware(t *testing.T) {
 
 	// Test logging middleware
 	called := false
-	handler := LoggingMiddleware(func(ctx context.Context, job *Job) error {
+	handler := LoggingMiddleware(func(_ context.Context, _ *Job) error {
 		called = true
 		return nil
 	})
@@ -601,7 +604,7 @@ func TestMiddleware(t *testing.T) {
 	}
 
 	// Test timeout middleware
-	timeoutHandler := TimeoutMiddleware(time.Millisecond * 100)(func(ctx context.Context, job *Job) error {
+	timeoutHandler := TimeoutMiddleware(time.Millisecond * 100)(func(_ context.Context, _ *Job) error {
 		time.Sleep(time.Millisecond * 200)
 		return nil
 	})
@@ -612,7 +615,7 @@ func TestMiddleware(t *testing.T) {
 	}
 
 	// Test recovery middleware
-	recoveryHandler := RecoveryMiddleware(func(ctx context.Context, job *Job) error {
+	recoveryHandler := RecoveryMiddleware(func(_ context.Context, _ *Job) error {
 		panic("test panic")
 	})
 
@@ -623,7 +626,7 @@ func TestMiddleware(t *testing.T) {
 
 	// Test middleware chain
 	chainHandler := MiddlewareChain(
-		func(ctx context.Context, job *Job) error {
+		func(_ context.Context, _ *Job) error {
 			return nil
 		},
 		LoggingMiddleware,
@@ -678,7 +681,7 @@ func TestJobContext(t *testing.T) {
 }
 
 func TestRetryableError(t *testing.T) {
-	err := NewRetryableError(fmt.Errorf("test error"))
+	err := NewRetryableError(errors.New("test error"))
 
 	if err.Error() != "test error" {
 		t.Errorf("Expected error message 'test error', got '%s'", err.Error())
@@ -688,7 +691,7 @@ func TestRetryableError(t *testing.T) {
 		t.Error("Error should be retryable")
 	}
 
-	regularErr := fmt.Errorf("regular error")
+	regularErr := errors.New("regular error")
 	if IsRetryable(regularErr) {
 		t.Error("Regular error should not be retryable")
 	}
@@ -701,7 +704,7 @@ func BenchmarkMemoryQueueEnqueue(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		job := NewJob("benchmark").WithID(fmt.Sprintf("job-%d", i)).Build()
-		queue.Enqueue(ctx, job)
+		apperror.Handle(queue.Enqueue(ctx, job), "failed to enqueue job")
 	}
 }
 
@@ -712,12 +715,12 @@ func BenchmarkMemoryQueueDequeue(b *testing.B) {
 	// Pre-populate queue
 	for i := 0; i < b.N; i++ {
 		job := NewJob("benchmark").WithID(fmt.Sprintf("job-%d", i)).Build()
-		queue.Enqueue(ctx, job)
+		apperror.Handle(queue.Enqueue(ctx, job), "failed to enqueue job")
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		queue.Dequeue(ctx, time.Second)
+		_, _ = queue.Dequeue(ctx, time.Second)
 	}
 }
 

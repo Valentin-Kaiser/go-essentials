@@ -18,7 +18,9 @@ type TaskFunc func(ctx context.Context) error
 type TaskType int
 
 const (
+	// TaskTypeCron represents cron-based task scheduling
 	TaskTypeCron TaskType = iota
+	// TaskTypeInterval represents interval-based task scheduling
 	TaskTypeInterval
 )
 
@@ -67,7 +69,6 @@ type TaskScheduler struct {
 	defaultTimeout time.Duration
 	defaultRetries int
 	retryDelay     time.Duration
-	ctx            context.Context
 	cancel         context.CancelFunc
 }
 
@@ -117,12 +118,12 @@ func (s *TaskScheduler) WithRetryDelay(delay time.Duration) *TaskScheduler {
 
 // RegisterCronTask registers a new cron-based task
 func (s *TaskScheduler) RegisterCronTask(name, cronSpec string, fn TaskFunc) error {
-	return s.RegisterCronTaskWithOptions(name, cronSpec, fn, TaskOptions{})
+	return s.RegisterCronTaskWithOptions(name, cronSpec, fn, TaskOptions{Enabled: true})
 }
 
 // RegisterIntervalTask registers a new interval-based task
 func (s *TaskScheduler) RegisterIntervalTask(name string, interval time.Duration, fn TaskFunc) error {
-	return s.RegisterIntervalTaskWithOptions(name, interval, fn, TaskOptions{})
+	return s.RegisterIntervalTaskWithOptions(name, interval, fn, TaskOptions{Enabled: true})
 }
 
 // TaskOptions provides configuration options for tasks
@@ -170,6 +171,7 @@ func (s *TaskScheduler) RegisterCronTaskWithOptions(name, cronSpec string, fn Ta
 		timeout = options.Timeout
 	}
 
+	options.Enabled = true // Ensure task is enabled by default
 	task := &Task{
 		ID:         generateTaskID(),
 		Name:       name,
@@ -235,6 +237,7 @@ func (s *TaskScheduler) RegisterIntervalTaskWithOptions(name string, interval ti
 		timeout = options.Timeout
 	}
 
+	options.Enabled = true // Ensure task is enabled by default
 	task := &Task{
 		ID:         generateTaskID(),
 		Name:       name,
@@ -267,10 +270,10 @@ func (s *TaskScheduler) Start(ctx context.Context) error {
 		return apperror.NewError("task scheduler is already running")
 	}
 
-	s.ctx, s.cancel = context.WithCancel(ctx)
+	ctx, s.cancel = context.WithCancel(ctx)
 
 	s.workerWg.Add(1)
-	go s.schedulerLoop()
+	go s.schedulerLoop(ctx)
 
 	log.Info().Msg("Task scheduler started")
 	return nil
@@ -294,7 +297,7 @@ func (s *TaskScheduler) Stop() {
 }
 
 // schedulerLoop is the main scheduler loop
-func (s *TaskScheduler) schedulerLoop() {
+func (s *TaskScheduler) schedulerLoop(ctx context.Context) {
 	defer s.workerWg.Done()
 
 	ticker := time.NewTicker(s.checkInterval)
@@ -304,16 +307,16 @@ func (s *TaskScheduler) schedulerLoop() {
 		select {
 		case <-s.shutdownChan:
 			return
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.checkAndRunTasks()
+			s.checkAndRunTasks(ctx)
 		}
 	}
 }
 
 // checkAndRunTasks checks for tasks that need to be executed and runs them
-func (s *TaskScheduler) checkAndRunTasks() {
+func (s *TaskScheduler) checkAndRunTasks(ctx context.Context) {
 	s.tasksMutex.RLock()
 	var tasksToRun []*Task
 	now := time.Now()
@@ -327,12 +330,12 @@ func (s *TaskScheduler) checkAndRunTasks() {
 
 	for _, task := range tasksToRun {
 		s.workerWg.Add(1)
-		go s.runTask(task)
+		go s.runTask(ctx, task)
 	}
 }
 
 // runTask executes a single task
-func (s *TaskScheduler) runTask(task *Task) {
+func (s *TaskScheduler) runTask(ctx context.Context, task *Task) {
 	defer s.workerWg.Done()
 
 	s.tasksMutex.Lock()
@@ -340,13 +343,13 @@ func (s *TaskScheduler) runTask(task *Task) {
 	task.UpdatedAt = time.Now()
 	s.tasksMutex.Unlock()
 
-	taskCtx, cancel := context.WithTimeout(s.ctx, task.Timeout)
+	taskCtx, cancel := context.WithTimeout(ctx, task.Timeout)
 	defer cancel()
 
 	var lastError error
 	for attempt := 0; attempt <= task.MaxRetries; attempt++ {
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			return
 		default:
 		}

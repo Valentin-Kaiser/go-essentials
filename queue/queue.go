@@ -121,7 +121,6 @@ package queue
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -428,7 +427,9 @@ func (m *Manager) processJob(ctx context.Context, job *Job, workerID int) {
 	job.Status = StatusRunning
 	job.Attempts++
 	job.UpdatedAt = time.Now()
-	m.queue.UpdateJob(ctx, job)
+	if err := m.queue.UpdateJob(ctx, job); err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Msg("failed to update job status to running")
+	}
 
 	m.handlerMutex.RLock()
 	handler, exists := m.handlers[job.Type]
@@ -436,9 +437,11 @@ func (m *Manager) processJob(ctx context.Context, job *Job, workerID int) {
 
 	if !exists {
 		job.Status = StatusFailed
-		job.Error = fmt.Sprintf("no handler registered for job type: %s", job.Type)
+		job.Error = "no handler registered for job type: " + job.Type
 		job.UpdatedAt = time.Now()
-		m.queue.UpdateJob(ctx, job)
+		if err := m.queue.UpdateJob(ctx, job); err != nil {
+			log.Error().Err(err).Str("job_id", job.ID).Msg("failed to update job status to failed")
+		}
 		atomic.AddInt64(&m.stats.JobsFailed, 1)
 		log.Error().Str("job_id", job.ID).Str("job_type", job.Type).Msg("no handler found")
 		return
@@ -451,7 +454,9 @@ func (m *Manager) processJob(ctx context.Context, job *Job, workerID int) {
 			job.Error = retryErr.Error()
 			job.RetryAt = time.Now().Add(m.calculateRetryDelay(job.Attempts))
 			job.UpdatedAt = time.Now()
-			m.queue.UpdateJob(ctx, job)
+			if err := m.queue.UpdateJob(ctx, job); err != nil {
+				log.Error().Err(err).Str("job_id", job.ID).Msg("failed to update job status to retrying")
+			}
 			atomic.AddInt64(&m.stats.JobsRetried, 1)
 
 			log.Info().
@@ -464,7 +469,9 @@ func (m *Manager) processJob(ctx context.Context, job *Job, workerID int) {
 				time.Sleep(m.calculateRetryDelay(job.Attempts))
 				job.Status = StatusPending
 				job.RetryAt = time.Time{}
-				m.queue.Enqueue(ctx, job)
+				if err := m.queue.Enqueue(ctx, job); err != nil {
+					log.Error().Err(err).Str("job_id", job.ID).Msg("failed to re-enqueue job for retry")
+				}
 			}()
 			return
 		}
@@ -472,7 +479,9 @@ func (m *Manager) processJob(ctx context.Context, job *Job, workerID int) {
 		job.Status = StatusFailed
 		job.Error = err.Error()
 		job.UpdatedAt = time.Now()
-		m.queue.UpdateJob(ctx, job)
+		if err := m.queue.UpdateJob(ctx, job); err != nil {
+			log.Error().Err(err).Str("job_id", job.ID).Msg("failed to update job status to failed")
+		}
 		atomic.AddInt64(&m.stats.JobsFailed, 1)
 
 		log.Error().
@@ -488,7 +497,9 @@ func (m *Manager) processJob(ctx context.Context, job *Job, workerID int) {
 	job.CompletedAt = time.Now()
 	job.Progress = 1.0
 	job.UpdatedAt = time.Now()
-	m.queue.UpdateJob(ctx, job)
+	if err := m.queue.UpdateJob(ctx, job); err != nil {
+		log.Error().Err(err).Str("job_id", job.ID).Msg("failed to update job status to completed")
+	}
 	atomic.AddInt64(&m.stats.JobsProcessed, 1)
 
 	log.Debug().
@@ -526,7 +537,9 @@ func (m *Manager) scheduleProcessor(ctx context.Context) {
 				if job.ScheduleAt.Before(now) || job.ScheduleAt.Equal(now) {
 					job.Status = StatusPending
 					job.ScheduleAt = time.Time{}
-					m.queue.Enqueue(ctx, job)
+					if err := m.queue.Enqueue(ctx, job); err != nil {
+						log.Error().Err(err).Str("job_id", job.ID).Msg("failed to enqueue scheduled job")
+					}
 				}
 			}
 		}

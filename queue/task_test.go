@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -61,7 +62,7 @@ func TestTaskScheduler_RegisterIntervalTask(t *testing.T) {
 	scheduler := NewTaskScheduler()
 
 	var executed int32
-	taskFunc := func(ctx context.Context) error {
+	taskFunc := func(_ context.Context) error {
 		atomic.AddInt32(&executed, 1)
 		return nil
 	}
@@ -103,7 +104,7 @@ func TestTaskScheduler_RegisterCronTask(t *testing.T) {
 	scheduler := NewTaskScheduler()
 
 	var executed int32
-	taskFunc := func(ctx context.Context) error {
+	taskFunc := func(_ context.Context) error {
 		atomic.AddInt32(&executed, 1)
 		return nil
 	}
@@ -186,7 +187,7 @@ func TestTaskScheduler_IntervalTaskExecution(t *testing.T) {
 	var executionTimes []time.Time
 	var mu sync.Mutex
 
-	taskFunc := func(ctx context.Context) error {
+	taskFunc := func(_ context.Context) error {
 		mu.Lock()
 		defer mu.Unlock()
 		atomic.AddInt32(&executed, 1)
@@ -241,7 +242,7 @@ func TestTaskScheduler_TaskRetry(t *testing.T) {
 	var successCount int32
 	var lastError error
 
-	taskFunc := func(ctx context.Context) error {
+	taskFunc := func(_ context.Context) error {
 		count := atomic.AddInt32(&attempts, 1)
 		if count < 3 {
 			lastError = fmt.Errorf("attempt %d failed", count)
@@ -308,9 +309,9 @@ func TestTaskScheduler_TaskFailure(t *testing.T) {
 		WithRetryDelay(time.Millisecond * 30)
 
 	var attempts int32
-	expectedError := fmt.Errorf("task always fails")
+	expectedError := errors.New("task always fails")
 
-	taskFunc := func(ctx context.Context) error {
+	taskFunc := func(_ context.Context) error {
 		atomic.AddInt32(&attempts, 1)
 		return expectedError
 	}
@@ -362,7 +363,7 @@ func TestTaskScheduler_TaskFailure(t *testing.T) {
 func TestTaskScheduler_EnableDisableTask(t *testing.T) {
 	scheduler := NewTaskScheduler()
 
-	taskFunc := func(ctx context.Context) error {
+	taskFunc := func(_ context.Context) error {
 		return nil
 	}
 
@@ -416,7 +417,7 @@ func TestTaskScheduler_EnableDisableTask(t *testing.T) {
 func TestTaskScheduler_RemoveTask(t *testing.T) {
 	scheduler := NewTaskScheduler()
 
-	taskFunc := func(ctx context.Context) error {
+	taskFunc := func(_ context.Context) error {
 		return nil
 	}
 
@@ -447,7 +448,7 @@ func TestTaskScheduler_RemoveTask(t *testing.T) {
 func TestTaskScheduler_GetTasks(t *testing.T) {
 	scheduler := NewTaskScheduler()
 
-	taskFunc := func(ctx context.Context) error {
+	taskFunc := func(_ context.Context) error {
 		return nil
 	}
 

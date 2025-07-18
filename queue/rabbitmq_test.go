@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 func TestRabbitMQQueue(t *testing.T) {
@@ -24,7 +26,7 @@ func TestRabbitMQQueue(t *testing.T) {
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ test: %v", err)
 	}
-	defer queue.Close()
+	defer apperror.Handle(queue.Close(), "failed to close queue")
 
 	ctx := context.Background()
 
@@ -96,7 +98,7 @@ func TestRabbitMQQueue(t *testing.T) {
 		}
 
 		dequeuedJob.Status = StatusCompleted
-		queue.UpdateJob(ctx, dequeuedJob)
+		apperror.Handle(queue.UpdateJob(ctx, dequeuedJob), "failed to update job")
 	})
 
 	t.Run("PriorityJobs", func(t *testing.T) {
@@ -238,7 +240,7 @@ func TestRabbitMQConfig(t *testing.T) {
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ config test: %v", err)
 	}
-	defer queue.Close()
+	defer apperror.Handle(queue.Close(), "failed to close queue")
 
 	if queue.queueName != "jobs" {
 		t.Errorf("Expected default queue name 'jobs', got %s", queue.queueName)
@@ -267,7 +269,7 @@ func TestRabbitMQReconnection(t *testing.T) {
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ reconnection test: %v", err)
 	}
-	defer queue.Close()
+	defer apperror.Handle(queue.Close(), "failed to close queue")
 
 	err = queue.Reconnect(config)
 	if err != nil {
@@ -294,7 +296,9 @@ func TestRabbitMQWithClosedConnection(t *testing.T) {
 		t.Skipf("Skipping RabbitMQ closed connection test: %v", err)
 	}
 
-	queue.Close()
+	if err := queue.Close(); err != nil {
+		t.Logf("Warning: failed to close queue: %v", err)
+	}
 
 	ctx := context.Background()
 
@@ -345,7 +349,7 @@ func BenchmarkRabbitMQEnqueue(b *testing.B) {
 	if err != nil {
 		b.Skipf("Skipping RabbitMQ benchmark: %v", err)
 	}
-	defer queue.Close()
+	defer apperror.Handle(queue.Close(), "failed to close queue")
 
 	ctx := context.Background()
 
@@ -381,7 +385,7 @@ func BenchmarkRabbitMQDequeue(b *testing.B) {
 	if err != nil {
 		b.Skipf("Skipping RabbitMQ dequeue benchmark: %v", err)
 	}
-	defer queue.Close()
+	defer apperror.Handle(queue.Close(), "failed to close queue")
 
 	ctx := context.Background()
 
@@ -409,6 +413,8 @@ func BenchmarkRabbitMQDequeue(b *testing.B) {
 		}
 
 		job.Status = StatusCompleted
-		queue.UpdateJob(ctx, job)
+		if err := queue.UpdateJob(ctx, job); err != nil {
+			b.Logf("Failed to update job: %v", err)
+		}
 	}
 }
