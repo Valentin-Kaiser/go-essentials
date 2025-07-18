@@ -10,6 +10,7 @@ func TestNewAesCipher(t *testing.T) {
 	cipher := NewAesCipher()
 	if cipher == nil {
 		t.Error("NewAesCipher() returned nil")
+		return
 	}
 
 	if cipher.Error != nil {

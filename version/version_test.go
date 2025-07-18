@@ -8,6 +8,7 @@ func TestGetVersion(t *testing.T) {
 	version := GetVersion()
 	if version == nil {
 		t.Error("GetVersion() returned nil")
+		return
 	}
 
 	if version.GitTag == "" {

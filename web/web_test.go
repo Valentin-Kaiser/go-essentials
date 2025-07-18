@@ -3,6 +3,7 @@ package web
 import (
 	"crypto/tls"
 	"crypto/x509/pkix"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/Valentin-Kaiser/go-core/security"
 	"github.com/gorilla/websocket"
 )
@@ -18,6 +20,7 @@ func TestServerCreation(t *testing.T) {
 	server := New()
 	if server == nil {
 		t.Error("New() should not return nil")
+		return
 	}
 
 	if server.Error != nil {
@@ -154,9 +157,11 @@ func TestServerWithRedirectWithoutTLS(t *testing.T) {
 func TestServerWithHandlerFunc(t *testing.T) {
 	server := New()
 
-	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
+	handlerFunc := func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("test"))
+		if _, err := w.Write([]byte("test")); err != nil {
+			t.Logf("Failed to write response: %v", err)
+		}
 	}
 
 	result := server.WithHandlerFunc("/test", handlerFunc)
@@ -166,7 +171,7 @@ func TestServerWithHandlerFunc(t *testing.T) {
 	}
 
 	// Test the handler was registered
-	req := httptest.NewRequest("GET", "/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
 	w := httptest.NewRecorder()
 
 	server.router.ServeHTTP(w, req)
@@ -183,9 +188,11 @@ func TestServerWithHandlerFunc(t *testing.T) {
 func TestServerWithHandler(t *testing.T) {
 	server := New()
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("created"))
+		if _, err := w.Write([]byte("created")); err != nil {
+			t.Logf("Failed to write response: %v", err)
+		}
 	})
 
 	result := server.WithHandler("/create", handler)
@@ -195,7 +202,7 @@ func TestServerWithHandler(t *testing.T) {
 	}
 
 	// Test the handler was registered
-	req := httptest.NewRequest("POST", "/create", nil)
+	req := httptest.NewRequest(http.MethodPost, "/create", nil)
 	w := httptest.NewRecorder()
 
 	server.router.ServeHTTP(w, req)
@@ -228,13 +235,15 @@ func TestServerWithMiddlewares(t *testing.T) {
 	server.WithRateLimit("/api", 100, 10*time.Second)
 
 	// Add a test handler
-	server.WithHandlerFunc("/middleware-test", func(w http.ResponseWriter, r *http.Request) {
+	server.WithHandlerFunc("/middleware-test", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("middleware test"))
+		if _, err := w.Write([]byte("middleware test")); err != nil {
+			t.Logf("Failed to write response: %v", err)
+		}
 	})
 
 	// Test the middleware chain
-	req := httptest.NewRequest("GET", "/middleware-test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/middleware-test", nil)
 	w := httptest.NewRecorder()
 
 	server.router.ServeHTTP(w, req)
@@ -257,8 +266,8 @@ func TestServerWithMiddlewares(t *testing.T) {
 func TestServerWithStaticFiles(t *testing.T) {
 	// Create a temporary directory with test files
 	tempDir := t.TempDir()
-	testFile := fmt.Sprintf("%s/test.txt", tempDir)
-	err := os.WriteFile(testFile, []byte("static file content"), 0644)
+	testFile := tempDir + "/test.txt"
+	err := os.WriteFile(testFile, []byte("static file content"), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
@@ -271,7 +280,7 @@ func TestServerWithStaticFiles(t *testing.T) {
 	}
 
 	// Test serving static file
-	req := httptest.NewRequest("GET", "/test.txt", nil)
+	req := httptest.NewRequest(http.MethodGet, "/test.txt", nil)
 	w := httptest.NewRecorder()
 
 	server.router.ServeHTTP(w, req)
@@ -288,8 +297,8 @@ func TestServerWithStaticFiles(t *testing.T) {
 func TestServerWithWebSocket(t *testing.T) {
 	server := New()
 
-	wsHandler := func(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) {
-		defer conn.Close()
+	wsHandler := func(_ http.ResponseWriter, _ *http.Request, conn *websocket.Conn) {
+		defer apperror.Defer(conn.Close(), "failed to close websocket connection")
 		// Echo server
 		for {
 			messageType, message, err := conn.ReadMessage()
@@ -348,7 +357,9 @@ func TestServerStartAsync(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Stop the server
-	server.Stop()
+	if err := server.Stop(); err != nil {
+		t.Logf("Warning: failed to stop server: %v", err)
+	}
 
 	// Wait for completion
 	select {
@@ -398,7 +409,7 @@ func TestServerErrorHandling(t *testing.T) {
 	server := New()
 
 	// Simulate an error condition
-	server.Error = fmt.Errorf("test error")
+	server.Error = errors.New("test error")
 
 	// Test that methods still return the server instance even with errors
 	result := server.WithHost("localhost")
@@ -424,7 +435,7 @@ func TestServerChaining(t *testing.T) {
 		WithSecurityHeaders().
 		WithGzip().
 		WithLog().
-		WithHandlerFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		WithHandlerFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 
@@ -441,13 +452,13 @@ func TestServerChaining(t *testing.T) {
 	}
 }
 
-func TestServerMemoryUsage(t *testing.T) {
+func TestServerMemoryUsage(_ *testing.T) {
 	// Test that creating many servers doesn't cause memory leaks
 	for i := 0; i < 100; i++ {
 		server := New()
 		server.WithHost("localhost").
 			WithPort(8080+uint16(i)).
-			WithHandlerFunc(fmt.Sprintf("/test%d", i), func(w http.ResponseWriter, r *http.Request) {
+			WithHandlerFunc(fmt.Sprintf("/test%d", i), func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
 			})
 	}
@@ -464,13 +475,13 @@ func TestServerConcurrency(t *testing.T) {
 		go func(id int) {
 			defer func() { done <- true }()
 
-			server.WithHandlerFunc(fmt.Sprintf("/concurrent%d", id), func(w http.ResponseWriter, r *http.Request) {
+			server.WithHandlerFunc(fmt.Sprintf("/concurrent%d", id), func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(fmt.Sprintf("concurrent %d", id)))
-			})
-
-			// Test the handler
-			req := httptest.NewRequest("GET", fmt.Sprintf("/concurrent%d", id), nil)
+				if _, err := fmt.Fprintf(w, "concurrent %d", id); err != nil {
+					t.Logf("Failed to write response: %v", err)
+				}
+			}) // Test the handler
+			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/concurrent%d", id), nil)
 			w := httptest.NewRecorder()
 			server.router.ServeHTTP(w, req)
 
@@ -492,7 +503,7 @@ func BenchmarkServerWithHandlerFunc(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		server.WithHandlerFunc(fmt.Sprintf("/bench%d", i), func(w http.ResponseWriter, r *http.Request) {
+		server.WithHandlerFunc(fmt.Sprintf("/bench%d", i), func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 	}
@@ -500,12 +511,14 @@ func BenchmarkServerWithHandlerFunc(b *testing.B) {
 
 func BenchmarkServerRouting(b *testing.B) {
 	server := New()
-	server.WithHandlerFunc("/benchmark", func(w http.ResponseWriter, r *http.Request) {
+	server.WithHandlerFunc("/benchmark", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("benchmark"))
+		if _, err := w.Write([]byte("benchmark")); err != nil {
+			b.Logf("Failed to write response: %v", err)
+		}
 	})
 
-	req := httptest.NewRequest("GET", "/benchmark", nil)
+	req := httptest.NewRequest(http.MethodGet, "/benchmark", nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -520,12 +533,14 @@ func BenchmarkServerMiddlewares(b *testing.B) {
 		WithSecurityHeaders().
 		WithGzip().
 		WithLog().
-		WithHandlerFunc("/middleware-bench", func(w http.ResponseWriter, r *http.Request) {
+		WithHandlerFunc("/middleware-bench", func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("middleware benchmark"))
+			if _, err := w.Write([]byte("middleware benchmark")); err != nil {
+				b.Logf("Failed to write response: %v", err)
+			}
 		})
 
-	req := httptest.NewRequest("GET", "/middleware-bench", nil)
+	req := httptest.NewRequest(http.MethodGet, "/middleware-bench", nil)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -155,7 +155,7 @@ func TestStringToKey32(t *testing.T) {
 
 		// Test that it's hex encoded
 		for _, c := range key {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 				t.Errorf("StringToKey32(%q) contains non-hex character: %c", tc, c)
 				break
 			}
@@ -181,8 +181,8 @@ func TestGetRandomBytesBase64(t *testing.T) {
 		// Test that it's valid base64
 		if size > 0 {
 			for _, c := range encoded {
-				if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-					(c >= '0' && c <= '9') || c == '+' || c == '/' || c == '=') {
+				if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') &&
+					(c < '0' || c > '9') && c != '+' && c != '/' && c != '=' {
 					t.Errorf("GetRandomBytesBase64(%d) contains invalid base64 character: %c", size, c)
 					break
 				}
@@ -252,7 +252,7 @@ func TestReadOrSavePassphrase(t *testing.T) {
 	}
 
 	// Test that file exists and has correct content
-	content, err := os.ReadFile(testFile)
+	content, err := os.ReadFile(filepath.Clean(testFile))
 	if err != nil {
 		t.Errorf("Failed to read test file: %v", err)
 	}
@@ -526,7 +526,7 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 			length:   16,
 			setup: func(path string) error {
 				dir := filepath.Dir(path)
-				if err := os.MkdirAll(dir, 0755); err != nil {
+				if err := os.MkdirAll(dir, 0750); err != nil {
 					return err
 				}
 				// Remove all permissions on Unix-like systems
@@ -565,7 +565,9 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 			if strings.Contains(tt.filename, "readonly") {
 				dir := filepath.Dir(filePath)
 				// Restore permissions before cleanup
-				os.Chmod(dir, 0755)
+				if err := os.Chmod(dir, 0600); err != nil {
+					t.Logf("Failed to restore permissions: %v", err)
+				}
 			}
 		})
 	}
@@ -589,7 +591,7 @@ func TestPGPCipherCreation(t *testing.T) {
 	if cipher1 == nil {
 		t.Error("NewPGPCipher() should not return nil")
 	}
-	if cipher1.handle == nil {
+	if cipher1 != nil && cipher1.handle == nil {
 		t.Error("PGPCipher should have a handle")
 	}
 
@@ -599,7 +601,7 @@ func TestPGPCipherCreation(t *testing.T) {
 	if cipher2 == nil {
 		t.Error("NewPGPCipher() should not return nil with custom profile")
 	}
-	if cipher2.handle == nil {
+	if cipher2 != nil && cipher2.handle == nil {
 		t.Error("PGPCipher should have a handle with custom profile")
 	}
 }
@@ -757,6 +759,7 @@ func TestNewTLSConfig(t *testing.T) {
 
 	if config == nil {
 		t.Error("NewTLSConfig() should not return nil")
+		return
 	}
 
 	if config.MinVersion != tls.VersionTLS12 {
@@ -887,7 +890,7 @@ func TestLoadCACertPool(t *testing.T) {
 	// Test with invalid CA file
 	tempDir := t.TempDir()
 	invalidCAFile := filepath.Join(tempDir, "invalid.ca")
-	err = os.WriteFile(invalidCAFile, []byte("invalid certificate data"), 0644)
+	err = os.WriteFile(invalidCAFile, []byte("invalid certificate data"), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create invalid CA file: %v", err)
 	}
@@ -928,13 +931,17 @@ func BenchmarkMd5(b *testing.B) {
 
 func BenchmarkGetRandomBytes(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		GetRandomBytes(32)
+		if _, err := GetRandomBytes(32); err != nil {
+			b.Logf("Failed to get random bytes: %v", err)
+		}
 	}
 }
 
 func BenchmarkGenerateRandomPassword(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		GenerateRandomPassword(16)
+		if _, err := GenerateRandomPassword(16); err != nil {
+			b.Logf("Failed to generate password: %v", err)
+		}
 	}
 }
 
