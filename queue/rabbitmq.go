@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,17 +43,17 @@ type RabbitMQConfig struct {
 
 // NewRabbitMQQueue creates a new RabbitMQ-backed queue
 func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
-	if config.URL == "" {
-		config.URL = "amqp://admin:admin123@localhost:5672/"
+	if strings.TrimSpace(config.URL) == "" {
+		return nil, apperror.NewError("RabbitMQ URL is required")
 	}
-	if config.QueueName == "" {
-		config.QueueName = "jobs"
+	if strings.TrimSpace(config.QueueName) == "" {
+		return nil, apperror.NewError("Queue name is required")
 	}
-	if config.ExchangeName == "" {
-		config.ExchangeName = "jobs_exchange"
+	if strings.TrimSpace(config.ExchangeName) == "" {
+		return nil, apperror.NewError("Exchange name is required")
 	}
-	if config.RoutingKey == "" {
-		config.RoutingKey = "jobs"
+	if strings.TrimSpace(config.RoutingKey) == "" {
+		return nil, apperror.NewError("Routing key is required")
 	}
 	if config.MaxPriority == 0 {
 		config.MaxPriority = 10 // Default to 10 priority levels
@@ -160,11 +161,6 @@ func NewRabbitMQQueueFromURL(url string) (*RabbitMQQueue, error) {
 		NoWait:       false,
 	}
 	return NewRabbitMQQueue(config)
-}
-
-// NewDefaultRabbitMQQueue creates a new RabbitMQ queue with default settings
-func NewDefaultRabbitMQQueue() (*RabbitMQQueue, error) {
-	return NewRabbitMQQueueFromURL("amqp://admin:admin123@localhost:5672/")
 }
 
 // Enqueue adds a job to the queue

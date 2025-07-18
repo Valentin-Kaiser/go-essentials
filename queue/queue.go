@@ -592,11 +592,3 @@ func (m *Manager) WithRabbitMQFromURL(url string) *Manager {
 	}
 	return m
 }
-
-// WithDefaultRabbitMQ sets the queue to use RabbitMQ with default settings
-func (m *Manager) WithDefaultRabbitMQ() *Manager {
-	if queue, err := NewDefaultRabbitMQQueue(); err == nil {
-		m.queue = queue
-	}
-	return m
-}
