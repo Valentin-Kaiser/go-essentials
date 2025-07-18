@@ -118,12 +118,12 @@ func (s *TaskScheduler) WithRetryDelay(delay time.Duration) *TaskScheduler {
 
 // RegisterCronTask registers a new cron-based task
 func (s *TaskScheduler) RegisterCronTask(name, cronSpec string, fn TaskFunc) error {
-	return s.RegisterCronTaskWithOptions(name, cronSpec, fn, TaskOptions{Enabled: true})
+	return s.RegisterCronTaskWithOptions(name, cronSpec, fn, TaskOptions{})
 }
 
 // RegisterIntervalTask registers a new interval-based task
 func (s *TaskScheduler) RegisterIntervalTask(name string, interval time.Duration, fn TaskFunc) error {
-	return s.RegisterIntervalTaskWithOptions(name, interval, fn, TaskOptions{Enabled: true})
+	return s.RegisterIntervalTaskWithOptions(name, interval, fn, TaskOptions{})
 }
 
 // TaskOptions provides configuration options for tasks
@@ -131,7 +131,7 @@ type TaskOptions struct {
 	MaxRetries int
 	RetryDelay time.Duration
 	Timeout    time.Duration
-	Enabled    bool
+	Enabled    *bool
 }
 
 // RegisterCronTaskWithOptions registers a new cron-based task with options
@@ -170,8 +170,6 @@ func (s *TaskScheduler) RegisterCronTaskWithOptions(name, cronSpec string, fn Ta
 	if options.Timeout > 0 {
 		timeout = options.Timeout
 	}
-
-	options.Enabled = true // Ensure task is enabled by default
 	task := &Task{
 		ID:         generateTaskID(),
 		Name:       name,
@@ -181,9 +179,13 @@ func (s *TaskScheduler) RegisterCronTaskWithOptions(name, cronSpec string, fn Ta
 		MaxRetries: maxRetries,
 		RetryDelay: retryDelay,
 		Timeout:    timeout,
-		Enabled:    options.Enabled,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
+		Enabled:    true,
+	}
+
+	if options.Enabled != nil {
+		task.Enabled = *options.Enabled
 	}
 
 	nextRun, err := s.calculateNextCronRun(cronSpec, time.Now())
@@ -237,7 +239,6 @@ func (s *TaskScheduler) RegisterIntervalTaskWithOptions(name string, interval ti
 		timeout = options.Timeout
 	}
 
-	options.Enabled = true // Ensure task is enabled by default
 	task := &Task{
 		ID:         generateTaskID(),
 		Name:       name,
@@ -248,9 +249,13 @@ func (s *TaskScheduler) RegisterIntervalTaskWithOptions(name string, interval ti
 		MaxRetries: maxRetries,
 		RetryDelay: retryDelay,
 		Timeout:    timeout,
-		Enabled:    options.Enabled,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
+		Enabled:    true,
+	}
+
+	if options.Enabled != nil {
+		task.Enabled = *options.Enabled
 	}
 
 	s.tasks[name] = task
