@@ -41,7 +41,27 @@ type RabbitMQConfig struct {
 	MaxPriority  int // Maximum priority level for the queue (0-255)
 }
 
-// NewRabbitMQQueue creates a new RabbitMQ-backed queue
+// NewRabbitMQQueue creates a new RabbitMQ-backed queue.
+// 
+// Configuration Parameters:
+// - URL: The RabbitMQ server URL. This is required for establishing a connection.
+// - QueueName: The name of the queue to use. This is required and must be unique.
+// - ExchangeName: The name of the exchange to bind the queue to. This is required.
+// - RoutingKey: The routing key for binding the queue to the exchange. This is required.
+// - Durable: If true, the queue will survive a broker restart.
+// - AutoDelete: If true, the queue will be deleted when no consumers are connected.
+// - Exclusive: If true, the queue will be used by only one connection and deleted when the connection closes.
+// - NoWait: If true, the queue declaration will not wait for a server response.
+// - MaxPriority: The maximum priority level for the queue (0-255). Defaults to 10 if not specified.
+// 
+// Connection Setup:
+// The function establishes a connection to the RabbitMQ server using the provided URL.
+// It then declares a queue with the specified configuration parameters and binds it to the exchange.
+// 
+// Error Conditions:
+// - Missing or empty URL, QueueName, ExchangeName, or RoutingKey will result in an error.
+// - Connection failures (e.g., network issues, invalid URL) will return a wrapped error.
+// - Invalid MaxPriority values (outside the range 0-255) may cause unexpected behavior.
 func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 	if strings.TrimSpace(config.URL) == "" {
 		return nil, apperror.NewError("RabbitMQ URL is required")
