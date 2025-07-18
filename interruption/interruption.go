@@ -74,14 +74,98 @@ func Handle() {
 // It allows graceful shutdown or cleanup operations when the application receives termination signals.
 // The returned context is canceled when the handler function returns, allowing the application to wait for cleanup operations to complete.
 func OnSignal(handlers []func() error, signals ...os.Signal) context.Context {
-	ctx, stop := signal.NotifyContext(context.Background(), signals...)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Create a channel to receive signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, signals...)
+
 	go func() {
-		for _, handler := range handlers {
-			if err := handler(); err != nil {
-				log.Error().Err(err).Msgf("[Signal] handler failed: %v", err)
-			}
+		defer func() {
+			signal.Stop(sigChan)
+			cancel()
+		}()
+
+		if len(handlers) == 0 {
+			return
 		}
-		stop()
+
+		// Wait for signal
+		<-sigChan
+
+		// Execute all handlers with panic recovery
+		for _, handler := range handlers {
+			func() {
+				defer Handle()
+				if err := handler(); err != nil {
+					log.Error().Err(err).Msgf("[Signal] handler failed: %v", err)
+				}
+			}()
+		}
 	}()
 	return ctx
+}
+
+// WaitForShutdown waits for the provided context to be done, enabling graceful shutdown.
+// This function is designed to be used with defer to ensure the application waits for
+// signal handlers to complete before exiting.
+//
+// Example usage:
+//
+//	func main() {
+//		defer interruption.Handle()
+//
+//		ctx := interruption.OnSignal([]func() error{
+//			func() error {
+//				log.Info().Msg("Shutting down gracefully...")
+//				return nil
+//			},
+//		}, os.Interrupt, syscall.SIGTERM)
+//
+//		defer interruption.WaitForShutdown(ctx)
+//
+//		// Your application logic here
+//		log.Info().Msg("Application running...")
+//
+//		// Application will wait for signal and graceful shutdown when function exits
+//	}
+func WaitForShutdown(ctx context.Context) {
+	if ctx == nil {
+		return
+	}
+	<-ctx.Done()
+}
+
+// SetupGracefulShutdown is a convenience function that combines OnSignal and WaitForShutdown.
+// It sets up signal handlers and returns a function that should be called with defer
+// to wait for graceful shutdown. This is the recommended way to add graceful shutdown to your application.
+//
+// Example usage:
+//
+//	func main() {
+//		defer interruption.Handle()
+//
+//		defer interruption.SetupGracefulShutdown([]func() error{
+//			func() error {
+//				log.Info().Msg("Database disconnecting...")
+//				// database.Disconnect()
+//				return nil
+//			},
+//			func() error {
+//				log.Info().Msg("Web server stopping...")
+//				// web.Instance().Stop()
+//				return nil
+//			},
+//		}, os.Interrupt, syscall.SIGTERM)
+//
+//		// Your application logic here
+//		log.Info().Msg("Application running...")
+//
+//		// Application will automatically wait for graceful shutdown when function exits
+//	}
+func SetupGracefulShutdown(handlers []func() error, signals ...os.Signal) func() {
+	ctx := OnSignal(handlers, signals...)
+	return func() {
+		WaitForShutdown(ctx)
+	}
 }

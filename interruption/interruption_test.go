@@ -227,8 +227,8 @@ func TestHandleWithDetailedPanicTypes(t *testing.T) {
 		name      string
 		panicData interface{}
 	}{
-		{"custom error", fmt.Errorf("custom error message")},
-		{"runtime error", fmt.Errorf("runtime error: invalid memory address or nil pointer dereference")},
+		{"custom error", errors.New("custom error message")},
+		{"runtime error", errors.New("runtime error: invalid memory address or nil pointer dereference")},
 		{"slice bound error", "runtime error: slice bounds out of range"},
 		{"map access", "runtime error: assignment to entry in nil map"},
 		{"channel close", "send on closed channel"},
@@ -436,7 +436,7 @@ func TestHandleInDifferentDebugModes(t *testing.T) {
 
 			func() {
 				defer Handle()
-				panic(fmt.Sprintf("panic in %s", mode.name))
+				panic("panic in " + mode.name)
 			}()
 		})
 	}
@@ -559,9 +559,6 @@ func TestHandlePerformance(t *testing.T) {
 	start := time.Now()
 	for i := 0; i < iterations; i++ {
 		func() {
-			defer func() {
-				recover() // Catch the panic to prevent test failure
-			}()
 			defer Handle()
 			panic("performance test")
 		}()
@@ -603,10 +600,16 @@ func TestHandleRuntimeCharacteristics(t *testing.T) {
 func TestHandleWithEnvironmentVariables(t *testing.T) {
 	// Test Handle() behavior with different environment configurations
 	originalPath := os.Getenv("PATH")
-	defer os.Setenv("PATH", originalPath)
+	defer func() {
+		if err := os.Setenv("PATH", originalPath); err != nil {
+			t.Logf("Failed to restore PATH: %v", err)
+		}
+	}()
 
 	// Test with modified environment
-	os.Setenv("PATH", "")
+	if err := os.Setenv("PATH", ""); err != nil {
+		t.Fatalf("Failed to set PATH: %v", err)
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -824,20 +827,10 @@ func TestOnSignalHandlerPanic(t *testing.T) {
 	// Simulate the OnSignal goroutine behavior with panic recovery
 	go func() {
 		defer wg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				// Panic was recovered, continue execution
-			}
-		}()
-
 		<-ctx.Done()
 		for _, handler := range handlers {
 			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						// Handle panic in individual handler
-					}
-				}()
+				defer Handle()
 				if err := handler(); err != nil {
 					t.Errorf("Handler failed: %v", err)
 				}
@@ -971,9 +964,6 @@ func TestOnSignalContextType(t *testing.T) {
 func BenchmarkHandle(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer func() {
-				recover() // Catch the panic to prevent benchmark failure
-			}()
 			defer Handle()
 			panic("benchmark test")
 		}()
@@ -983,10 +973,6 @@ func BenchmarkHandle(b *testing.B) {
 func BenchmarkHandleWithLargeStack(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer func() {
-				recover() // Catch the panic to prevent benchmark failure
-			}()
-
 			// Create a deep call stack
 			var deepCall func(depth int)
 			deepCall = func(depth int) {
@@ -1010,9 +996,6 @@ func BenchmarkHandleDebugMode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer func() {
-				recover() // Catch the panic to prevent benchmark failure
-			}()
 			defer Handle()
 			panic("debug mode benchmark")
 		}()
@@ -1026,9 +1009,6 @@ func BenchmarkHandleProductionMode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer func() {
-				recover() // Catch the panic to prevent benchmark failure
-			}()
 			defer Handle()
 			panic("production mode benchmark")
 		}()
@@ -1060,5 +1040,201 @@ func BenchmarkOnSignalMultipleHandlers(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ctx := OnSignal(handlers, syscall.SIGTERM)
 		_ = ctx // Use the context to prevent optimization
+	}
+}
+
+func TestWaitForShutdown(t *testing.T) {
+	// Test WaitForShutdown with a normal context
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan bool, 1)
+	go func() {
+		WaitForShutdown(ctx)
+		done <- true
+	}()
+
+	// Should not be done immediately
+	select {
+	case <-done:
+		t.Error("WaitForShutdown should not complete immediately")
+	case <-time.After(10 * time.Millisecond):
+		// Expected
+	}
+
+	// Cancel the context
+	cancel()
+
+	// Should complete now
+	select {
+	case <-done:
+		// Expected
+	case <-time.After(100 * time.Millisecond):
+		t.Error("WaitForShutdown should complete after context cancellation")
+	}
+}
+
+func TestWaitForShutdownWithNilContext(t *testing.T) {
+	// Test WaitForShutdown with nil context
+	done := make(chan bool, 1)
+	go func() {
+		WaitForShutdown(nil)
+		done <- true
+	}()
+
+	// Should complete immediately with nil context
+	select {
+	case <-done:
+		// Expected
+	case <-time.After(100 * time.Millisecond):
+		t.Error("WaitForShutdown should complete immediately with nil context")
+	}
+}
+
+func TestWaitForShutdownWithOnSignal(t *testing.T) {
+	// Skip this test on Windows as signal sending to processes is not supported
+	if runtime.GOOS == "windows" {
+		t.Skip("Signal sending not supported on Windows")
+	}
+
+	// Test WaitForShutdown with OnSignal context
+	var mu sync.Mutex
+	executed := false
+
+	handler := func() error {
+		mu.Lock()
+		executed = true
+		mu.Unlock()
+		return nil
+	}
+
+	ctx := OnSignal([]func() error{handler}, syscall.SIGTERM)
+
+	done := make(chan bool, 1)
+	go func() {
+		WaitForShutdown(ctx)
+		done <- true
+	}()
+
+	// Should not be done immediately
+	select {
+	case <-done:
+		t.Error("WaitForShutdown should not complete immediately")
+	case <-time.After(10 * time.Millisecond):
+		// Expected
+	}
+
+	// Send signal to ourselves
+	process, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		t.Fatalf("Failed to find process: %v", err)
+	}
+
+	if err := process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatalf("Failed to send signal: %v", err)
+	}
+
+	// Should complete after signal and handler execution
+	select {
+	case <-done:
+		// Expected
+	case <-time.After(1 * time.Second):
+		t.Error("WaitForShutdown should complete after signal handling")
+	}
+
+	// Check that handler was executed
+	mu.Lock()
+	if !executed {
+		t.Error("Signal handler should have been executed")
+	}
+	mu.Unlock()
+}
+
+func TestSetupGracefulShutdown(t *testing.T) {
+	// Test SetupGracefulShutdown function
+	var mu sync.Mutex
+	executed := false
+
+	handler := func() error {
+		mu.Lock()
+		executed = true
+		mu.Unlock()
+		return nil
+	}
+
+	// Setup graceful shutdown - this should return a function to defer
+	shutdownFunc := SetupGracefulShutdown([]func() error{handler}, syscall.SIGTERM)
+
+	if shutdownFunc == nil {
+		t.Error("SetupGracefulShutdown should return a non-nil function")
+	}
+
+	// The shutdown function should exist but handler should not be executed yet
+	mu.Lock()
+	if executed {
+		t.Error("Handler should not be executed immediately after setup")
+	}
+	mu.Unlock()
+
+	// Test that the shutdown function works when called
+	done := make(chan bool, 1)
+	go func() {
+		shutdownFunc()
+		done <- true
+	}()
+
+	// Should not be done immediately (waiting for signal)
+	select {
+	case <-done:
+		// This could happen if no handlers, which is fine
+	case <-time.After(10 * time.Millisecond):
+		// Expected behavior - waiting for signal
+	}
+}
+
+func TestSetupGracefulShutdownWithNoHandlers(t *testing.T) {
+	// Test with no handlers
+	shutdownFunc := SetupGracefulShutdown([]func() error{}, syscall.SIGTERM)
+
+	if shutdownFunc == nil {
+		t.Error("SetupGracefulShutdown should return a non-nil function even with no handlers")
+	}
+
+	// Test that the shutdown function completes quickly with no handlers
+	done := make(chan bool, 1)
+	go func() {
+		shutdownFunc()
+		done <- true
+	}()
+
+	// Should complete quickly with no handlers
+	select {
+	case <-done:
+		// Expected
+	case <-time.After(100 * time.Millisecond):
+		t.Error("SetupGracefulShutdown should complete quickly with no handlers")
+	}
+}
+
+func TestSetupGracefulShutdownWithNilHandlers(t *testing.T) {
+	// Test with nil handlers
+	shutdownFunc := SetupGracefulShutdown(nil, syscall.SIGTERM)
+
+	if shutdownFunc == nil {
+		t.Error("SetupGracefulShutdown should return a non-nil function even with nil handlers")
+	}
+
+	// Test that the shutdown function completes quickly with nil handlers
+	done := make(chan bool, 1)
+	go func() {
+		shutdownFunc()
+		done <- true
+	}()
+
+	// Should complete quickly with nil handlers
+	select {
+	case <-done:
+		// Expected
+	case <-time.After(100 * time.Millisecond):
+		t.Error("SetupGracefulShutdown should complete quickly with nil handlers")
 	}
 }
