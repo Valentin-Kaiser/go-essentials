@@ -42,7 +42,7 @@ type RabbitMQConfig struct {
 }
 
 // NewRabbitMQQueue creates a new RabbitMQ-backed queue.
-// 
+//
 // Configuration Parameters:
 // - URL: The RabbitMQ server URL. This is required for establishing a connection.
 // - QueueName: The name of the queue to use. This is required and must be unique.
@@ -53,11 +53,11 @@ type RabbitMQConfig struct {
 // - Exclusive: If true, the queue will be used by only one connection and deleted when the connection closes.
 // - NoWait: If true, the queue declaration will not wait for a server response.
 // - MaxPriority: The maximum priority level for the queue (0-255). Defaults to 10 if not specified.
-// 
+//
 // Connection Setup:
 // The function establishes a connection to the RabbitMQ server using the provided URL.
 // It then declares a queue with the specified configuration parameters and binds it to the exchange.
-// 
+//
 // Error Conditions:
 // - Missing or empty URL, QueueName, ExchangeName, or RoutingKey will result in an error.
 // - Connection failures (e.g., network issues, invalid URL) will return a wrapped error.

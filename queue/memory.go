@@ -20,10 +20,10 @@ type MemoryQueue struct {
 }
 
 // NewMemoryQueue creates and initializes a new in-memory job queue with priority support.
-// 
+//
 // Thread-safety: The queue is thread-safe, utilizing a sync.RWMutex for concurrent access
 // and a channel for notifications. This ensures safe operations in multi-threaded environments.
-// 
+//
 // Intended use cases: The queue is suitable for managing jobs in memory, particularly in
 // scenarios requiring priority-based scheduling and thread-safe operations. It is ideal for
 // applications where job persistence is not required, and all jobs can be managed in memory.
