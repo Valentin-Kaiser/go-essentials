@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 // TestUser represents a test user struct for testing serialization
@@ -19,7 +21,7 @@ func TestMemoryCache_BasicOperations(t *testing.T) {
 		WithMaxSize(100).
 		WithDefaultTTL(time.Hour)
 
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -72,7 +74,7 @@ func TestMemoryCache_TTL(t *testing.T) {
 	cache := NewMemoryCache().
 		WithDefaultTTL(time.Millisecond * 100)
 
-	defer cache.Close()
+	apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -109,7 +111,7 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 		WithMaxSize(3).
 		WithLRUEviction(true)
 
-	defer cache.Close()
+	apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -157,7 +159,7 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 
 func TestMemoryCache_MultiOperations(t *testing.T) {
 	cache := NewMemoryCache()
-	defer cache.Close()
+	apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -216,7 +218,7 @@ func TestMemoryCache_Stats(t *testing.T) {
 	cache := NewMemoryCache().
 		WithMaxSize(10)
 
-	defer cache.Close()
+	apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -282,7 +284,7 @@ func TestMemoryCache_Events(t *testing.T) {
 			eventsChan <- event
 		})
 
-	defer cache.Close()
+	apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -339,7 +341,7 @@ func TestMemoryCache_Namespace(t *testing.T) {
 	config.Namespace = "test"
 
 	cache := NewMemoryCacheWithConfig(config)
-	defer cache.Close()
+	apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -375,7 +377,7 @@ func TestMemoryCache_Namespace(t *testing.T) {
 
 func TestMemoryCache_Clear(t *testing.T) {
 	cache := NewMemoryCache()
-	defer cache.Close()
+	apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -417,7 +419,7 @@ func TestMemoryCache_Clear(t *testing.T) {
 
 func TestMemoryCache_TTLOperations(t *testing.T) {
 	cache := NewMemoryCache()
-	defer cache.Close()
+	apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 

@@ -3,6 +3,7 @@ package cache
 import (
 	"container/list"
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -80,7 +81,7 @@ func (mc *MemoryCache) WithEventHandler(handler EventHandler) *MemoryCache {
 }
 
 // Get retrieves a value from the cache
-func (mc *MemoryCache) Get(ctx context.Context, key string, dest interface{}) (bool, error) {
+func (mc *MemoryCache) Get(_ context.Context, key string, dest interface{}) (bool, error) {
 	formattedKey := mc.formatKey(key)
 
 	mc.mutex.Lock()
@@ -92,7 +93,12 @@ func (mc *MemoryCache) Get(ctx context.Context, key string, dest interface{}) (b
 		return false, nil
 	}
 
-	memItem := element.Value.(*memoryItem)
+	memItem, ok := element.Value.(*memoryItem)
+	if !ok {
+		mc.updateStats(func(s *Stats) { s.Misses++ })
+		mc.emitEvent(EventGet, key, nil, nil)
+		return false, NewCacheError("get", key, errors.New("invalid cache item type"))
+	}
 	item := memItem.item
 
 	// Check if item has expired
@@ -114,7 +120,12 @@ func (mc *MemoryCache) Get(ctx context.Context, key string, dest interface{}) (b
 	mc.mutex.Unlock()
 
 	// Deserialize the value
-	err := mc.config.Serializer.Deserialize(item.Value.([]byte), dest)
+	data, ok := item.Value.([]byte)
+	if !ok {
+		mc.updateStats(func(s *Stats) { s.Misses++ })
+		return false, NewCacheError("get", key, errors.New("invalid item value type"))
+	}
+	err := mc.config.Serializer.Deserialize(data, dest)
 	if err != nil {
 		mc.recordError(err)
 		mc.emitEvent(EventGet, key, nil, err)
@@ -127,7 +138,7 @@ func (mc *MemoryCache) Get(ctx context.Context, key string, dest interface{}) (b
 }
 
 // Set stores a value in the cache
-func (mc *MemoryCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+func (mc *MemoryCache) Set(_ context.Context, key string, value interface{}, ttl time.Duration) error {
 	formattedKey := mc.formatKey(key)
 	effectiveTTL := mc.calculateTTL(ttl)
 
@@ -168,7 +179,10 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value interface{}, t
 	// Check if key already exists
 	if element, exists := mc.items[formattedKey]; exists {
 		// Update existing item
-		oldMemItem := element.Value.(*memoryItem)
+		oldMemItem, ok := element.Value.(*memoryItem)
+		if !ok {
+			return NewCacheError("set", key, errors.New("invalid existing item type"))
+		}
 		element.Value = memItem
 		if mc.config.EnableLRU {
 			mc.lruList.MoveToFront(element)
@@ -200,7 +214,7 @@ func (mc *MemoryCache) Set(ctx context.Context, key string, value interface{}, t
 }
 
 // Delete removes a value from the cache
-func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
+func (mc *MemoryCache) Delete(_ context.Context, key string) error {
 	formattedKey := mc.formatKey(key)
 
 	mc.mutex.Lock()
@@ -218,7 +232,7 @@ func (mc *MemoryCache) Delete(ctx context.Context, key string) error {
 }
 
 // Exists checks if a key exists in the cache
-func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
+func (mc *MemoryCache) Exists(_ context.Context, key string) (bool, error) {
 	formattedKey := mc.formatKey(key)
 
 	mc.mutex.RLock()
@@ -228,7 +242,11 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 		return false, nil
 	}
 
-	memItem := element.Value.(*memoryItem)
+	memItem, ok := element.Value.(*memoryItem)
+	if !ok {
+		mc.mutex.RUnlock()
+		return false, NewCacheError("exists", key, errors.New("invalid item type"))
+	}
 	item := memItem.item
 
 	// Check if item has expired
@@ -246,7 +264,7 @@ func (mc *MemoryCache) Exists(ctx context.Context, key string) (bool, error) {
 }
 
 // Clear removes all entries from the cache
-func (mc *MemoryCache) Clear(ctx context.Context) error {
+func (mc *MemoryCache) Clear(_ context.Context) error {
 	mc.mutex.Lock()
 	defer mc.mutex.Unlock()
 
@@ -301,7 +319,7 @@ func (mc *MemoryCache) DeleteMulti(ctx context.Context, keys []string) error {
 }
 
 // GetTTL returns the remaining TTL for a key
-func (mc *MemoryCache) GetTTL(ctx context.Context, key string) (time.Duration, error) {
+func (mc *MemoryCache) GetTTL(_ context.Context, key string) (time.Duration, error) {
 	formattedKey := mc.formatKey(key)
 
 	mc.mutex.RLock()
@@ -312,7 +330,10 @@ func (mc *MemoryCache) GetTTL(ctx context.Context, key string) (time.Duration, e
 		return 0, apperror.NewError("key not found")
 	}
 
-	memItem := element.Value.(*memoryItem)
+	memItem, ok := element.Value.(*memoryItem)
+	if !ok {
+		return 0, NewCacheError("gettl", key, errors.New("invalid item type"))
+	}
 	item := memItem.item
 
 	if item.ExpiresAt.IsZero() {
@@ -327,7 +348,7 @@ func (mc *MemoryCache) GetTTL(ctx context.Context, key string) (time.Duration, e
 }
 
 // SetTTL updates the TTL for an existing key
-func (mc *MemoryCache) SetTTL(ctx context.Context, key string, ttl time.Duration) error {
+func (mc *MemoryCache) SetTTL(_ context.Context, key string, ttl time.Duration) error {
 	formattedKey := mc.formatKey(key)
 
 	mc.mutex.Lock()
@@ -338,7 +359,10 @@ func (mc *MemoryCache) SetTTL(ctx context.Context, key string, ttl time.Duration
 		return apperror.NewError("key not found")
 	}
 
-	memItem := element.Value.(*memoryItem)
+	memItem, ok := element.Value.(*memoryItem)
+	if !ok {
+		return NewCacheError("setttl", key, errors.New("invalid item type"))
+	}
 	item := memItem.item
 
 	if ttl > 0 {
@@ -360,9 +384,36 @@ func (mc *MemoryCache) Close() error {
 	return nil
 }
 
+// GetKeys returns all keys in the cache (useful for debugging)
+func (mc *MemoryCache) GetKeys() []string {
+	mc.mutex.RLock()
+	defer mc.mutex.RUnlock()
+
+	keys := make([]string, 0, len(mc.items))
+	for key := range mc.items {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+// GetSize returns the current number of items in the cache
+func (mc *MemoryCache) GetSize() int64 {
+	mc.mutex.RLock()
+	defer mc.mutex.RUnlock()
+	return int64(len(mc.items))
+}
+
+// GetMemoryUsage returns the current memory usage in bytes
+func (mc *MemoryCache) GetMemoryUsage() int64 {
+	return mc.stats.Memory
+}
+
 // removeElement removes an element from the cache (must be called with lock held)
 func (mc *MemoryCache) removeElement(element *list.Element, key string) {
-	memItem := element.Value.(*memoryItem)
+	memItem, ok := element.Value.(*memoryItem)
+	if !ok {
+		return // Skip if invalid type
+	}
 	delete(mc.items, key)
 	mc.lruList.Remove(element)
 
@@ -380,7 +431,10 @@ func (mc *MemoryCache) evictLRU() {
 
 	element := mc.lruList.Back()
 	if element != nil {
-		memItem := element.Value.(*memoryItem)
+		memItem, ok := element.Value.(*memoryItem)
+		if !ok {
+			return // Skip if invalid type
+		}
 		key := memItem.item.Key
 		mc.removeElement(element, key)
 
@@ -418,7 +472,10 @@ func (mc *MemoryCache) cleanupExpired() {
 
 	// Find expired items
 	for key, element := range mc.items {
-		memItem := element.Value.(*memoryItem)
+		memItem, ok := element.Value.(*memoryItem)
+		if !ok {
+			continue
+		}
 		item := memItem.item
 
 		if !item.ExpiresAt.IsZero() && now.After(item.ExpiresAt) {
@@ -433,28 +490,4 @@ func (mc *MemoryCache) cleanupExpired() {
 			mc.emitEvent(EventExpire, key, nil, nil)
 		}
 	}
-}
-
-// GetKeys returns all keys in the cache (useful for debugging)
-func (mc *MemoryCache) GetKeys() []string {
-	mc.mutex.RLock()
-	defer mc.mutex.RUnlock()
-
-	keys := make([]string, 0, len(mc.items))
-	for key := range mc.items {
-		keys = append(keys, key)
-	}
-	return keys
-}
-
-// GetSize returns the current number of items in the cache
-func (mc *MemoryCache) GetSize() int64 {
-	mc.mutex.RLock()
-	defer mc.mutex.RUnlock()
-	return int64(len(mc.items))
-}
-
-// GetMemoryUsage returns the current memory usage in bytes
-func (mc *MemoryCache) GetMemoryUsage() int64 {
-	return mc.stats.Memory
 }

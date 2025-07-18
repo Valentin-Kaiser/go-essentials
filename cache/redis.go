@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -200,7 +199,7 @@ func (rc *RedisCache) Clear(ctx context.Context) error {
 		return apperror.NewError("clear operation requires a namespace to avoid deleting all Redis keys")
 	}
 
-	pattern := fmt.Sprintf("%s:*", rc.config.Namespace)
+	pattern := rc.config.Namespace + ":*"
 	keys, err := rc.client.Keys(ctx, pattern).Result()
 	if err != nil {
 		rc.recordError(err)

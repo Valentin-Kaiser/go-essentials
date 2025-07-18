@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -41,7 +42,9 @@ func setupTieredTest(t *testing.T) *TieredCache {
 	l2Cache := NewRedisCacheWithConfig(client, l2Config)
 
 	// Clean up any existing test data
-	l2Cache.Clear(ctx)
+	if err := l2Cache.Clear(ctx); err != nil {
+		t.Logf("Warning: failed to clear test data: %v", err)
+	}
 
 	// Create tiered cache
 	tieredConfig := DefaultConfig()
@@ -53,7 +56,7 @@ func setupTieredTest(t *testing.T) *TieredCache {
 
 func TestTieredCache_BasicOperations(t *testing.T) {
 	cache := setupTieredTest(t)
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -129,7 +132,7 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 
 func TestTieredCache_L1Eviction(t *testing.T) {
 	cache := setupTieredTest(t)
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -177,7 +180,7 @@ func TestTieredCache_L1Eviction(t *testing.T) {
 
 func TestTieredCache_L2Backfill(t *testing.T) {
 	cache := setupTieredTest(t)
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -230,9 +233,31 @@ func TestTieredCache_L2Backfill(t *testing.T) {
 	}
 }
 
+func TestTieredCache_TTL(t *testing.T) {
+	cache := setupTieredTest(t)
+	defer apperror.Catch(cache.Close, "failed to close cache")
+
+	ctx := context.Background()
+
+	// Test TTL operations
+	err := cache.Set(ctx, "test", "value", time.Hour)
+	if err != nil {
+		t.Fatalf("Failed to set value: %v", err)
+	}
+
+	// Check TTL
+	ttl, err := cache.GetTTL(ctx, "test")
+	if err != nil {
+		t.Fatalf("Failed to get TTL: %v", err)
+	}
+	if ttl <= 0 || ttl > time.Hour {
+		t.Errorf("Expected TTL between 0 and 1 hour, got %v", ttl)
+	}
+}
+
 func TestTieredCache_TTLPropagation(t *testing.T) {
 	cache := setupTieredTest(t)
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -274,7 +299,7 @@ func TestTieredCache_TTLPropagation(t *testing.T) {
 
 func TestTieredCache_MultiOperations(t *testing.T) {
 	cache := setupTieredTest(t)
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -347,7 +372,7 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 
 func TestTieredCache_Clear(t *testing.T) {
 	cache := setupTieredTest(t)
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -396,7 +421,7 @@ func TestTieredCache_Events(t *testing.T) {
 	cache.config.EventHandler = func(event Event) {
 		eventsChan <- event
 	}
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -455,7 +480,7 @@ eventLoop:
 
 func TestTieredCache_Stats(t *testing.T) {
 	cache := setupTieredTest(t)
-	defer cache.Close()
+	defer apperror.Catch(cache.Close, "failed to close cache")
 
 	ctx := context.Background()
 

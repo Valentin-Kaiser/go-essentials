@@ -151,11 +151,17 @@ func (i *Item) IsExpired() bool {
 type EventType int
 
 const (
+	// EventSet represents a cache set event
 	EventSet EventType = iota
+	// EventGet represents a cache get event
 	EventGet
+	// EventDelete represents a cache delete event
 	EventDelete
+	// EventEvict represents a cache eviction event
 	EventEvict
+	// EventExpire represents a cache expiration event
 	EventExpire
+	// EventClear represents a cache clear event
 	EventClear
 )
 
@@ -290,6 +296,13 @@ func (bc *BaseCache) GetConfig() Config {
 	return bc.config
 }
 
+// GetStats returns a copy of the current cache statistics
+func (bc *BaseCache) GetStats() Stats {
+	bc.mutex.RLock()
+	defer bc.mutex.RUnlock()
+	return bc.stats
+}
+
 // updateStats updates cache statistics safely
 func (bc *BaseCache) updateStats(fn func(*Stats)) {
 	if !bc.config.EnableStats {
@@ -305,13 +318,6 @@ func (bc *BaseCache) updateStats(fn func(*Stats)) {
 	if total > 0 {
 		bc.stats.HitRatio = float64(bc.stats.Hits) / float64(total)
 	}
-}
-
-// GetStats returns a copy of the current cache statistics
-func (bc *BaseCache) GetStats() Stats {
-	bc.mutex.RLock()
-	defer bc.mutex.RUnlock()
-	return bc.stats
 }
 
 // emitEvent emits a cache event if events are enabled
@@ -358,15 +364,24 @@ func (bc *BaseCache) calculateTTL(ttl time.Duration) time.Duration {
 	return ttl
 }
 
-// CacheError represents a cache-specific error
-type CacheError struct {
+// Error represents a cache-specific error
+type Error struct {
 	Op  string
 	Key string
 	Err error
 }
 
+// NewCacheError creates a new cache error
+func NewCacheError(op, key string, err error) *Error {
+	return &Error{
+		Op:  op,
+		Key: key,
+		Err: err,
+	}
+}
+
 // Error implements the error interface
-func (e *CacheError) Error() string {
+func (e *Error) Error() string {
 	if e.Key != "" {
 		return fmt.Sprintf("cache %s failed for key '%s': %v", e.Op, e.Key, e.Err)
 	}
@@ -374,15 +389,6 @@ func (e *CacheError) Error() string {
 }
 
 // Unwrap returns the underlying error
-func (e *CacheError) Unwrap() error {
+func (e *Error) Unwrap() error {
 	return e.Err
-}
-
-// NewCacheError creates a new cache error
-func NewCacheError(op, key string, err error) *CacheError {
-	return &CacheError{
-		Op:  op,
-		Key: key,
-		Err: err,
-	}
 }
