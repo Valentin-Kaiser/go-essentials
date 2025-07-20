@@ -1,4 +1,4 @@
-package queue
+package queue_test
 
 import (
 	"context"
@@ -10,20 +10,22 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/queue"
 )
 
 func TestNewJob(t *testing.T) {
-	builder := NewJob("test-job")
-	if builder.job.Type != "test-job" {
-		t.Errorf("Expected job type 'test-job', got '%s'", builder.job.Type)
+	builder := queue.NewJob("test-job")
+	job := builder.Build()
+	if job.Type != "test-job" {
+		t.Errorf("Expected job type 'test-job', got '%s'", job.Type)
 	}
 
-	if builder.job.Priority != PriorityNormal {
-		t.Errorf("Expected priority Normal, got %v", builder.job.Priority)
+	if job.Priority != queue.PriorityNormal {
+		t.Errorf("Expected priority Normal, got %v", job.Priority)
 	}
 
-	if builder.job.MaxAttempts != 3 {
-		t.Errorf("Expected max attempts 3, got %d", builder.job.MaxAttempts)
+	if job.MaxAttempts != 3 {
+		t.Errorf("Expected max attempts 3, got %d", job.MaxAttempts)
 	}
 }
 
@@ -33,10 +35,10 @@ func TestJobBuilder(t *testing.T) {
 		"name":  "Test User",
 	}
 
-	job := NewJob("email").
+	job := queue.NewJob("email").
 		WithID("test-id").
 		WithPayload(payload).
-		WithPriority(PriorityHigh).
+		WithPriority(queue.PriorityHigh).
 		WithMaxAttempts(5).
 		WithDelay(time.Hour).
 		WithMetadata("source", "test").
@@ -50,7 +52,7 @@ func TestJobBuilder(t *testing.T) {
 		t.Errorf("Expected job type 'email', got '%s'", job.Type)
 	}
 
-	if job.Priority != PriorityHigh {
+	if job.Priority != queue.PriorityHigh {
 		t.Errorf("Expected priority High, got %v", job.Priority)
 	}
 
@@ -58,7 +60,7 @@ func TestJobBuilder(t *testing.T) {
 		t.Errorf("Expected max attempts 5, got %d", job.MaxAttempts)
 	}
 
-	if job.Status != StatusScheduled {
+	if job.Status != queue.StatusScheduled {
 		t.Errorf("Expected status Scheduled, got %v", job.Status)
 	}
 
@@ -80,7 +82,7 @@ func TestJobBuilder(t *testing.T) {
 func TestJobBuilderWithPayloadJSON(t *testing.T) {
 	jsonData := []byte(`{"email": "test@example.com", "count": 42}`)
 
-	job := NewJob("email").
+	job := queue.NewJob("email").
 		WithJSONPayload(jsonData).
 		Build()
 
@@ -100,8 +102,8 @@ func TestJobBuilderWithPayloadJSON(t *testing.T) {
 }
 
 func TestJobStatus(t *testing.T) {
-	job := &Job{
-		Status:      StatusPending,
+	job := &queue.Job{
+		Status:      queue.StatusPending,
 		MaxAttempts: 3,
 	}
 
@@ -129,14 +131,14 @@ func TestJobStatus(t *testing.T) {
 
 func TestPriorityString(t *testing.T) {
 	tests := []struct {
-		priority Priority
+		priority queue.Priority
 		expected string
 	}{
-		{PriorityLow, "low"},
-		{PriorityNormal, "normal"},
-		{PriorityHigh, "high"},
-		{PriorityCritical, "critical"},
-		{Priority(99), "unknown"},
+		{queue.PriorityLow, "low"},
+		{queue.PriorityNormal, "normal"},
+		{queue.PriorityHigh, "high"},
+		{queue.PriorityCritical, "critical"},
+		{queue.Priority(99), "unknown"},
 	}
 
 	for _, test := range tests {
@@ -148,17 +150,17 @@ func TestPriorityString(t *testing.T) {
 
 func TestStatusString(t *testing.T) {
 	tests := []struct {
-		status   Status
+		status   queue.Status
 		expected string
 	}{
-		{StatusPending, "pending"},
-		{StatusRunning, "running"},
-		{StatusCompleted, "completed"},
-		{StatusFailed, "failed"},
-		{StatusRetrying, "retrying"},
-		{StatusScheduled, "scheduled"},
-		{StatusDeadLetter, "dead_letter"},
-		{Status(99), "unknown"},
+		{queue.StatusPending, "pending"},
+		{queue.StatusRunning, "running"},
+		{queue.StatusCompleted, "completed"},
+		{queue.StatusFailed, "failed"},
+		{queue.StatusRetrying, "retrying"},
+		{queue.StatusScheduled, "scheduled"},
+		{queue.StatusDeadLetter, "dead_letter"},
+		{queue.Status(99), "unknown"},
 	}
 
 	for _, test := range tests {
@@ -170,17 +172,17 @@ func TestStatusString(t *testing.T) {
 
 func TestMemoryQueue(t *testing.T) {
 	ctx := context.Background()
-	queue := NewMemoryQueue()
+	q := queue.NewMemoryQueue()
 
 	// Test enqueue
-	job := NewJob("test").WithID("test-1").Build()
-	err := queue.Enqueue(ctx, job)
+	job := queue.NewJob("test").WithID("test-1").Build()
+	err := q.Enqueue(ctx, job)
 	if err != nil {
 		t.Fatalf("Failed to enqueue job: %v", err)
 	}
 
 	// Test dequeue
-	dequeuedJob, err := queue.Dequeue(ctx, time.Second)
+	dequeuedJob, err := q.Dequeue(ctx, time.Second)
 	if err != nil {
 		t.Fatalf("Failed to dequeue job: %v", err)
 	}
@@ -190,7 +192,7 @@ func TestMemoryQueue(t *testing.T) {
 	}
 
 	// Test get job
-	retrievedJob, err := queue.GetJob(ctx, job.ID)
+	retrievedJob, err := q.GetJob(ctx, job.ID)
 	if err != nil {
 		t.Fatalf("Failed to get job: %v", err)
 	}
@@ -200,14 +202,14 @@ func TestMemoryQueue(t *testing.T) {
 	}
 
 	// Test update job
-	job.Status = StatusCompleted
-	err = queue.UpdateJob(ctx, job)
+	job.Status = queue.StatusCompleted
+	err = q.UpdateJob(ctx, job)
 	if err != nil {
 		t.Fatalf("Failed to update job: %v", err)
 	}
 
 	// Test get jobs by status
-	jobs, err := queue.GetJobs(ctx, StatusCompleted, 10)
+	jobs, err := q.GetJobs(ctx, queue.StatusCompleted, 10)
 	if err != nil {
 		t.Fatalf("Failed to get jobs by status: %v", err)
 	}
@@ -217,7 +219,7 @@ func TestMemoryQueue(t *testing.T) {
 	}
 
 	// Test stats
-	stats, err := queue.GetStats(ctx)
+	stats, err := q.GetStats(ctx)
 	if err != nil {
 		t.Fatalf("Failed to get stats: %v", err)
 	}
@@ -231,13 +233,13 @@ func TestMemoryQueue(t *testing.T) {
 	}
 
 	// Test delete job
-	err = queue.DeleteJob(ctx, job.ID)
+	err = q.DeleteJob(ctx, job.ID)
 	if err != nil {
 		t.Fatalf("Failed to delete job: %v", err)
 	}
 
 	// Test close
-	err = queue.Close()
+	err = q.Close()
 	if err != nil {
 		t.Fatalf("Failed to close queue: %v", err)
 	}
@@ -245,21 +247,21 @@ func TestMemoryQueue(t *testing.T) {
 
 func TestMemoryQueueScheduled(t *testing.T) {
 	ctx := context.Background()
-	queue := NewMemoryQueue()
+	q := queue.NewMemoryQueue()
 
 	// Test scheduled job
-	job := NewJob("test").
+	job := queue.NewJob("test").
 		WithID("test-scheduled").
 		WithScheduleAt(time.Now().Add(time.Hour)).
 		Build()
 
-	err := queue.Schedule(ctx, job)
+	err := q.Schedule(ctx, job)
 	if err != nil {
 		t.Fatalf("Failed to schedule job: %v", err)
 	}
 
 	// Should not be dequeued immediately
-	dequeuedJob, err := queue.Dequeue(ctx, time.Millisecond*100)
+	dequeuedJob, err := q.Dequeue(ctx, time.Millisecond*100)
 	if err != context.DeadlineExceeded {
 		t.Errorf("Expected timeout error, got %v", err)
 	}
@@ -269,7 +271,7 @@ func TestMemoryQueueScheduled(t *testing.T) {
 	}
 
 	// Test get scheduled jobs
-	jobs, err := queue.GetJobs(ctx, StatusScheduled, 10)
+	jobs, err := q.GetJobs(ctx, queue.StatusScheduled, 10)
 	if err != nil {
 		t.Fatalf("Failed to get scheduled jobs: %v", err)
 	}
@@ -278,7 +280,7 @@ func TestMemoryQueueScheduled(t *testing.T) {
 		t.Errorf("Expected 1 scheduled job, got %d", len(jobs))
 	}
 
-	err = queue.Close()
+	err = q.Close()
 	if err != nil {
 		t.Fatalf("Failed to close queue: %v", err)
 	}
@@ -286,18 +288,18 @@ func TestMemoryQueueScheduled(t *testing.T) {
 
 func TestMemoryQueuePriority(t *testing.T) {
 	ctx := context.Background()
-	queue := NewMemoryQueue()
+	q := queue.NewMemoryQueue()
 
 	// Enqueue jobs with different priorities
-	jobs := []*Job{
-		NewJob("low").WithID("low-1").WithPriority(PriorityLow).Build(),
-		NewJob("high").WithID("high-1").WithPriority(PriorityHigh).Build(),
-		NewJob("normal").WithID("normal-1").WithPriority(PriorityNormal).Build(),
-		NewJob("critical").WithID("critical-1").WithPriority(PriorityCritical).Build(),
+	jobs := []*queue.Job{
+		queue.NewJob("low").WithID("low-1").WithPriority(queue.PriorityLow).Build(),
+		queue.NewJob("high").WithID("high-1").WithPriority(queue.PriorityHigh).Build(),
+		queue.NewJob("normal").WithID("normal-1").WithPriority(queue.PriorityNormal).Build(),
+		queue.NewJob("critical").WithID("critical-1").WithPriority(queue.PriorityCritical).Build(),
 	}
 
 	for _, job := range jobs {
-		err := queue.Enqueue(ctx, job)
+		err := q.Enqueue(ctx, job)
 		if err != nil {
 			t.Fatalf("Failed to enqueue job: %v", err)
 		}
@@ -306,7 +308,7 @@ func TestMemoryQueuePriority(t *testing.T) {
 	// Dequeue jobs - should come out in priority order
 	expectedOrder := []string{"critical-1", "high-1", "normal-1", "low-1"}
 	for _, expectedID := range expectedOrder {
-		job, err := queue.Dequeue(ctx, time.Second)
+		job, err := q.Dequeue(ctx, time.Second)
 		if err != nil {
 			t.Fatalf("Failed to dequeue job: %v", err)
 		}
@@ -316,7 +318,7 @@ func TestMemoryQueuePriority(t *testing.T) {
 		}
 	}
 
-	err := queue.Close()
+	err := q.Close()
 	if err != nil {
 		t.Fatalf("Failed to close queue: %v", err)
 	}
@@ -324,7 +326,7 @@ func TestMemoryQueuePriority(t *testing.T) {
 
 func TestManager(t *testing.T) {
 	ctx := context.Background()
-	manager := NewManager().
+	manager := queue.NewManager().
 		WithWorkers(2).
 		WithRetryAttempts(2).
 		WithRetryDelay(time.Millisecond * 100)
@@ -332,7 +334,7 @@ func TestManager(t *testing.T) {
 	// Register a test handler
 	var handlerCalled bool
 	var mu sync.Mutex
-	manager.RegisterHandler("test", func(_ context.Context, _ *Job) error {
+	manager.RegisterHandler("test", func(_ context.Context, _ *queue.Job) error {
 		mu.Lock()
 		handlerCalled = true
 		mu.Unlock()
@@ -346,7 +348,7 @@ func TestManager(t *testing.T) {
 	}
 
 	// Enqueue a job
-	job := NewJob("test").WithID("test-manager").Build()
+	job := queue.NewJob("test").WithID("test-manager").Build()
 	err = manager.Enqueue(ctx, job)
 	if err != nil {
 		t.Fatalf("Failed to enqueue job: %v", err)
@@ -369,7 +371,7 @@ func TestManager(t *testing.T) {
 		t.Fatalf("Failed to get job: %v", err)
 	}
 
-	if processedJob.Status != StatusCompleted {
+	if processedJob.Status != queue.StatusCompleted {
 		t.Errorf("Expected job status Completed, got %v", processedJob.Status)
 	}
 
@@ -386,7 +388,7 @@ func TestManager(t *testing.T) {
 
 func TestManagerRetry(t *testing.T) {
 	ctx := context.Background()
-	manager := NewManager().
+	manager := queue.NewManager().
 		WithWorkers(1).
 		WithRetryAttempts(2).
 		WithRetryDelay(time.Millisecond * 50)
@@ -394,14 +396,14 @@ func TestManagerRetry(t *testing.T) {
 	// Register a handler that fails initially
 	var attempts int
 	var mu sync.Mutex
-	manager.RegisterHandler("retry-test", func(_ context.Context, _ *Job) error {
+	manager.RegisterHandler("retry-test", func(_ context.Context, _ *queue.Job) error {
 		mu.Lock()
 		attempts++
 		currentAttempts := attempts
 		mu.Unlock()
 
 		if currentAttempts < 2 {
-			return NewRetryableError(errors.New("temporary failure"))
+			return queue.NewRetryableError(errors.New("temporary failure"))
 		}
 		return nil
 	})
@@ -413,7 +415,7 @@ func TestManagerRetry(t *testing.T) {
 	}
 
 	// Enqueue a job
-	job := NewJob("retry-test").WithID("retry-job").Build()
+	job := queue.NewJob("retry-test").WithID("retry-job").Build()
 	err = manager.Enqueue(ctx, job)
 	if err != nil {
 		t.Fatalf("Failed to enqueue job: %v", err)
@@ -436,7 +438,7 @@ func TestManagerRetry(t *testing.T) {
 		t.Fatalf("Failed to get job: %v", err)
 	}
 
-	if processedJob.Status != StatusCompleted {
+	if processedJob.Status != queue.StatusCompleted {
 		t.Errorf("Expected job status Completed, got %v", processedJob.Status)
 	}
 
@@ -449,14 +451,14 @@ func TestManagerRetry(t *testing.T) {
 
 func TestManagerScheduled(t *testing.T) {
 	ctx := context.Background()
-	manager := NewManager().
+	manager := queue.NewManager().
 		WithWorkers(1).
 		WithScheduleInterval(time.Millisecond * 50)
 
 	// Register a test handler
 	var handlerCalled bool
 	var mu sync.Mutex
-	manager.RegisterHandler("scheduled-test", func(_ context.Context, _ *Job) error {
+	manager.RegisterHandler("scheduled-test", func(_ context.Context, _ *queue.Job) error {
 		mu.Lock()
 		handlerCalled = true
 		mu.Unlock()
@@ -470,7 +472,7 @@ func TestManagerScheduled(t *testing.T) {
 	}
 
 	// Schedule a job for near future
-	job := NewJob("scheduled-test").
+	job := queue.NewJob("scheduled-test").
 		WithID("scheduled-job").
 		WithScheduleAt(time.Now().Add(time.Millisecond * 100)).
 		Build()
@@ -511,12 +513,12 @@ func TestManagerScheduled(t *testing.T) {
 
 func TestBatchManager(t *testing.T) {
 	ctx := context.Background()
-	manager := NewManager().WithWorkers(2)
+	manager := queue.NewManager().WithWorkers(2)
 
 	// Register a test handler
 	processedJobs := make(map[string]bool)
 	var processedMutex sync.Mutex
-	manager.RegisterHandler("batch-test", func(_ context.Context, job *Job) error {
+	manager.RegisterHandler("batch-test", func(_ context.Context, job *queue.Job) error {
 		processedMutex.Lock()
 		processedJobs[job.ID] = true
 		processedMutex.Unlock()
@@ -530,13 +532,13 @@ func TestBatchManager(t *testing.T) {
 	}
 
 	// Create batch manager
-	batchManager := NewBatchManager(manager)
+	batchManager := queue.NewBatchManager(manager)
 
 	// Create batch of jobs
-	jobs := []*Job{
-		NewJob("batch-test").WithID("batch-job-1").Build(),
-		NewJob("batch-test").WithID("batch-job-2").Build(),
-		NewJob("batch-test").WithID("batch-job-3").Build(),
+	jobs := []*queue.Job{
+		queue.NewJob("batch-test").WithID("batch-job-1").Build(),
+		queue.NewJob("batch-test").WithID("batch-job-2").Build(),
+		queue.NewJob("batch-test").WithID("batch-job-3").Build(),
 	}
 
 	batch, err := batchManager.CreateBatch(ctx, "test-batch", jobs)
@@ -572,7 +574,7 @@ func TestBatchManager(t *testing.T) {
 		t.Fatalf("Failed to get batch: %v", err)
 	}
 
-	if updatedBatch.Status != StatusCompleted {
+	if updatedBatch.Status != queue.StatusCompleted {
 		t.Errorf("Expected batch status Completed, got %v", updatedBatch.Status)
 	}
 
@@ -585,11 +587,11 @@ func TestBatchManager(t *testing.T) {
 
 func TestMiddleware(t *testing.T) {
 	ctx := context.Background()
-	job := NewJob("test").WithID("middleware-test").Build()
+	job := queue.NewJob("test").WithID("middleware-test").Build()
 
 	// Test logging middleware
 	called := false
-	handler := LoggingMiddleware(func(_ context.Context, _ *Job) error {
+	handler := queue.LoggingMiddleware(func(_ context.Context, _ *queue.Job) error {
 		called = true
 		return nil
 	})
@@ -604,7 +606,7 @@ func TestMiddleware(t *testing.T) {
 	}
 
 	// Test timeout middleware
-	timeoutHandler := TimeoutMiddleware(time.Millisecond * 100)(func(_ context.Context, _ *Job) error {
+	timeoutHandler := queue.TimeoutMiddleware(time.Millisecond * 100)(func(_ context.Context, _ *queue.Job) error {
 		time.Sleep(time.Millisecond * 200)
 		return nil
 	})
@@ -615,7 +617,7 @@ func TestMiddleware(t *testing.T) {
 	}
 
 	// Test recovery middleware
-	recoveryHandler := RecoveryMiddleware(func(_ context.Context, _ *Job) error {
+	recoveryHandler := queue.RecoveryMiddleware(func(_ context.Context, _ *queue.Job) error {
 		panic("test panic")
 	})
 
@@ -625,13 +627,13 @@ func TestMiddleware(t *testing.T) {
 	}
 
 	// Test middleware chain
-	chainHandler := MiddlewareChain(
-		func(_ context.Context, _ *Job) error {
+	chainHandler := queue.MiddlewareChain(
+		func(_ context.Context, _ *queue.Job) error {
 			return nil
 		},
-		LoggingMiddleware,
-		MetricsMiddleware,
-		RecoveryMiddleware,
+		queue.LoggingMiddleware,
+		queue.MetricsMiddleware,
+		queue.RecoveryMiddleware,
 	)
 
 	err = chainHandler(ctx, job)
@@ -642,7 +644,7 @@ func TestMiddleware(t *testing.T) {
 
 func TestJobContext(t *testing.T) {
 	ctx := context.Background()
-	job := NewJob("test").
+	job := queue.NewJob("test").
 		WithPayload(map[string]interface{}{
 			"string_value": "test",
 			"int_value":    42,
@@ -651,7 +653,7 @@ func TestJobContext(t *testing.T) {
 		WithMetadata("source", "test").
 		Build()
 
-	jobCtx := NewJobContext(ctx, job)
+	jobCtx := queue.NewJobContext(ctx, job)
 
 	// Test payload getters
 	strValue, ok := jobCtx.GetPayloadString("string_value")
@@ -681,46 +683,46 @@ func TestJobContext(t *testing.T) {
 }
 
 func TestRetryableError(t *testing.T) {
-	err := NewRetryableError(errors.New("test error"))
+	err := queue.NewRetryableError(errors.New("test error"))
 
 	if err.Error() != "test error" {
 		t.Errorf("Expected error message 'test error', got '%s'", err.Error())
 	}
 
-	if !IsRetryable(err) {
+	if !queue.IsRetryable(err) {
 		t.Error("Error should be retryable")
 	}
 
 	regularErr := errors.New("regular error")
-	if IsRetryable(regularErr) {
+	if queue.IsRetryable(regularErr) {
 		t.Error("Regular error should not be retryable")
 	}
 }
 
 func BenchmarkMemoryQueueEnqueue(b *testing.B) {
 	ctx := context.Background()
-	queue := NewMemoryQueue()
+	q := queue.NewMemoryQueue()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		job := NewJob("benchmark").WithID(fmt.Sprintf("job-%d", i)).Build()
-		apperror.Handle(queue.Enqueue(ctx, job), "failed to enqueue job")
+		job := queue.NewJob("benchmark").WithID(fmt.Sprintf("job-%d", i)).Build()
+		apperror.Handle(q.Enqueue(ctx, job), "failed to enqueue job")
 	}
 }
 
 func BenchmarkMemoryQueueDequeue(b *testing.B) {
 	ctx := context.Background()
-	queue := NewMemoryQueue()
+	q := queue.NewMemoryQueue()
 
 	// Pre-populate queue
 	for i := 0; i < b.N; i++ {
-		job := NewJob("benchmark").WithID(fmt.Sprintf("job-%d", i)).Build()
-		apperror.Handle(queue.Enqueue(ctx, job), "failed to enqueue job")
+		job := queue.NewJob("benchmark").WithID(fmt.Sprintf("job-%d", i)).Build()
+		apperror.Handle(q.Enqueue(ctx, job), "failed to enqueue job")
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = queue.Dequeue(ctx, time.Second)
+		_, _ = q.Dequeue(ctx, time.Second)
 	}
 }
 
@@ -732,9 +734,9 @@ func BenchmarkJobBuilder(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		NewJob("email").
+		queue.NewJob("email").
 			WithPayload(payload).
-			WithPriority(PriorityHigh).
+			WithPriority(queue.PriorityHigh).
 			WithMaxAttempts(3).
 			WithMetadata("source", "test").
 			Build()

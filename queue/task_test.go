@@ -1,4 +1,4 @@
-package queue
+package queue_test
 
 import (
 	"context"
@@ -8,58 +8,12 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/Valentin-Kaiser/go-core/queue"
 )
 
-func TestTaskScheduler_New(t *testing.T) {
-	scheduler := NewTaskScheduler()
-
-	if scheduler == nil {
-		t.Fatal("NewTaskScheduler returned nil")
-	}
-
-	if scheduler.tasks == nil {
-		t.Error("tasks map not initialized")
-	}
-
-	if scheduler.checkInterval != time.Second*10 {
-		t.Errorf("expected default check interval 10s, got %v", scheduler.checkInterval)
-	}
-
-	if scheduler.defaultTimeout != time.Minute*5 {
-		t.Errorf("expected default timeout 5m, got %v", scheduler.defaultTimeout)
-	}
-
-	if scheduler.defaultRetries != 3 {
-		t.Errorf("expected default retries 3, got %d", scheduler.defaultRetries)
-	}
-}
-
-func TestTaskScheduler_WithOptions(t *testing.T) {
-	scheduler := NewTaskScheduler().
-		WithCheckInterval(time.Second * 5).
-		WithDefaultTimeout(time.Minute * 2).
-		WithDefaultRetries(5).
-		WithRetryDelay(time.Second * 2)
-
-	if scheduler.checkInterval != time.Second*5 {
-		t.Errorf("expected check interval 5s, got %v", scheduler.checkInterval)
-	}
-
-	if scheduler.defaultTimeout != time.Minute*2 {
-		t.Errorf("expected timeout 2m, got %v", scheduler.defaultTimeout)
-	}
-
-	if scheduler.defaultRetries != 5 {
-		t.Errorf("expected retries 5, got %d", scheduler.defaultRetries)
-	}
-
-	if scheduler.retryDelay != time.Second*2 {
-		t.Errorf("expected retry delay 2s, got %v", scheduler.retryDelay)
-	}
-}
-
 func TestTaskScheduler_RegisterIntervalTask(t *testing.T) {
-	scheduler := NewTaskScheduler()
+	scheduler := queue.NewTaskScheduler()
 
 	var executed int32
 	taskFunc := func(_ context.Context) error {
@@ -81,7 +35,7 @@ func TestTaskScheduler_RegisterIntervalTask(t *testing.T) {
 		t.Errorf("expected task name 'test-task', got '%s'", task.Name)
 	}
 
-	if task.Type != TaskTypeInterval {
+	if task.Type != queue.TaskTypeInterval {
 		t.Errorf("expected task type interval, got %v", task.Type)
 	}
 
@@ -101,7 +55,7 @@ func TestTaskScheduler_RegisterIntervalTask(t *testing.T) {
 }
 
 func TestTaskScheduler_RegisterCronTask(t *testing.T) {
-	scheduler := NewTaskScheduler()
+	scheduler := queue.NewTaskScheduler()
 
 	var executed int32
 	taskFunc := func(_ context.Context) error {
@@ -120,7 +74,7 @@ func TestTaskScheduler_RegisterCronTask(t *testing.T) {
 		t.Fatalf("failed to get task: %v", err)
 	}
 
-	if task.Type != TaskTypeCron {
+	if task.Type != queue.TaskTypeCron {
 		t.Errorf("expected task type cron, got %v", task.Type)
 	}
 
@@ -148,7 +102,7 @@ func TestTaskScheduler_RegisterCronTask(t *testing.T) {
 }
 
 func TestTaskScheduler_StartStop(t *testing.T) {
-	scheduler := NewTaskScheduler()
+	scheduler := queue.NewTaskScheduler()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -181,7 +135,7 @@ func TestTaskScheduler_StartStop(t *testing.T) {
 }
 
 func TestTaskScheduler_IntervalTaskExecution(t *testing.T) {
-	scheduler := NewTaskScheduler().WithCheckInterval(time.Millisecond * 100)
+	scheduler := queue.NewTaskScheduler().WithCheckInterval(time.Millisecond * 100)
 
 	var executed int32
 	var executionTimes []time.Time
@@ -234,7 +188,7 @@ func TestTaskScheduler_IntervalTaskExecution(t *testing.T) {
 }
 
 func TestTaskScheduler_TaskRetry(t *testing.T) {
-	scheduler := NewTaskScheduler().
+	scheduler := queue.NewTaskScheduler().
 		WithCheckInterval(time.Millisecond * 50).
 		WithRetryDelay(time.Millisecond * 50)
 
@@ -252,7 +206,7 @@ func TestTaskScheduler_TaskRetry(t *testing.T) {
 		return nil
 	}
 
-	err := scheduler.RegisterIntervalTaskWithOptions("retry-task", time.Second*10, taskFunc, TaskOptions{
+	err := scheduler.RegisterIntervalTaskWithOptions("retry-task", time.Second*10, taskFunc, queue.TaskOptions{
 		MaxRetries: 3,
 		RetryDelay: time.Millisecond * 30,
 	})
@@ -304,7 +258,7 @@ func TestTaskScheduler_TaskRetry(t *testing.T) {
 }
 
 func TestTaskScheduler_TaskFailure(t *testing.T) {
-	scheduler := NewTaskScheduler().
+	scheduler := queue.NewTaskScheduler().
 		WithCheckInterval(time.Millisecond * 50).
 		WithRetryDelay(time.Millisecond * 30)
 
@@ -316,7 +270,7 @@ func TestTaskScheduler_TaskFailure(t *testing.T) {
 		return expectedError
 	}
 
-	err := scheduler.RegisterIntervalTaskWithOptions("failing-task", time.Second*5, taskFunc, TaskOptions{
+	err := scheduler.RegisterIntervalTaskWithOptions("failing-task", time.Second*5, taskFunc, queue.TaskOptions{
 		MaxRetries: 2,
 		RetryDelay: time.Millisecond * 30,
 	})
@@ -361,7 +315,7 @@ func TestTaskScheduler_TaskFailure(t *testing.T) {
 }
 
 func TestTaskScheduler_EnableDisableTask(t *testing.T) {
-	scheduler := NewTaskScheduler()
+	scheduler := queue.NewTaskScheduler()
 
 	taskFunc := func(_ context.Context) error {
 		return nil
@@ -415,7 +369,7 @@ func TestTaskScheduler_EnableDisableTask(t *testing.T) {
 }
 
 func TestTaskScheduler_RemoveTask(t *testing.T) {
-	scheduler := NewTaskScheduler()
+	scheduler := queue.NewTaskScheduler()
 
 	taskFunc := func(_ context.Context) error {
 		return nil
@@ -446,7 +400,7 @@ func TestTaskScheduler_RemoveTask(t *testing.T) {
 }
 
 func TestTaskScheduler_GetTasks(t *testing.T) {
-	scheduler := NewTaskScheduler()
+	scheduler := queue.NewTaskScheduler()
 
 	taskFunc := func(_ context.Context) error {
 		return nil

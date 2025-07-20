@@ -1,4 +1,4 @@
-package interruption
+package interruption_test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/flag"
+	"github.com/Valentin-Kaiser/go-core/interruption"
 )
 
 func TestHandle(t *testing.T) {
@@ -25,7 +26,7 @@ func TestHandle(t *testing.T) {
 
 	// Test normal execution (no panic)
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		// Normal code that doesn't panic
 	}()
 }
@@ -37,7 +38,7 @@ func TestHandleWithPanic(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Catch()
+				interruption.Catch()
 			}
 			handled = true
 		}()
@@ -68,7 +69,7 @@ func TestHandleWithDifferentPanicTypes(t *testing.T) {
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
-						Catch()
+						interruption.Catch()
 					}
 					handled = true
 				}()
@@ -95,7 +96,7 @@ func TestHandleInDebugMode(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Catch()
+				interruption.Catch()
 			}
 			handled = true
 		}()
@@ -120,7 +121,7 @@ func TestHandleInProductionMode(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Catch()
+				interruption.Catch()
 			}
 			handled = true
 		}()
@@ -139,7 +140,7 @@ func TestHandleNested(t *testing.T) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Catch()
+				interruption.Catch()
 			}
 			outerHandled = true
 		}()
@@ -147,7 +148,7 @@ func TestHandleNested(t *testing.T) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					Catch()
+					interruption.Catch()
 				}
 				innerHandled = true
 			}()
@@ -173,7 +174,7 @@ func TestHandleMultiple(t *testing.T) {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
-					Catch()
+					interruption.Catch()
 				}
 				handled = true
 			}()
@@ -191,7 +192,7 @@ func TestHandleWithoutPanic(t *testing.T) {
 	var normalExecution bool
 
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		normalExecution = true
 	}()
 
@@ -207,7 +208,7 @@ func TestHandleInGoroutine(t *testing.T) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				Catch()
+				interruption.Catch()
 			}
 			done <- true
 		}()
@@ -251,7 +252,7 @@ func TestHandleWithDetailedPanicTypes(t *testing.T) {
 			}()
 
 			func() {
-				defer Catch()
+				defer interruption.Catch()
 				panic(tt.panicData)
 			}()
 		})
@@ -274,7 +275,7 @@ func TestHandleWithCallStack(t *testing.T) {
 		}()
 
 		func() {
-			defer Catch()
+			defer interruption.Catch()
 			panic("debug mode panic")
 		}()
 	}()
@@ -290,7 +291,7 @@ func TestHandleWithCallStack(t *testing.T) {
 		}()
 
 		func() {
-			defer Catch()
+			defer interruption.Catch()
 			panic("production mode panic")
 		}()
 	}()
@@ -311,7 +312,7 @@ func TestHandleWithGoroutineStack(t *testing.T) {
 		}()
 
 		func() {
-			defer Catch()
+			defer interruption.Catch()
 			panic("goroutine panic")
 		}()
 	}()
@@ -336,7 +337,7 @@ func TestHandleWithRecursivePanic(t *testing.T) {
 			}
 		}()
 
-		defer Catch()
+		defer interruption.Catch()
 
 		depth++
 		if depth < maxDepth {
@@ -359,7 +360,7 @@ func TestHandleCallerInformation(t *testing.T) {
 		{
 			"direct call",
 			func() {
-				defer Catch()
+				defer interruption.Catch()
 				panic("direct panic")
 			},
 		},
@@ -367,7 +368,7 @@ func TestHandleCallerInformation(t *testing.T) {
 			"nested call",
 			func() {
 				func() {
-					defer Catch()
+					defer interruption.Catch()
 					panic("nested panic")
 				}()
 			},
@@ -376,7 +377,7 @@ func TestHandleCallerInformation(t *testing.T) {
 			"anonymous function",
 			func() {
 				func() {
-					defer Catch()
+					defer interruption.Catch()
 					panic("anonymous panic")
 				}()
 			},
@@ -407,7 +408,7 @@ func TestHandleWithRuntimeCallerFailure(t *testing.T) {
 	}()
 
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		panic("test runtime caller failure scenario")
 	}()
 }
@@ -435,7 +436,7 @@ func TestHandleInDifferentDebugModes(t *testing.T) {
 			}()
 
 			func() {
-				defer Catch()
+				defer interruption.Catch()
 				panic("panic in " + mode.name)
 			}()
 		})
@@ -450,7 +451,7 @@ func TestHandleWithNilPanic(t *testing.T) {
 	}()
 
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		var nilPtr *int
 		panic(nilPtr)
 	}()
@@ -470,7 +471,7 @@ func TestHandleWithLargePanicData(t *testing.T) {
 	}
 
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		panic(largeData)
 	}()
 }
@@ -485,7 +486,7 @@ func TestHandleFilePathProcessing(t *testing.T) {
 
 	// Create a scenario with nested directory structure
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		panic("file path processing test")
 	}()
 }
@@ -501,7 +502,7 @@ func TestHandleWithOSSignals(t *testing.T) {
 	}()
 
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		// Simulate some OS-related panic
 		panic("simulated OS signal panic")
 	}()
@@ -516,7 +517,7 @@ func TestHandleMemoryPressure(t *testing.T) {
 	}()
 
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		// Simulate out of memory scenario
 		panic("runtime: out of memory")
 	}()
@@ -537,15 +538,15 @@ func TestMultipleHandleRegistrations(t *testing.T) {
 
 	func() {
 		defer func() { counter++ }()
-		defer Catch()
+		defer interruption.Catch()
 
 		func() {
 			defer func() { counter++ }()
-			defer Catch()
+			defer interruption.Catch()
 
 			func() {
 				defer func() { counter++ }()
-				defer Catch()
+				defer interruption.Catch()
 				panic("nested handle test")
 			}()
 		}()
@@ -559,7 +560,7 @@ func TestHandlePerformance(t *testing.T) {
 	start := time.Now()
 	for i := 0; i < iterations; i++ {
 		func() {
-			defer Catch()
+			defer interruption.Catch()
 			panic("performance test")
 		}()
 	}
@@ -590,7 +591,7 @@ func TestHandleRuntimeCharacteristics(t *testing.T) {
 			}()
 
 			func() {
-				defer Catch()
+				defer interruption.Catch()
 				panic(fmt.Sprintf("panic with GOMAXPROCS=%d", procs))
 			}()
 		})
@@ -618,7 +619,7 @@ func TestHandleWithEnvironmentVariables(t *testing.T) {
 	}()
 
 	func() {
-		defer Catch()
+		defer interruption.Catch()
 		panic("environment variable test")
 	}()
 }
@@ -631,7 +632,7 @@ func TestOnSignalContextCreation(t *testing.T) {
 		return nil
 	}
 
-	ctx := OnSignal([]func() error{handler}, syscall.SIGTERM)
+	ctx := interruption.OnSignal([]func() error{handler}, syscall.SIGTERM)
 
 	if ctx == nil {
 		t.Error("OnSignal should return a non-nil context")
@@ -763,7 +764,7 @@ func TestOnSignalWithErrors(t *testing.T) {
 
 func TestOnSignalNoHandlers(t *testing.T) {
 	// Test with empty handlers slice
-	ctx := OnSignal([]func() error{}, syscall.SIGTERM)
+	ctx := interruption.OnSignal([]func() error{}, syscall.SIGTERM)
 
 	if ctx == nil {
 		t.Error("OnSignal should return a non-nil context even with no handlers")
@@ -781,7 +782,7 @@ func TestOnSignalNoHandlers(t *testing.T) {
 
 func TestOnSignalNilHandlers(t *testing.T) {
 	// Test with nil handlers slice
-	ctx := OnSignal(nil, syscall.SIGTERM)
+	ctx := interruption.OnSignal(nil, syscall.SIGTERM)
 
 	if ctx == nil {
 		t.Error("OnSignal should return a non-nil context even with nil handlers")
@@ -830,7 +831,7 @@ func TestOnSignalHandlerPanic(t *testing.T) {
 		<-ctx.Done()
 		for _, handler := range handlers {
 			func() {
-				defer Catch()
+				defer interruption.Catch()
 				if err := handler(); err != nil {
 					t.Errorf("Handler failed: %v", err)
 				}
@@ -917,7 +918,7 @@ func TestOnSignalMultipleSignalTypes(t *testing.T) {
 	}
 
 	// Test that function accepts multiple signal types without error
-	ctx := OnSignal([]func() error{handler}, syscall.SIGTERM, syscall.SIGINT)
+	ctx := interruption.OnSignal([]func() error{handler}, syscall.SIGTERM, syscall.SIGINT)
 
 	if ctx == nil {
 		t.Error("OnSignal should return a non-nil context with multiple signals")
@@ -938,7 +939,7 @@ func TestOnSignalContextType(t *testing.T) {
 		return nil
 	}
 
-	ctx := OnSignal([]func() error{handler}, syscall.SIGTERM)
+	ctx := interruption.OnSignal([]func() error{handler}, syscall.SIGTERM)
 
 	if ctx == nil {
 		t.Fatal("OnSignal should return a non-nil context")
@@ -964,7 +965,7 @@ func TestOnSignalContextType(t *testing.T) {
 func BenchmarkHandle(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer Catch()
+			defer interruption.Catch()
 			panic("benchmark test")
 		}()
 	}
@@ -979,7 +980,7 @@ func BenchmarkHandleWithLargeStack(b *testing.B) {
 				if depth > 0 {
 					deepCall(depth - 1)
 				} else {
-					defer Catch()
+					defer interruption.Catch()
 					panic("deep stack benchmark")
 				}
 			}
@@ -996,7 +997,7 @@ func BenchmarkHandleDebugMode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer Catch()
+			defer interruption.Catch()
 			panic("debug mode benchmark")
 		}()
 	}
@@ -1009,7 +1010,7 @@ func BenchmarkHandleProductionMode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		func() {
-			defer Catch()
+			defer interruption.Catch()
 			panic("production mode benchmark")
 		}()
 	}
@@ -1023,7 +1024,7 @@ func BenchmarkOnSignalCreation(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := OnSignal([]func() error{handler}, syscall.SIGTERM)
+		ctx := interruption.OnSignal([]func() error{handler}, syscall.SIGTERM)
 		_ = ctx // Use the context to prevent optimization
 	}
 }
@@ -1038,7 +1039,7 @@ func BenchmarkOnSignalMultipleHandlers(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ctx := OnSignal(handlers, syscall.SIGTERM)
+		ctx := interruption.OnSignal(handlers, syscall.SIGTERM)
 		_ = ctx // Use the context to prevent optimization
 	}
 }
@@ -1049,7 +1050,7 @@ func TestWaitForShutdown(t *testing.T) {
 
 	done := make(chan bool, 1)
 	go func() {
-		WaitForShutdown(ctx)
+		interruption.WaitForShutdown(ctx)
 		done <- true
 	}()
 
@@ -1077,7 +1078,7 @@ func TestWaitForShutdownWithNilContext(t *testing.T) {
 	// Test WaitForShutdown with nil context
 	done := make(chan bool, 1)
 	go func() {
-		WaitForShutdown(nil)
+		interruption.WaitForShutdown(nil)
 		done <- true
 	}()
 
@@ -1107,11 +1108,11 @@ func TestWaitForShutdownWithOnSignal(t *testing.T) {
 		return nil
 	}
 
-	ctx := OnSignal([]func() error{handler}, syscall.SIGTERM)
+	ctx := interruption.OnSignal([]func() error{handler}, syscall.SIGTERM)
 
 	done := make(chan bool, 1)
 	go func() {
-		WaitForShutdown(ctx)
+		interruption.WaitForShutdown(ctx)
 		done <- true
 	}()
 
@@ -1162,7 +1163,7 @@ func TestSetupGracefulShutdown(t *testing.T) {
 	}
 
 	// Setup graceful shutdown - this should return a function to defer
-	shutdownFunc := SetupGracefulShutdown([]func() error{handler}, syscall.SIGTERM)
+	shutdownFunc := interruption.SetupGracefulShutdown([]func() error{handler}, syscall.SIGTERM)
 
 	if shutdownFunc == nil {
 		t.Error("SetupGracefulShutdown should return a non-nil function")
@@ -1193,7 +1194,7 @@ func TestSetupGracefulShutdown(t *testing.T) {
 
 func TestSetupGracefulShutdownWithNoHandlers(t *testing.T) {
 	// Test with no handlers
-	shutdownFunc := SetupGracefulShutdown([]func() error{}, syscall.SIGTERM)
+	shutdownFunc := interruption.SetupGracefulShutdown([]func() error{}, syscall.SIGTERM)
 
 	if shutdownFunc == nil {
 		t.Error("SetupGracefulShutdown should return a non-nil function even with no handlers")
@@ -1217,7 +1218,7 @@ func TestSetupGracefulShutdownWithNoHandlers(t *testing.T) {
 
 func TestSetupGracefulShutdownWithNilHandlers(t *testing.T) {
 	// Test with nil handlers
-	shutdownFunc := SetupGracefulShutdown(nil, syscall.SIGTERM)
+	shutdownFunc := interruption.SetupGracefulShutdown(nil, syscall.SIGTERM)
 
 	if shutdownFunc == nil {
 		t.Error("SetupGracefulShutdown should return a non-nil function even with nil handlers")

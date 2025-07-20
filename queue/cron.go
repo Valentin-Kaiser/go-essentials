@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	presets = map[string]string{
+	Presets = map[string]string{
 		"@yearly":   "0 0 0 1 1 *", // Run once a year, midnight, Jan. 1st
 		"@annually": "0 0 0 1 1 *", // Alias for @yearly
 		"@monthly":  "0 0 0 1 * *", // Run once a month, midnight, first of month
@@ -20,11 +20,11 @@ var (
 		"@midnight": "0 0 0 * * *", // Alias for @daily
 		"@hourly":   "0 0 * * * *", // Run once an hour, beginning of hour
 	}
-	months = map[string]int{
+	Months = map[string]int{
 		"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
 		"JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
 	}
-	days = map[string]int{
+	Days = map[string]int{
 		"SUN": 0, "MON": 1, "TUE": 2, "WED": 3, "THU": 4, "FRI": 5, "SAT": 6,
 	}
 )
@@ -45,7 +45,7 @@ type CronExpression struct {
 	DayOfWeek CronField  // Day of week field (0-6, 0 = Sunday)
 }
 
-// validateCronSpec validates a cron specification.
+// ValidateCronSpec validates a cron specification.
 //
 // Purpose:
 // This function checks whether the provided cron specification is valid.
@@ -60,15 +60,15 @@ type CronExpression struct {
 // - Ensures the cron syntax is correct.
 // - Maps predefined expressions to their equivalent cron strings.
 // - Delegates parsing and validation to the parseCronSpec function.
-func (s *TaskScheduler) validateCronSpec(cronSpec string) error {
-	_, err := s.parseCronSpec(cronSpec)
+func (s *TaskScheduler) ValidateCronSpec(spec string) error {
+	_, err := s.ParseCronSpec(spec)
 	return err
 }
 
-// parseCronSpec parses a cron specification
-func (s *TaskScheduler) parseCronSpec(cronSpec string) (*CronExpression, error) {
-	if predefined, exists := presets[cronSpec]; exists {
-		return s.parseCronSpec(predefined)
+// ParseCronSpec parses a cron specification
+func (s *TaskScheduler) ParseCronSpec(cronSpec string) (*CronExpression, error) {
+	if predefined, exists := Presets[cronSpec]; exists {
+		return s.ParseCronSpec(predefined)
 	}
 
 	fields := strings.Fields(cronSpec)
@@ -105,12 +105,12 @@ func (s *TaskScheduler) parseCronSpec(cronSpec string) (*CronExpression, error) 
 		return nil, fmt.Errorf("invalid day field: %v", err)
 	}
 
-	expr.Month, err = s.parseCronFieldWithNames(fields[fieldOffset+3], 1, 12, months)
+	expr.Month, err = s.parseCronFieldWithNames(fields[fieldOffset+3], 1, 12, Months)
 	if err != nil {
 		return nil, fmt.Errorf("invalid month field: %v", err)
 	}
 
-	expr.DayOfWeek, err = s.parseCronFieldWithNames(fields[fieldOffset+4], 0, 6, days)
+	expr.DayOfWeek, err = s.parseCronFieldWithNames(fields[fieldOffset+4], 0, 6, Days)
 	if err != nil {
 		return nil, fmt.Errorf("invalid day-of-week field: %v", err)
 	}
@@ -302,16 +302,6 @@ func (s *TaskScheduler) parseSingleField(field string, low, high int, cronField 
 	return cronField, nil
 }
 
-// calculateNextCronRun calculates the next run time for a cron expression
-func (s *TaskScheduler) calculateNextCronRun(cronSpec string, after time.Time) (time.Time, error) {
-	expr, err := s.parseCronSpec(cronSpec)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	return s.calculateNextCronRunOptimized(expr, after)
-}
-
 // calculateNextCronRunOptimized efficiently calculates the next run time
 //
 // Algorithm Overview:
@@ -323,7 +313,12 @@ func (s *TaskScheduler) calculateNextCronRun(cronSpec string, after time.Time) (
 //
 // Time Complexity: O(Y*M*D*H*M*S) where each factor represents the number of
 // valid values in that field, significantly better than brute-force O(total_time_units)
-func (s *TaskScheduler) calculateNextCronRunOptimized(expr *CronExpression, after time.Time) (time.Time, error) {
+func (s *TaskScheduler) calculateNextCronRun(cronSpec string, after time.Time) (time.Time, error) {
+	expr, err := s.ParseCronSpec(cronSpec)
+	if err != nil {
+		return time.Time{}, err
+	}
+
 	// Start with the time after the given time
 	var t time.Time
 	if expr.Second != nil {
@@ -524,37 +519,6 @@ func (s *TaskScheduler) calculateNextCronRunOptimized(expr *CronExpression, afte
 	}
 
 	return time.Time{}, apperror.NewError("could not find next run time within reasonable limits")
-}
-
-// cronMatches checks if a time matches a cron expression
-func (s *TaskScheduler) cronMatches(expr *CronExpression, t time.Time) bool {
-	if expr.Second != nil {
-		if !s.fieldMatches(*expr.Second, t.Second()) {
-			return false
-		}
-	}
-
-	if !s.fieldMatches(expr.Minute, t.Minute()) {
-		return false
-	}
-
-	if !s.fieldMatches(expr.Hour, t.Hour()) {
-		return false
-	}
-
-	if !s.fieldMatches(expr.Month, int(t.Month())) {
-		return false
-	}
-
-	if !s.fieldMatches(expr.DayOfWeek, int(t.Weekday())) {
-		return false
-	}
-
-	if !s.fieldMatches(expr.Day, t.Day()) {
-		return false
-	}
-
-	return true
 }
 
 // fieldMatches checks if a value matches a cron field

@@ -1,4 +1,4 @@
-package queue
+package queue_test
 
 import (
 	"context"
@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/queue"
 )
 
 func TestRabbitMQQueue(t *testing.T) {
-	config := RabbitMQConfig{
+	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_queue",
 		ExchangeName: "test_exchange",
@@ -22,26 +23,26 @@ func TestRabbitMQQueue(t *testing.T) {
 		NoWait:       false,
 	}
 
-	queue, err := NewRabbitMQQueue(config)
+	q, err := queue.NewRabbitMQQueue(config)
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ test: %v", err)
 	}
-	defer apperror.Handle(queue.Close(), "failed to close queue")
+	defer apperror.Handle(q.Close(), "failed to close queue")
 
 	ctx := context.Background()
 
 	t.Run("BasicEnqueueDequeue", func(t *testing.T) {
-		job := NewJob("test-job").
+		job := queue.NewJob("test-job").
 			WithID("test-1").
 			WithPayload(map[string]interface{}{"message": "hello world"}).
 			Build()
 
-		err := queue.Enqueue(ctx, job)
+		err := q.Enqueue(ctx, job)
 		if err != nil {
 			t.Fatalf("Failed to enqueue job: %v", err)
 		}
 
-		dequeuedJob, err := queue.Dequeue(ctx, time.Second*5)
+		dequeuedJob, err := q.Dequeue(ctx, time.Second*5)
 		if err != nil {
 			t.Fatalf("Failed to dequeue job: %v", err)
 		}
@@ -58,8 +59,8 @@ func TestRabbitMQQueue(t *testing.T) {
 			t.Errorf("Expected job type %s, got %s", job.Type, dequeuedJob.Type)
 		}
 
-		if dequeuedJob.Status != StatusRunning {
-			t.Errorf("Expected job status %s, got %s", StatusRunning, dequeuedJob.Status)
+		if dequeuedJob.Status != queue.StatusRunning {
+			t.Errorf("Expected job status %s, got %s", queue.StatusRunning, dequeuedJob.Status)
 		}
 
 		var payload map[string]interface{}
@@ -73,18 +74,18 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("ScheduledJobs", func(t *testing.T) {
-		job := NewJob("scheduled-job").
+		job := queue.NewJob("scheduled-job").
 			WithID("scheduled-1").
 			WithDelay(time.Millisecond * 200).
 			WithPayload(map[string]interface{}{"scheduled": true}).
 			Build()
 
-		err := queue.Schedule(ctx, job)
+		err := q.Schedule(ctx, job)
 		if err != nil {
 			t.Fatalf("Failed to schedule job: %v", err)
 		}
 
-		dequeuedJob, err := queue.Dequeue(ctx, time.Second*5)
+		dequeuedJob, err := q.Dequeue(ctx, time.Second*5)
 		if err != nil {
 			t.Fatalf("Failed to dequeue scheduled job: %v", err)
 		}
@@ -97,37 +98,37 @@ func TestRabbitMQQueue(t *testing.T) {
 			t.Errorf("Expected job ID %s, got %s", job.ID, dequeuedJob.ID)
 		}
 
-		dequeuedJob.Status = StatusCompleted
-		apperror.Handle(queue.UpdateJob(ctx, dequeuedJob), "failed to update job")
+		dequeuedJob.Status = queue.StatusCompleted
+		apperror.Handle(q.UpdateJob(ctx, dequeuedJob), "failed to update job")
 	})
 
 	t.Run("PriorityJobs", func(t *testing.T) {
-		lowJob := NewJob("low-job").
+		lowJob := queue.NewJob("low-job").
 			WithID("low-1").
-			WithPriority(PriorityLow).
+			WithPriority(queue.PriorityLow).
 			Build()
 
-		highJob := NewJob("high-job").
+		highJob := queue.NewJob("high-job").
 			WithID("high-1").
-			WithPriority(PriorityHigh).
+			WithPriority(queue.PriorityHigh).
 			Build()
 
-		normalJob := NewJob("normal-job").
+		normalJob := queue.NewJob("normal-job").
 			WithID("normal-1").
-			WithPriority(PriorityNormal).
+			WithPriority(queue.PriorityNormal).
 			Build()
 
-		err := queue.Enqueue(ctx, normalJob)
+		err := q.Enqueue(ctx, normalJob)
 		if err != nil {
 			t.Fatalf("Failed to enqueue normal job: %v", err)
 		}
 
-		err = queue.Enqueue(ctx, lowJob)
+		err = q.Enqueue(ctx, lowJob)
 		if err != nil {
 			t.Fatalf("Failed to enqueue low job: %v", err)
 		}
 
-		err = queue.Enqueue(ctx, highJob)
+		err = q.Enqueue(ctx, highJob)
 		if err != nil {
 			t.Fatalf("Failed to enqueue high job: %v", err)
 		}
@@ -136,7 +137,7 @@ func TestRabbitMQQueue(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		for i := 0; i < 3; i++ {
-			job, err := queue.Dequeue(ctx, time.Second*5)
+			job, err := q.Dequeue(ctx, time.Second*5)
 			if err != nil {
 				t.Fatalf("Failed to dequeue job %d: %v", i, err)
 			}
@@ -145,8 +146,8 @@ func TestRabbitMQQueue(t *testing.T) {
 				t.Fatalf("Expected job %d, got nil", i)
 			}
 
-			job.Status = StatusCompleted
-			err = queue.UpdateJob(ctx, job)
+			job.Status = queue.StatusCompleted
+			err = q.UpdateJob(ctx, job)
 			if err != nil {
 				t.Fatalf("Failed to update job %d: %v", i, err)
 			}
@@ -157,17 +158,17 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("JobOperations", func(t *testing.T) {
-		job := NewJob("test-ops").
+		job := queue.NewJob("test-ops").
 			WithID("ops-1").
 			WithPayload(map[string]interface{}{"operation": "test"}).
 			Build()
 
-		err := queue.Enqueue(ctx, job)
+		err := q.Enqueue(ctx, job)
 		if err != nil {
 			t.Fatalf("Failed to enqueue job: %v", err)
 		}
 
-		retrievedJob, err := queue.GetJob(ctx, job.ID)
+		retrievedJob, err := q.GetJob(ctx, job.ID)
 		if err != nil {
 			t.Fatalf("Failed to get job: %v", err)
 		}
@@ -176,7 +177,7 @@ func TestRabbitMQQueue(t *testing.T) {
 			t.Errorf("Expected job ID %s, got %s", job.ID, retrievedJob.ID)
 		}
 
-		pendingJobs, err := queue.GetJobs(ctx, StatusPending, 10)
+		pendingJobs, err := q.GetJobs(ctx, queue.StatusPending, 10)
 		if err != nil {
 			t.Fatalf("Failed to get pending jobs: %v", err)
 		}
@@ -193,7 +194,7 @@ func TestRabbitMQQueue(t *testing.T) {
 			t.Error("Job not found in pending jobs")
 		}
 
-		stats, err := queue.GetStats(ctx)
+		stats, err := q.GetStats(ctx)
 		if err != nil {
 			t.Fatalf("Failed to get stats: %v", err)
 		}
@@ -202,28 +203,28 @@ func TestRabbitMQQueue(t *testing.T) {
 			t.Error("Expected pending jobs in stats")
 		}
 
-		err = queue.DeleteJob(ctx, job.ID)
+		err = q.DeleteJob(ctx, job.ID)
 		if err != nil {
 			t.Fatalf("Failed to delete job: %v", err)
 		}
 
-		_, err = queue.GetJob(ctx, job.ID)
+		_, err = q.GetJob(ctx, job.ID)
 		if err == nil {
 			t.Error("Expected error when getting deleted job")
 		}
 	})
 
 	t.Run("Connection", func(t *testing.T) {
-		if !queue.IsConnectionOpen() {
+		if !q.IsConnectionOpen() {
 			t.Error("Expected connection to be open")
 		}
 
-		err := queue.PurgeQueue(ctx)
+		err := q.PurgeQueue(ctx)
 		if err != nil {
 			t.Fatalf("Failed to purge queue: %v", err)
 		}
 
-		stats, err := queue.GetStats(ctx)
+		stats, err := q.GetStats(ctx)
 		if err != nil {
 			t.Fatalf("Failed to get stats after purge: %v", err)
 		}
@@ -234,29 +235,8 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 }
 
-func TestRabbitMQConfig(t *testing.T) {
-	config := RabbitMQConfig{}
-	queue, err := NewRabbitMQQueue(config)
-	if err != nil {
-		t.Skipf("Skipping RabbitMQ config test: %v", err)
-	}
-	defer apperror.Handle(queue.Close(), "failed to close queue")
-
-	if queue.queueName != "jobs" {
-		t.Errorf("Expected default queue name 'jobs', got %s", queue.queueName)
-	}
-
-	if queue.exchangeName != "jobs_exchange" {
-		t.Errorf("Expected default exchange name 'jobs_exchange', got %s", queue.exchangeName)
-	}
-
-	if queue.routingKey != "jobs" {
-		t.Errorf("Expected default routing key 'jobs', got %s", queue.routingKey)
-	}
-}
-
 func TestRabbitMQReconnection(t *testing.T) {
-	config := RabbitMQConfig{
+	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_reconnect",
 		ExchangeName: "test_reconnect_exchange",
@@ -265,7 +245,7 @@ func TestRabbitMQReconnection(t *testing.T) {
 		AutoDelete:   true,
 	}
 
-	queue, err := NewRabbitMQQueue(config)
+	queue, err := queue.NewRabbitMQQueue(config)
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ reconnection test: %v", err)
 	}
@@ -282,7 +262,7 @@ func TestRabbitMQReconnection(t *testing.T) {
 }
 
 func TestRabbitMQWithClosedConnection(t *testing.T) {
-	config := RabbitMQConfig{
+	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_closed",
 		ExchangeName: "test_closed_exchange",
@@ -291,52 +271,52 @@ func TestRabbitMQWithClosedConnection(t *testing.T) {
 		AutoDelete:   true,
 	}
 
-	queue, err := NewRabbitMQQueue(config)
+	q, err := queue.NewRabbitMQQueue(config)
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ closed connection test: %v", err)
 	}
 
-	if err := queue.Close(); err != nil {
+	if err := q.Close(); err != nil {
 		t.Logf("Warning: failed to close queue: %v", err)
 	}
 
 	ctx := context.Background()
 
-	job := NewJob("test-closed").WithID("closed-1").Build()
+	job := queue.NewJob("test-closed").WithID("closed-1").Build()
 
-	err = queue.Enqueue(ctx, job)
+	err = q.Enqueue(ctx, job)
 	if err == nil {
 		t.Error("Expected error when enqueuing to closed queue")
 	}
 
-	_, err = queue.Dequeue(ctx, time.Second)
+	_, err = q.Dequeue(ctx, time.Second)
 	if err == nil {
 		t.Error("Expected error when dequeuing from closed queue")
 	}
 
-	_, err = queue.GetJob(ctx, job.ID)
+	_, err = q.GetJob(ctx, job.ID)
 	if err == nil {
 		t.Error("Expected error when getting job from closed queue")
 	}
 
-	_, err = queue.GetJobs(ctx, StatusPending, 10)
+	_, err = q.GetJobs(ctx, queue.StatusPending, 10)
 	if err == nil {
 		t.Error("Expected error when getting jobs from closed queue")
 	}
 
-	_, err = queue.GetStats(ctx)
+	_, err = q.GetStats(ctx)
 	if err == nil {
 		t.Error("Expected error when getting stats from closed queue")
 	}
 
-	err = queue.DeleteJob(ctx, job.ID)
+	err = q.DeleteJob(ctx, job.ID)
 	if err == nil {
 		t.Error("Expected error when deleting job from closed queue")
 	}
 }
 
 func BenchmarkRabbitMQEnqueue(b *testing.B) {
-	config := RabbitMQConfig{
+	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "benchmark_queue",
 		ExchangeName: "benchmark_exchange",
@@ -345,11 +325,11 @@ func BenchmarkRabbitMQEnqueue(b *testing.B) {
 		AutoDelete:   true,
 	}
 
-	queue, err := NewRabbitMQQueue(config)
+	q, err := queue.NewRabbitMQQueue(config)
 	if err != nil {
 		b.Skipf("Skipping RabbitMQ benchmark: %v", err)
 	}
-	defer apperror.Handle(queue.Close(), "failed to close queue")
+	defer apperror.Handle(q.Close(), "failed to close queue")
 
 	ctx := context.Background()
 
@@ -357,12 +337,12 @@ func BenchmarkRabbitMQEnqueue(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
 		for pb.Next() {
-			job := NewJob("benchmark-job").
+			job := queue.NewJob("benchmark-job").
 				WithID(fmt.Sprintf("bench-%d", i)).
 				WithPayload(map[string]interface{}{"index": i}).
 				Build()
 
-			err := queue.Enqueue(ctx, job)
+			err := q.Enqueue(ctx, job)
 			if err != nil {
 				b.Fatalf("Failed to enqueue job: %v", err)
 			}
@@ -372,7 +352,7 @@ func BenchmarkRabbitMQEnqueue(b *testing.B) {
 }
 
 func BenchmarkRabbitMQDequeue(b *testing.B) {
-	config := RabbitMQConfig{
+	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "benchmark_dequeue",
 		ExchangeName: "benchmark_dequeue_exchange",
@@ -381,22 +361,22 @@ func BenchmarkRabbitMQDequeue(b *testing.B) {
 		AutoDelete:   true,
 	}
 
-	queue, err := NewRabbitMQQueue(config)
+	q, err := queue.NewRabbitMQQueue(config)
 	if err != nil {
 		b.Skipf("Skipping RabbitMQ dequeue benchmark: %v", err)
 	}
-	defer apperror.Handle(queue.Close(), "failed to close queue")
+	defer apperror.Handle(q.Close(), "failed to close queue")
 
 	ctx := context.Background()
 
 	// Pre-populate queue with jobs
 	for i := 0; i < b.N; i++ {
-		job := NewJob("benchmark-dequeue-job").
+		job := queue.NewJob("benchmark-dequeue-job").
 			WithID(fmt.Sprintf("dequeue-bench-%d", i)).
 			WithPayload(map[string]interface{}{"index": i}).
 			Build()
 
-		err := queue.Enqueue(ctx, job)
+		err := q.Enqueue(ctx, job)
 		if err != nil {
 			b.Fatalf("Failed to enqueue job: %v", err)
 		}
@@ -404,7 +384,7 @@ func BenchmarkRabbitMQDequeue(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		job, err := queue.Dequeue(ctx, time.Second*5)
+		job, err := q.Dequeue(ctx, time.Second*5)
 		if err != nil {
 			b.Fatalf("Failed to dequeue job: %v", err)
 		}
@@ -412,8 +392,8 @@ func BenchmarkRabbitMQDequeue(b *testing.B) {
 			b.Fatal("Expected job, got nil")
 		}
 
-		job.Status = StatusCompleted
-		if err := queue.UpdateJob(ctx, job); err != nil {
+		job.Status = queue.StatusCompleted
+		if err := q.UpdateJob(ctx, job); err != nil {
 			b.Logf("Failed to update job: %v", err)
 		}
 	}

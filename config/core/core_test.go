@@ -1,4 +1,4 @@
-package core
+package core_test
 
 import (
 	"errors"
@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Valentin-Kaiser/go-core/config/core"
 	"github.com/Valentin-Kaiser/go-core/flag"
 	"github.com/fsnotify/fsnotify"
 )
@@ -43,7 +44,7 @@ func (c *TestConfigWithError) Validate() error {
 
 func TestRegisterConfigBasic(t *testing.T) {
 	// Test nil config
-	err := RegisterConfig("test-nil", nil)
+	err := core.RegisterConfig("test-nil", nil)
 	if err == nil {
 		t.Error("RegisterConfig() should return error for nil config")
 	}
@@ -56,7 +57,7 @@ func TestRegisterConfigBasic(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err = RegisterConfig("test-valid", cfg)
+	err = core.RegisterConfig("test-valid", cfg)
 	if err != nil {
 		t.Errorf("RegisterConfig() with valid config should succeed: %v", err)
 	}
@@ -112,12 +113,12 @@ func TestConfigWithErrorValidation(t *testing.T) {
 
 func TestConfigInterface(_ *testing.T) {
 	// Test that our test configs implement the Config interface
-	var _ Config = &TestConfig{}
-	var _ Config = &TestConfigWithError{}
+	var _ core.Config = &TestConfig{}
+	var _ core.Config = &TestConfigWithError{}
 }
 
 func TestWriteWithNilConfig(t *testing.T) {
-	err := Write(nil)
+	err := core.Write(nil)
 	if err == nil {
 		t.Error("Write() should return error for nil config")
 	}
@@ -171,7 +172,7 @@ func TestFileOperations(t *testing.T) {
 func TestGetWithoutRegistration(_ *testing.T) {
 	// Test Get() when no config is registered
 	// This should return nil or the previously registered config
-	result := Get()
+	result := core.Get()
 	// We can't make strong assertions here since the config package
 	// maintains global state and other tests might have registered configs
 	_ = result
@@ -179,10 +180,10 @@ func TestGetWithoutRegistration(_ *testing.T) {
 
 func TestPackageConstants(_ *testing.T) {
 	// Test that we can access package-level functions
-	_ = Get()
+	_ = core.Get()
 
 	// Test that we can call OnChange (should not panic)
-	OnChange(func(_ Config) error {
+	core.OnChange(func(_ core.Config) error {
 		return nil
 	})
 }
@@ -195,7 +196,7 @@ func TestConcurrentAccess(_ *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer func() { done <- true }()
-			config := Get()
+			config := core.Get()
 			_ = config // Use the config to avoid compiler optimization
 		}()
 	}
@@ -365,7 +366,7 @@ func TestRegisterConfigWithNonStruct(t *testing.T) {
 	var cfg StringConfig = "test"
 	// Since StringConfig doesn't have a pointer receiver for Validate,
 	// we need to pass a pointer to it to test the non-struct error
-	err := RegisterConfig("string-config", &cfg)
+	err := core.RegisterConfig("string-config", &cfg)
 	if err == nil {
 		t.Error("RegisterConfig() should return error for non-struct type")
 	}
@@ -380,8 +381,8 @@ func TestRegisterConfigWithNonPointer(t *testing.T) {
 
 	// Instead, test with an interface value that's not a pointer to struct
 	var iface interface{} = "not a struct"
-	if config, ok := iface.(Config); ok {
-		err := RegisterConfig("non-pointer", config)
+	if config, ok := iface.(core.Config); ok {
+		err := core.RegisterConfig("non-pointer", config)
 		if err == nil {
 			t.Error("RegisterConfig() should return error for non-pointer")
 		}
@@ -400,7 +401,7 @@ func TestRegisterConfigWithNestedStructs(t *testing.T) {
 		},
 	}
 
-	err := RegisterConfig("nested-config", cfg)
+	err := core.RegisterConfig("nested-config", cfg)
 	if err != nil {
 		t.Errorf("RegisterConfig() with nested structs should succeed: %v", err)
 	}
@@ -436,7 +437,7 @@ func TestRegisterConfigWithPointerFields(t *testing.T) {
 		},
 	}
 
-	err := RegisterConfig("pointer-config-test-3", cfg)
+	err := core.RegisterConfig("pointer-config-test-3", cfg)
 	if err != nil {
 		t.Errorf("RegisterConfig() with pointer fields should succeed: %v", err)
 	}
@@ -466,7 +467,7 @@ func TestRegisterConfigWithNilPointerFields(t *testing.T) {
 		NilDatabase: nil,
 	}
 
-	err := RegisterConfig("nil-pointer-config", cfg)
+	err := core.RegisterConfig("nil-pointer-config", cfg)
 	if err != nil {
 		t.Errorf("RegisterConfig() with nil pointer fields should succeed: %v", err)
 	}
@@ -491,7 +492,7 @@ func TestRegisterConfigWithComplexTypes(t *testing.T) {
 		StringSlice: []string{"a", "b", "c"},
 	}
 
-	err := RegisterConfig("complex-config", cfg)
+	err := core.RegisterConfig("complex-config", cfg)
 	if err != nil {
 		t.Errorf("RegisterConfig() with complex types should succeed: %v", err)
 	}
@@ -510,13 +511,13 @@ func TestReadConfigFileOperations(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("read-test", cfg)
+	err := core.RegisterConfig("read-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
 
 	// Test Read() when config file doesn't exist
-	err = Read()
+	err = core.Read()
 	if err != nil {
 		t.Errorf("Read() should create config file if it doesn't exist: %v", err)
 	}
@@ -528,7 +529,7 @@ func TestReadConfigFileOperations(t *testing.T) {
 	}
 
 	// Test Read() when config file exists
-	err = Read()
+	err = core.Read()
 	if err != nil {
 		t.Errorf("Read() should succeed when config file exists: %v", err)
 	}
@@ -547,7 +548,7 @@ func TestWriteConfig(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("write-test", cfg)
+	err := core.RegisterConfig("write-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
@@ -560,13 +561,13 @@ func TestWriteConfig(t *testing.T) {
 		DatabaseURL:     "postgres://localhost",
 	}
 
-	err = Write(newCfg)
+	err = core.Write(newCfg)
 	if err != nil {
 		t.Errorf("Write() should succeed with valid config: %v", err)
 	}
 
 	// Verify the config was updated
-	current, ok := Get().(*TestConfig)
+	current, ok := core.Get().(*TestConfig)
 	if !ok {
 		t.Fatal("Expected config to be *TestConfig")
 	}
@@ -583,7 +584,7 @@ func TestWriteConfigWithInvalidConfig(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("write-invalid-test", cfg)
+	err := core.RegisterConfig("write-invalid-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
@@ -596,7 +597,7 @@ func TestWriteConfigWithInvalidConfig(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err = Write(invalidCfg)
+	err = core.Write(invalidCfg)
 	if err == nil {
 		t.Error("Write() should fail with invalid config")
 	}
@@ -610,13 +611,13 @@ func TestOnChangeCallbacks(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("onchange-test", cfg)
+	err := core.RegisterConfig("onchange-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
 
 	callbackCalled := false
-	OnChange(func(_ Config) error {
+	core.OnChange(func(_ core.Config) error {
 		callbackCalled = true
 		return nil
 	})
@@ -629,7 +630,7 @@ func TestOnChangeCallbacks(t *testing.T) {
 		DatabaseURL:     "postgres://localhost",
 	}
 
-	err = Write(newCfg)
+	err = core.Write(newCfg)
 	if err != nil {
 		t.Errorf("Write() failed: %v", err)
 	}
@@ -640,7 +641,7 @@ func TestOnChangeCallbacks(t *testing.T) {
 }
 
 func TestOnChangeCallbackError(t *testing.T) {
-	defer Reset()
+	defer core.Reset()
 	cfg := &TestConfig{
 		ApplicationName: "test-app",
 		ServerPort:      8080,
@@ -648,12 +649,12 @@ func TestOnChangeCallbackError(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("onchange-error-test", cfg)
+	err := core.RegisterConfig("onchange-error-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
 
-	OnChange(func(_ Config) error {
+	core.OnChange(func(_ core.Config) error {
 		return errors.New("callback error")
 	})
 
@@ -665,7 +666,7 @@ func TestOnChangeCallbackError(t *testing.T) {
 		DatabaseURL:     "postgres://localhost",
 	}
 
-	err = Write(newCfg)
+	err = core.Write(newCfg)
 	if err == nil {
 		t.Error("Write() should fail when callback returns error")
 	}
@@ -684,19 +685,19 @@ func TestWatchConfigFile(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("watch-test", cfg)
+	err := core.RegisterConfig("watch-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
 
 	// Create initial config file
-	err = Read()
+	err = core.Read()
 	if err != nil {
 		t.Fatalf("Read() failed: %v", err)
 	}
 
 	watchCalled := make(chan bool, 1)
-	Watch(func(_ fsnotify.Event) {
+	core.Watch(func(_ fsnotify.Event) {
 		select {
 		case watchCalled <- true:
 		default:
@@ -718,7 +719,7 @@ func TestConcurrentConfigOperations(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("concurrent-test", cfg)
+	err := core.RegisterConfig("concurrent-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
@@ -731,7 +732,7 @@ func TestConcurrentConfigOperations(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			config := Get()
+			config := core.Get()
 			if config == nil {
 				errs <- errors.New("Get() returned nil")
 			}
@@ -749,7 +750,7 @@ func TestConcurrentConfigOperations(t *testing.T) {
 				EnableVerbose:   true,
 				DatabaseURL:     "sqlite:///test.db",
 			}
-			if err := Write(newCfg); err != nil {
+			if err := core.Write(newCfg); err != nil {
 				errs <- err
 			}
 		}(i)
@@ -776,12 +777,12 @@ func TestConfigFilePermissions(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("permissions-test", cfg)
+	err := core.RegisterConfig("permissions-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
 
-	err = Read()
+	err = core.Read()
 	if err != nil {
 		t.Fatalf("Read() failed: %v", err)
 	}
@@ -818,12 +819,12 @@ func TestConfigDirectoryCreation(t *testing.T) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("directory-test", cfg)
+	err := core.RegisterConfig("directory-test", cfg)
 	if err != nil {
 		t.Fatalf("RegisterConfig failed: %v", err)
 	}
 
-	err = Read()
+	err = core.Read()
 	if err != nil {
 		t.Fatalf("Read() should create directory and config file: %v", err)
 	}
@@ -849,7 +850,7 @@ func BenchmarkRegisterConfig(b *testing.B) {
 			EnableVerbose:   false,
 			DatabaseURL:     "sqlite:///test.db",
 		}
-		if err := RegisterConfig(fmt.Sprintf("benchmark-%d", i), cfg); err != nil {
+		if err := core.RegisterConfig(fmt.Sprintf("benchmark-%d", i), cfg); err != nil {
 			b.Logf("Failed to register config: %v", err)
 		}
 	}
@@ -868,7 +869,7 @@ func BenchmarkWrite(b *testing.B) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("benchmark-write", cfg)
+	err := core.RegisterConfig("benchmark-write", cfg)
 	if err != nil {
 		b.Fatalf("RegisterConfig failed: %v", err)
 	}
@@ -881,7 +882,7 @@ func BenchmarkWrite(b *testing.B) {
 			EnableVerbose:   i%2 == 0,
 			DatabaseURL:     "sqlite:///test.db",
 		}
-		if err := Write(newCfg); err != nil {
+		if err := core.Write(newCfg); err != nil {
 			b.Logf("Failed to write config: %v", err)
 		}
 	}
@@ -900,20 +901,20 @@ func BenchmarkRead(b *testing.B) {
 		DatabaseURL:     "sqlite:///test.db",
 	}
 
-	err := RegisterConfig("benchmark-read", cfg)
+	err := core.RegisterConfig("benchmark-read", cfg)
 	if err != nil {
 		b.Fatalf("RegisterConfig failed: %v", err)
 	}
 
 	// Create initial config file
-	err = Read()
+	err = core.Read()
 	if err != nil {
 		b.Fatalf("Initial Read() failed: %v", err)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := Read(); err != nil {
+		if err := core.Read(); err != nil {
 			b.Logf("Failed to read config: %v", err)
 		}
 	}

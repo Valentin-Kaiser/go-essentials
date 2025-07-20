@@ -146,7 +146,7 @@ func (s *TaskScheduler) RegisterCronTaskWithOptions(name, cronSpec string, fn Ta
 		return apperror.NewError("task function cannot be nil")
 	}
 
-	if err := s.validateCronSpec(cronSpec); err != nil {
+	if err := s.ValidateCronSpec(cronSpec); err != nil {
 		return apperror.NewError(fmt.Sprintf("invalid cron specification: %v", err))
 	}
 

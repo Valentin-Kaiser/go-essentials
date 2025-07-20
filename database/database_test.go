@@ -1,10 +1,11 @@
-package database
+package database_test
 
 import (
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/Valentin-Kaiser/go-core/database"
 	"github.com/Valentin-Kaiser/go-core/version"
 	"gorm.io/gorm"
 )
@@ -13,17 +14,17 @@ func TestConfig_Validate(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name   string
-		config Config
+		config database.Config
 		valid  bool
 	}{
 		{
 			name:   "empty config",
-			config: Config{},
+			config: database.Config{},
 			valid:  false,
 		},
 		{
 			name: "valid sqlite config",
-			config: Config{
+			config: database.Config{
 				Driver: "sqlite",
 				Name:   "test.db",
 			},
@@ -31,14 +32,14 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid sqlite config - no name",
-			config: Config{
+			config: database.Config{
 				Driver: "sqlite",
 			},
 			valid: false,
 		},
 		{
 			name: "valid mysql config",
-			config: Config{
+			config: database.Config{
 				Driver:   "mysql",
 				Host:     "localhost",
 				Port:     3306,
@@ -50,7 +51,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid mysql config - no host",
-			config: Config{
+			config: database.Config{
 				Driver:   "mysql",
 				Port:     3306,
 				User:     "root",
@@ -61,7 +62,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid mysql config - no port",
-			config: Config{
+			config: database.Config{
 				Driver:   "mysql",
 				Host:     "localhost",
 				User:     "root",
@@ -72,7 +73,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid mysql config - no user",
-			config: Config{
+			config: database.Config{
 				Driver:   "mysql",
 				Host:     "localhost",
 				Port:     3306,
@@ -83,7 +84,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid mysql config - no password",
-			config: Config{
+			config: database.Config{
 				Driver: "mysql",
 				Host:   "localhost",
 				Port:   3306,
@@ -94,7 +95,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid mysql config - no name",
-			config: Config{
+			config: database.Config{
 				Driver:   "mysql",
 				Host:     "localhost",
 				Port:     3306,
@@ -105,7 +106,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "valid mariadb config",
-			config: Config{
+			config: database.Config{
 				Driver:   "mariadb",
 				Host:     "localhost",
 				Port:     3306,
@@ -117,7 +118,7 @@ func TestConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "unknown driver",
-			config: Config{
+			config: database.Config{
 				Driver:   "postgres",
 				Host:     "localhost",
 				Port:     5432,
@@ -144,12 +145,12 @@ func TestConfig_Validate(t *testing.T) {
 
 func TestConnected(t *testing.T) {
 	// Initially should not be connected
-	if Connected() {
+	if database.Connected() {
 		t.Error("Expected not connected initially")
 	}
 
 	// Test that we can call the function without panic
-	result := Connected()
+	result := database.Connected()
 	if result {
 		t.Error("Expected false when not connected")
 	}
@@ -157,7 +158,7 @@ func TestConnected(t *testing.T) {
 
 func TestExecuteWithoutConnection(t *testing.T) {
 	// Test Execute when not connected
-	err := Execute(func(_ *gorm.DB) error {
+	err := database.Execute(func(_ *gorm.DB) error {
 		return nil
 	})
 
@@ -168,10 +169,10 @@ func TestExecuteWithoutConnection(t *testing.T) {
 
 func TestReconnect(t *testing.T) {
 	// Test that Reconnect doesn't panic
-	Reconnect()
+	database.Reconnect()
 
 	// Should still not be connected after reconnect without actual connection
-	if Connected() {
+	if database.Connected() {
 		t.Error("Expected not connected after reconnect without connection")
 	}
 }
@@ -182,7 +183,7 @@ func TestAwaitConnectionTimeout(t *testing.T) {
 
 	go func() {
 		// This should block since we're not connected
-		AwaitConnection()
+		database.AwaitConnection()
 		done <- true
 	}()
 
@@ -196,45 +197,45 @@ func TestAwaitConnectionTimeout(t *testing.T) {
 
 func TestConnectWithInvalidConfig(t *testing.T) {
 	// Test Connect with invalid config
-	config := Config{
+	config := database.Config{
 		Driver: "invalid-driver",
 	}
 
 	// This should not panic
-	Connect(time.Millisecond, config)
+	database.Connect(time.Millisecond, config)
 
 	// Give it a moment to try connecting
 	time.Sleep(10 * time.Millisecond)
 
 	// Should still not be connected
-	if Connected() {
+	if database.Connected() {
 		t.Error("Should not be connected with invalid config")
 	}
 
 	// Clean up
-	Disconnect()
+	database.Disconnect()
 }
 
 func TestConnectWithSQLiteConfig(t *testing.T) {
 	// Test Connect with SQLite config (should work without external database)
-	config := Config{
+	config := database.Config{
 		Driver: "sqlite",
 		Name:   ":memory:",
 	}
 
 	// This should not panic
-	Connect(time.Millisecond, config)
+	database.Connect(time.Millisecond, config)
 
 	// Give it a moment to connect
 	time.Sleep(100 * time.Millisecond)
 
 	// Should be connected to in-memory SQLite
-	if !Connected() {
+	if !database.Connected() {
 		t.Error("Should be connected to in-memory SQLite")
 	}
 
 	// Test Execute with connection
-	err := Execute(func(db *gorm.DB) error {
+	err := database.Execute(func(db *gorm.DB) error {
 		return db.Exec("SELECT 1").Error
 	})
 
@@ -243,7 +244,7 @@ func TestConnectWithSQLiteConfig(t *testing.T) {
 	}
 
 	// Clean up
-	Disconnect()
+	database.Disconnect()
 
 	// Give it more time to disconnect since it's asynchronous
 	time.Sleep(50 * time.Millisecond)
@@ -260,7 +261,7 @@ func TestRegisterSchema(_ *testing.T) {
 	}
 
 	// This should not panic
-	RegisterSchema(&TestModel{})
+	database.RegisterSchema(&TestModel{})
 
 	// Test with multiple schemas
 	type AnotherModel struct {
@@ -268,7 +269,7 @@ func TestRegisterSchema(_ *testing.T) {
 		Value string `gorm:"not null"`
 	}
 
-	RegisterSchema(&TestModel{}, &AnotherModel{})
+	database.RegisterSchema(&TestModel{}, &AnotherModel{})
 }
 
 func TestRegisterMigrationStep(_ *testing.T) {
@@ -279,12 +280,12 @@ func TestRegisterMigrationStep(_ *testing.T) {
 	}
 
 	// This should not panic
-	RegisterMigrationStep(v, func(_ *gorm.DB) error {
+	database.RegisterMigrationStep(v, func(_ *gorm.DB) error {
 		return nil
 	})
 
 	// Test with migration that returns error
-	RegisterMigrationStep(version.Version{
+	database.RegisterMigrationStep(version.Version{
 		GitTag:    "v1.0.1",
 		GitCommit: "def456",
 	}, func(_ *gorm.DB) error {
@@ -296,7 +297,7 @@ func TestRegisterOnConnectHandler(t *testing.T) {
 	// Test OnConnect handler registration
 	var handlerCalled bool
 
-	RegisterOnConnectHandler(func(_ *gorm.DB, _ Config) error {
+	database.RegisterOnConnectHandler(func(_ *gorm.DB, _ database.Config) error {
 		handlerCalled = true
 		return nil
 	})
@@ -307,7 +308,7 @@ func TestRegisterOnConnectHandler(t *testing.T) {
 	}
 
 	// Test handler with error
-	RegisterOnConnectHandler(func(_ *gorm.DB, _ Config) error {
+	database.RegisterOnConnectHandler(func(_ *gorm.DB, _ database.Config) error {
 		return errors.New("handler error")
 	})
 }
@@ -320,9 +321,9 @@ func TestDisconnectWithoutConnection(t *testing.T) {
 
 	go func() {
 		// Start a connection attempt first to have something to disconnect
-		Connect(time.Millisecond, Config{Driver: "invalid"})
+		database.Connect(time.Millisecond, database.Config{Driver: "invalid"})
 		time.Sleep(10 * time.Millisecond)
-		Disconnect()
+		database.Disconnect()
 		done <- true
 	}()
 
@@ -336,7 +337,7 @@ func TestDisconnectWithoutConnection(t *testing.T) {
 
 func TestConfigStruct(t *testing.T) {
 	// Test that Config struct has proper fields
-	config := Config{
+	config := database.Config{
 		Driver:   "mysql",
 		Host:     "localhost",
 		Port:     3306,
@@ -372,7 +373,7 @@ func TestConfigStruct(t *testing.T) {
 
 func TestConfigImplementsInterface(t *testing.T) {
 	// Test that Config implements the config.Config interface
-	var cfg Config
+	var cfg database.Config
 	err := cfg.Validate()
 	if err == nil {
 		t.Error("Empty config should fail validation")
@@ -381,7 +382,7 @@ func TestConfigImplementsInterface(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkConfigValidate(b *testing.B) {
-	config := Config{
+	config := database.Config{
 		Driver:   "mysql",
 		Host:     "localhost",
 		Port:     3306,
@@ -398,13 +399,13 @@ func BenchmarkConfigValidate(b *testing.B) {
 
 func BenchmarkConnected(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		Connected()
+		database.Connected()
 	}
 }
 
 func BenchmarkExecuteError(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = Execute(func(_ *gorm.DB) error {
+		_ = database.Execute(func(_ *gorm.DB) error {
 			return nil
 		})
 	}
