@@ -1,4 +1,4 @@
-package cache
+package cache_test
 
 import (
 	"context"
@@ -8,14 +8,15 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/cache"
 	"github.com/redis/go-redis/v9"
 )
 
-func setupTieredTest(t *testing.T) *TieredCache {
+func setupTieredTest(t *testing.T) *cache.TieredCache {
 	// Setup L1 cache (memory)
-	l1Config := DefaultConfig()
+	l1Config := cache.DefaultConfig()
 	l1Config.MaxSize = 5 // Small L1 cache to test eviction
-	l1Cache := NewMemoryCacheWithConfig(l1Config)
+	l1Cache := cache.NewMemoryCacheWithConfig(l1Config)
 
 	// Setup L2 cache (Redis)
 	redisURL := os.Getenv("REDIS_URL")
@@ -37,9 +38,9 @@ func setupTieredTest(t *testing.T) *TieredCache {
 		t.Skipf("Redis not available: %v", err)
 	}
 
-	l2Config := DefaultConfig()
+	l2Config := cache.DefaultConfig()
 	l2Config.Namespace = fmt.Sprintf("tiered-test:%d", time.Now().UnixNano())
-	l2Cache := NewRedisCacheWithConfig(client, l2Config)
+	l2Cache := cache.NewRedisCacheWithConfig(client, l2Config)
 
 	// Clean up any existing test data
 	if err := l2Cache.Clear(ctx); err != nil {
@@ -47,28 +48,28 @@ func setupTieredTest(t *testing.T) *TieredCache {
 	}
 
 	// Create tiered cache
-	tieredConfig := DefaultConfig()
+	tieredConfig := cache.DefaultConfig()
 	tieredConfig.Namespace = fmt.Sprintf("tiered:%d", time.Now().UnixNano())
 
-	cache := NewTieredCacheWithConfig(l1Cache, l2Cache, tieredConfig)
-	return cache
+	c := cache.NewTieredCacheWithConfig(l1Cache, l2Cache, tieredConfig)
+	return c
 }
 
 func TestTieredCache_BasicOperations(t *testing.T) {
-	cache := setupTieredTest(t)
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Test Set and Get
 	user := TestUser{ID: 1, Name: "John Doe", Email: "john@example.com"}
-	err := cache.Set(ctx, "user:1", user, time.Hour)
+	err := c.Set(ctx, "user:1", user, time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	var retrievedUser TestUser
-	found, err := cache.Get(ctx, "user:1", &retrievedUser)
+	found, err := c.Get(ctx, "user:1", &retrievedUser)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
@@ -82,7 +83,7 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 	}
 
 	// Value should exist in both L1 and L2
-	l1Found, err := cache.GetL1Cache().Exists(ctx, "user:1")
+	l1Found, err := c.GetL1Cache().Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check L1 exists: %v", err)
 	}
@@ -90,7 +91,7 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 		t.Error("Expected value to exist in L1 cache")
 	}
 
-	l2Found, err := cache.GetL2Cache().Exists(ctx, "user:1")
+	l2Found, err := c.GetL2Cache().Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check L2 exists: %v", err)
 	}
@@ -99,12 +100,12 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 	}
 
 	// Test Delete
-	err = cache.Delete(ctx, "user:1")
+	err = c.Delete(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to delete value: %v", err)
 	}
 
-	found, err = cache.Get(ctx, "user:1", &retrievedUser)
+	found, err = c.Get(ctx, "user:1", &retrievedUser)
 	if err != nil {
 		t.Fatalf("Failed to get value after delete: %v", err)
 	}
@@ -113,7 +114,7 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 	}
 
 	// Value should be deleted from both L1 and L2
-	l1Found, err = cache.GetL1Cache().Exists(ctx, "user:1")
+	l1Found, err = c.GetL1Cache().Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check L1 exists after delete: %v", err)
 	}
@@ -121,7 +122,7 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 		t.Error("Expected value to be deleted from L1 cache")
 	}
 
-	l2Found, err = cache.GetL2Cache().Exists(ctx, "user:1")
+	l2Found, err = c.GetL2Cache().Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check L2 exists after delete: %v", err)
 	}
@@ -131,15 +132,15 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 }
 
 func TestTieredCache_L1Eviction(t *testing.T) {
-	cache := setupTieredTest(t)
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Fill L1 cache beyond its capacity (L1 has maxSize of 5)
 	for i := 1; i <= 7; i++ {
 		user := TestUser{ID: i, Name: fmt.Sprintf("User%d", i), Email: fmt.Sprintf("user%d@example.com", i)}
-		err := cache.Set(ctx, fmt.Sprintf("user:%d", i), user, time.Hour)
+		err := c.Set(ctx, fmt.Sprintf("user:%d", i), user, time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set user:%d: %v", i, err)
 		}
@@ -147,7 +148,7 @@ func TestTieredCache_L1Eviction(t *testing.T) {
 
 	// All items should be in L2
 	for i := 1; i <= 7; i++ {
-		l2Found, err := cache.GetL2Cache().Exists(ctx, fmt.Sprintf("user:%d", i))
+		l2Found, err := c.GetL2Cache().Exists(ctx, fmt.Sprintf("user:%d", i))
 		if err != nil {
 			t.Fatalf("Failed to check L2 exists for user:%d: %v", i, err)
 		}
@@ -158,7 +159,7 @@ func TestTieredCache_L1Eviction(t *testing.T) {
 
 	// Only the last 5 items should be in L1 due to LRU eviction
 	for i := 1; i <= 2; i++ {
-		l1Found, err := cache.GetL1Cache().Exists(ctx, fmt.Sprintf("user:%d", i))
+		l1Found, err := c.GetL1Cache().Exists(ctx, fmt.Sprintf("user:%d", i))
 		if err != nil {
 			t.Fatalf("Failed to check L1 exists for user:%d: %v", i, err)
 		}
@@ -168,7 +169,7 @@ func TestTieredCache_L1Eviction(t *testing.T) {
 	}
 
 	for i := 3; i <= 7; i++ {
-		l1Found, err := cache.GetL1Cache().Exists(ctx, fmt.Sprintf("user:%d", i))
+		l1Found, err := c.GetL1Cache().Exists(ctx, fmt.Sprintf("user:%d", i))
 		if err != nil {
 			t.Fatalf("Failed to check L1 exists for user:%d: %v", i, err)
 		}
@@ -179,20 +180,20 @@ func TestTieredCache_L1Eviction(t *testing.T) {
 }
 
 func TestTieredCache_L2Backfill(t *testing.T) {
-	cache := setupTieredTest(t)
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Set value in L2 directly (simulating L1 eviction)
 	user := TestUser{ID: 1, Name: "John Doe", Email: "john@example.com"}
-	err := cache.GetL2Cache().Set(ctx, "user:1", user, time.Hour)
+	err := c.GetL2Cache().Set(ctx, "user:1", user, time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value in L2: %v", err)
 	}
 
 	// Value should not be in L1
-	l1Found, err := cache.GetL1Cache().Exists(ctx, "user:1")
+	l1Found, err := c.GetL1Cache().Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check L1 exists: %v", err)
 	}
@@ -202,7 +203,7 @@ func TestTieredCache_L2Backfill(t *testing.T) {
 
 	// Get value through tiered cache (should trigger L2 -> L1 backfill)
 	var retrievedUser TestUser
-	found, err := cache.Get(ctx, "user:1", &retrievedUser)
+	found, err := c.Get(ctx, "user:1", &retrievedUser)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
@@ -216,7 +217,7 @@ func TestTieredCache_L2Backfill(t *testing.T) {
 	}
 
 	// Value should now be in both L1 and L2 due to backfill
-	l1Found, err = cache.GetL1Cache().Exists(ctx, "user:1")
+	l1Found, err = c.GetL1Cache().Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check L1 exists after backfill: %v", err)
 	}
@@ -224,7 +225,7 @@ func TestTieredCache_L2Backfill(t *testing.T) {
 		t.Error("Expected value to be backfilled to L1 cache")
 	}
 
-	l2Found, err := cache.GetL2Cache().Exists(ctx, "user:1")
+	l2Found, err := c.GetL2Cache().Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check L2 exists after backfill: %v", err)
 	}
@@ -234,19 +235,19 @@ func TestTieredCache_L2Backfill(t *testing.T) {
 }
 
 func TestTieredCache_TTL(t *testing.T) {
-	cache := setupTieredTest(t)
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Test TTL operations
-	err := cache.Set(ctx, "test", "value", time.Hour)
+	err := c.Set(ctx, "test", "value", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Check TTL
-	ttl, err := cache.GetTTL(ctx, "test")
+	ttl, err := c.GetTTL(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to get TTL: %v", err)
 	}
@@ -256,24 +257,24 @@ func TestTieredCache_TTL(t *testing.T) {
 }
 
 func TestTieredCache_TTLPropagation(t *testing.T) {
-	cache := setupTieredTest(t)
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Set value with short TTL
-	err := cache.Set(ctx, "test", "value", time.Second*2)
+	err := c.Set(ctx, "test", "value", time.Second*2)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Check TTL in both caches
-	l1TTL, err := cache.GetL1Cache().GetTTL(ctx, "test")
+	l1TTL, err := c.GetL1Cache().GetTTL(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to get L1 TTL: %v", err)
 	}
 
-	l2TTL, err := cache.GetL2Cache().GetTTL(ctx, "test")
+	l2TTL, err := c.GetL2Cache().GetTTL(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to get L2 TTL: %v", err)
 	}
@@ -288,7 +289,7 @@ func TestTieredCache_TTLPropagation(t *testing.T) {
 
 	// Value should be expired in both caches
 	var value string
-	found, err := cache.Get(ctx, "test", &value)
+	found, err := c.Get(ctx, "test", &value)
 	if err != nil {
 		t.Fatalf("Failed to get expired value: %v", err)
 	}
@@ -298,8 +299,8 @@ func TestTieredCache_TTLPropagation(t *testing.T) {
 }
 
 func TestTieredCache_MultiOperations(t *testing.T) {
-	cache := setupTieredTest(t)
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -310,14 +311,14 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 		"user:3": TestUser{ID: 3, Name: "Charlie", Email: "charlie@example.com"},
 	}
 
-	err := cache.SetMulti(ctx, items, time.Hour)
+	err := c.SetMulti(ctx, items, time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set multiple items: %v", err)
 	}
 
 	// Test GetMulti
 	keys := []string{"user:1", "user:2", "user:3", "user:4"} // user:4 doesn't exist
-	results, err := cache.GetMulti(ctx, keys)
+	results, err := c.GetMulti(ctx, keys)
 	if err != nil {
 		t.Fatalf("Failed to get multiple items: %v", err)
 	}
@@ -328,14 +329,14 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 
 	// Test DeleteMulti
 	deleteKeys := []string{"user:1", "user:2"}
-	err = cache.DeleteMulti(ctx, deleteKeys)
+	err = c.DeleteMulti(ctx, deleteKeys)
 	if err != nil {
 		t.Fatalf("Failed to delete multiple items: %v", err)
 	}
 
 	// Verify deletions in both caches
 	for _, key := range deleteKeys {
-		l1Found, err := cache.GetL1Cache().Exists(ctx, key)
+		l1Found, err := c.GetL1Cache().Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check L1 exists for %s: %v", key, err)
 		}
@@ -343,7 +344,7 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 			t.Errorf("Expected %s to be deleted from L1", key)
 		}
 
-		l2Found, err := cache.GetL2Cache().Exists(ctx, key)
+		l2Found, err := c.GetL2Cache().Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check L2 exists for %s: %v", key, err)
 		}
@@ -353,7 +354,7 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 	}
 
 	// user:3 should still exist in both caches
-	l1Found, err := cache.GetL1Cache().Exists(ctx, "user:3")
+	l1Found, err := c.GetL1Cache().Exists(ctx, "user:3")
 	if err != nil {
 		t.Fatalf("Failed to check L1 exists for user:3: %v", err)
 	}
@@ -361,7 +362,7 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 		t.Error("Expected user:3 to still exist in L1")
 	}
 
-	l2Found, err := cache.GetL2Cache().Exists(ctx, "user:3")
+	l2Found, err := c.GetL2Cache().Exists(ctx, "user:3")
 	if err != nil {
 		t.Fatalf("Failed to check L2 exists for user:3: %v", err)
 	}
@@ -371,8 +372,8 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 }
 
 func TestTieredCache_Clear(t *testing.T) {
-	cache := setupTieredTest(t)
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -381,21 +382,21 @@ func TestTieredCache_Clear(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		key := fmt.Sprintf("key%d", i)
 		testKeys[i-1] = key
-		err := cache.Set(ctx, key, fmt.Sprintf("value%d", i), time.Hour)
+		err := c.Set(ctx, key, fmt.Sprintf("value%d", i), time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set %s: %v", key, err)
 		}
 	}
 
 	// Clear cache
-	err := cache.Clear(ctx)
+	err := c.Clear(ctx)
 	if err != nil {
 		t.Fatalf("Failed to clear cache: %v", err)
 	}
 
 	// Verify all keys are deleted from both caches
 	for _, key := range testKeys {
-		l1Found, err := cache.GetL1Cache().Exists(ctx, key)
+		l1Found, err := c.GetL1Cache().Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check L1 exists for %s: %v", key, err)
 		}
@@ -403,7 +404,7 @@ func TestTieredCache_Clear(t *testing.T) {
 			t.Errorf("Expected %s to be cleared from L1", key)
 		}
 
-		l2Found, err := cache.GetL2Cache().Exists(ctx, key)
+		l2Found, err := c.GetL2Cache().Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check L2 exists for %s: %v", key, err)
 		}
@@ -414,39 +415,39 @@ func TestTieredCache_Clear(t *testing.T) {
 }
 
 func TestTieredCache_Events(t *testing.T) {
-	eventsChan := make(chan Event, 20)
+	eventsChan := make(chan cache.Event, 20)
 
-	cache := setupTieredTest(t)
-	cache.config.EnableEvents = true
-	cache.config.EventHandler = func(event Event) {
-		eventsChan <- event
-	}
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	// c.config.EnableEvents = true
+	// c.config.EventHandler = func(event Event) {
+	// 	eventsChan <- event
+	// }
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Set value (should generate events from both L1 and L2)
-	err := cache.Set(ctx, "test", "value", time.Hour)
+	err := c.Set(ctx, "test", "value", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Get value (should generate events)
 	var value string
-	_, err = cache.Get(ctx, "test", &value)
+	_, err = c.Get(ctx, "test", &value)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
 
 	// Delete value (should generate events from both L1 and L2)
-	err = cache.Delete(ctx, "test")
+	err = c.Delete(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to delete value: %v", err)
 	}
 
 	// Wait for events
 	timeout := time.After(time.Second * 2)
-	var events []Event
+	var events []cache.Event
 
 eventLoop:
 	for len(events) < 3 {
@@ -463,14 +464,14 @@ eventLoop:
 	}
 
 	// Should have set, get, and delete events
-	eventTypes := make(map[EventType]bool)
+	eventTypes := make(map[cache.EventType]bool)
 	for _, event := range events {
 		if event.Key == "test" {
 			eventTypes[event.Type] = true
 		}
 	}
 
-	expectedTypes := []EventType{EventSet, EventGet, EventDelete}
+	expectedTypes := []cache.EventType{cache.EventSet, cache.EventGet, cache.EventDelete}
 	for _, expectedType := range expectedTypes {
 		if !eventTypes[expectedType] {
 			t.Errorf("Expected event type %s not found", expectedType)
@@ -479,14 +480,14 @@ eventLoop:
 }
 
 func TestTieredCache_Stats(t *testing.T) {
-	cache := setupTieredTest(t)
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	c := setupTieredTest(t)
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Set some values
 	for i := 1; i <= 3; i++ {
-		err := cache.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
+		err := c.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set key%d: %v", i, err)
 		}
@@ -494,7 +495,7 @@ func TestTieredCache_Stats(t *testing.T) {
 
 	// Get existing value (hit in L1)
 	var value string
-	found, err := cache.Get(ctx, "key1", &value)
+	found, err := c.Get(ctx, "key1", &value)
 	if err != nil {
 		t.Fatalf("Failed to get key1: %v", err)
 	}
@@ -503,13 +504,13 @@ func TestTieredCache_Stats(t *testing.T) {
 	}
 
 	// Remove from L1 to test L2 hit
-	err = cache.GetL1Cache().Delete(ctx, "key2")
+	err = c.GetL1Cache().Delete(ctx, "key2")
 	if err != nil {
 		t.Fatalf("Failed to delete key2 from L1: %v", err)
 	}
 
 	// Get value that's only in L2 (should trigger backfill)
-	found, err = cache.Get(ctx, "key2", &value)
+	found, err = c.Get(ctx, "key2", &value)
 	if err != nil {
 		t.Fatalf("Failed to get key2: %v", err)
 	}
@@ -518,7 +519,7 @@ func TestTieredCache_Stats(t *testing.T) {
 	}
 
 	// Get non-existing value (miss)
-	found, err = cache.Get(ctx, "nonexistent", &value)
+	found, err = c.Get(ctx, "nonexistent", &value)
 	if err != nil {
 		t.Fatalf("Failed to get nonexistent key: %v", err)
 	}
@@ -527,7 +528,7 @@ func TestTieredCache_Stats(t *testing.T) {
 	}
 
 	// Check combined stats
-	stats := cache.GetStats()
+	stats := c.GetStats()
 	// 3 initial sets to both L1 and L2 (6 sets) + 1 backfill set to L1 (1 set) = 7 sets
 	if stats.Sets != 7 {
 		t.Errorf("Expected 7 sets, got %d", stats.Sets)

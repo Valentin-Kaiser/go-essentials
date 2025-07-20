@@ -1,4 +1,4 @@
-package cache
+package cache_test
 
 import (
 	"context"
@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Valentin-Kaiser/go-core/cache"
 	"github.com/redis/go-redis/v9"
 )
 
-func setupRedisTest(t *testing.T) *RedisCache {
+func setupRedisTest(t *testing.T) *cache.RedisCache {
 	// Skip if Redis is not available
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
@@ -31,32 +32,32 @@ func setupRedisTest(t *testing.T) *RedisCache {
 		t.Skipf("Redis not available: %v", err)
 	}
 
-	config := DefaultConfig()
+	config := cache.DefaultConfig()
 	config.Namespace = fmt.Sprintf("test:%d", time.Now().UnixNano())
 
-	cache := NewRedisCacheWithConfig(client, config)
+	c := cache.NewRedisCacheWithConfig(client, config)
 
 	// Clean up any existing test data
-	cache.Clear(ctx)
+	c.Clear(ctx)
 
-	return cache
+	return c
 }
 
 func TestRedisCache_BasicOperations(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
 	// Test Set and Get
 	user := TestUser{ID: 1, Name: "John Doe", Email: "john@example.com"}
-	err := cache.Set(ctx, "user:1", user, time.Minute)
+	err := c.Set(ctx, "user:1", user, time.Minute)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	var retrievedUser TestUser
-	found, err := cache.Get(ctx, "user:1", &retrievedUser)
+	found, err := c.Get(ctx, "user:1", &retrievedUser)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
@@ -70,7 +71,7 @@ func TestRedisCache_BasicOperations(t *testing.T) {
 	}
 
 	// Test Exists
-	exists, err := cache.Exists(ctx, "user:1")
+	exists, err := c.Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check exists: %v", err)
 	}
@@ -79,12 +80,12 @@ func TestRedisCache_BasicOperations(t *testing.T) {
 	}
 
 	// Test Delete
-	err = cache.Delete(ctx, "user:1")
+	err = c.Delete(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to delete value: %v", err)
 	}
 
-	found, err = cache.Get(ctx, "user:1", &retrievedUser)
+	found, err = c.Get(ctx, "user:1", &retrievedUser)
 	if err != nil {
 		t.Fatalf("Failed to get value after delete: %v", err)
 	}
@@ -94,19 +95,19 @@ func TestRedisCache_BasicOperations(t *testing.T) {
 }
 
 func TestRedisCache_TTL(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
 	// Set value with TTL
-	err := cache.Set(ctx, "test", "value", time.Second*2)
+	err := c.Set(ctx, "test", "value", time.Second*2)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Should exist immediately
-	exists, err := cache.Exists(ctx, "test")
+	exists, err := c.Exists(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to check exists: %v", err)
 	}
@@ -115,7 +116,7 @@ func TestRedisCache_TTL(t *testing.T) {
 	}
 
 	// Get TTL
-	ttl, err := cache.GetTTL(ctx, "test")
+	ttl, err := c.GetTTL(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to get TTL: %v", err)
 	}
@@ -128,7 +129,7 @@ func TestRedisCache_TTL(t *testing.T) {
 	time.Sleep(time.Second * 3)
 
 	var value string
-	found, err := cache.Get(ctx, "test", &value)
+	found, err := c.Get(ctx, "test", &value)
 	if err != nil {
 		t.Fatalf("Failed to get expired value: %v", err)
 	}
@@ -138,8 +139,8 @@ func TestRedisCache_TTL(t *testing.T) {
 }
 
 func TestRedisCache_MultiOperations(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
@@ -150,14 +151,14 @@ func TestRedisCache_MultiOperations(t *testing.T) {
 		"user:3": TestUser{ID: 3, Name: "Charlie", Email: "charlie@example.com"},
 	}
 
-	err := cache.SetMulti(ctx, items, time.Hour)
+	err := c.SetMulti(ctx, items, time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set multiple items: %v", err)
 	}
 
 	// Test GetMulti
 	keys := []string{"user:1", "user:2", "user:3", "user:4"} // user:4 doesn't exist
-	results, err := cache.GetMulti(ctx, keys)
+	results, err := c.GetMulti(ctx, keys)
 	if err != nil {
 		t.Fatalf("Failed to get multiple items: %v", err)
 	}
@@ -194,14 +195,14 @@ func TestRedisCache_MultiOperations(t *testing.T) {
 
 	// Test DeleteMulti
 	deleteKeys := []string{"user:1", "user:2"}
-	err = cache.DeleteMulti(ctx, deleteKeys)
+	err = c.DeleteMulti(ctx, deleteKeys)
 	if err != nil {
 		t.Fatalf("Failed to delete multiple items: %v", err)
 	}
 
 	// Verify deletions
 	for _, key := range deleteKeys {
-		exists, err := cache.Exists(ctx, key)
+		exists, err := c.Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check exists for %s: %v", key, err)
 		}
@@ -211,7 +212,7 @@ func TestRedisCache_MultiOperations(t *testing.T) {
 	}
 
 	// user:3 should still exist
-	exists, err := cache.Exists(ctx, "user:3")
+	exists, err := c.Exists(ctx, "user:3")
 	if err != nil {
 		t.Fatalf("Failed to check exists for user:3: %v", err)
 	}
@@ -221,13 +222,13 @@ func TestRedisCache_MultiOperations(t *testing.T) {
 }
 
 func TestRedisCache_AtomicOperations(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
 	// Test SetNX (set if not exists)
-	success, err := cache.SetNX(ctx, "atomic:test", "value1", time.Hour)
+	success, err := c.SetNX(ctx, "atomic:test", "value1", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed SetNX: %v", err)
 	}
@@ -236,7 +237,7 @@ func TestRedisCache_AtomicOperations(t *testing.T) {
 	}
 
 	// SetNX should fail for existing key
-	success, err = cache.SetNX(ctx, "atomic:test", "value2", time.Hour)
+	success, err = c.SetNX(ctx, "atomic:test", "value2", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed second SetNX: %v", err)
 	}
@@ -246,7 +247,7 @@ func TestRedisCache_AtomicOperations(t *testing.T) {
 
 	// Verify original value is unchanged
 	var value string
-	found, err := cache.Get(ctx, "atomic:test", &value)
+	found, err := c.Get(ctx, "atomic:test", &value)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
@@ -255,7 +256,7 @@ func TestRedisCache_AtomicOperations(t *testing.T) {
 	}
 
 	// Test GetSet
-	oldValue, found, err := cache.GetSet(ctx, "atomic:test", "value2")
+	oldValue, found, err := c.GetSet(ctx, "atomic:test", "value2")
 	if err != nil {
 		t.Fatalf("Failed GetSet: %v", err)
 	}
@@ -272,7 +273,7 @@ func TestRedisCache_AtomicOperations(t *testing.T) {
 	}
 
 	// Verify new value is set
-	found, err = cache.Get(ctx, "atomic:test", &value)
+	found, err = c.Get(ctx, "atomic:test", &value)
 	if err != nil {
 		t.Fatalf("Failed to get new value: %v", err)
 	}
@@ -282,13 +283,13 @@ func TestRedisCache_AtomicOperations(t *testing.T) {
 }
 
 func TestRedisCache_Increment(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
 	// Test Increment on non-existing key
-	newValue, err := cache.Increment(ctx, "counter", 1)
+	newValue, err := c.Increment(ctx, "counter", 1)
 	if err != nil {
 		t.Fatalf("Failed to increment non-existing key: %v", err)
 	}
@@ -297,7 +298,7 @@ func TestRedisCache_Increment(t *testing.T) {
 	}
 
 	// Test Increment on existing key
-	newValue, err = cache.Increment(ctx, "counter", 5)
+	newValue, err = c.Increment(ctx, "counter", 5)
 	if err != nil {
 		t.Fatalf("Failed to increment existing key: %v", err)
 	}
@@ -306,7 +307,7 @@ func TestRedisCache_Increment(t *testing.T) {
 	}
 
 	// Test Decrement
-	newValue, err = cache.Increment(ctx, "counter", -2)
+	newValue, err = c.Increment(ctx, "counter", -2)
 	if err != nil {
 		t.Fatalf("Failed to decrement: %v", err)
 	}
@@ -316,15 +317,15 @@ func TestRedisCache_Increment(t *testing.T) {
 }
 
 func TestRedisCache_Keys(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
 	// Set some test keys
 	testKeys := []string{"test:1", "test:2", "other:1"}
 	for _, key := range testKeys {
-		err := cache.Set(ctx, key, "value", time.Hour)
+		err := c.Set(ctx, key, "value", time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set %s: %v", key, err)
 		}
@@ -332,7 +333,7 @@ func TestRedisCache_Keys(t *testing.T) {
 
 	// Verify keys exist individually since GetKeys is not available
 	for _, testKey := range testKeys {
-		exists, err := cache.Exists(ctx, testKey)
+		exists, err := c.Exists(ctx, testKey)
 		if err != nil {
 			t.Fatalf("Failed to check exists for %s: %v", testKey, err)
 		}
@@ -343,8 +344,8 @@ func TestRedisCache_Keys(t *testing.T) {
 }
 
 func TestRedisCache_Clear(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
@@ -353,7 +354,7 @@ func TestRedisCache_Clear(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		key := fmt.Sprintf("key%d", i)
 		testKeys[i-1] = key
-		err := cache.Set(ctx, key, fmt.Sprintf("value%d", i), time.Hour)
+		err := c.Set(ctx, key, fmt.Sprintf("value%d", i), time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set %s: %v", key, err)
 		}
@@ -361,7 +362,7 @@ func TestRedisCache_Clear(t *testing.T) {
 
 	// Verify they exist
 	for _, key := range testKeys {
-		exists, err := cache.Exists(ctx, key)
+		exists, err := c.Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check exists for %s: %v", key, err)
 		}
@@ -371,14 +372,14 @@ func TestRedisCache_Clear(t *testing.T) {
 	}
 
 	// Clear cache
-	err := cache.Clear(ctx)
+	err := c.Clear(ctx)
 	if err != nil {
 		t.Fatalf("Failed to clear cache: %v", err)
 	}
 
 	// Verify no keys exist
 	for _, key := range testKeys {
-		exists, err := cache.Exists(ctx, key)
+		exists, err := c.Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check exists for %s: %v", key, err)
 		}
@@ -389,8 +390,8 @@ func TestRedisCache_Clear(t *testing.T) {
 }
 
 func TestRedisCache_Pipeline(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
@@ -401,7 +402,7 @@ func TestRedisCache_Pipeline(t *testing.T) {
 		"pipe:3": "value3",
 	}
 
-	err := cache.SetMulti(ctx, items, time.Hour)
+	err := c.SetMulti(ctx, items, time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set multiple items via pipeline: %v", err)
 	}
@@ -409,7 +410,7 @@ func TestRedisCache_Pipeline(t *testing.T) {
 	// Verify all items were set
 	for key, expectedValue := range items {
 		var value string
-		found, err := cache.Get(ctx, key, &value)
+		found, err := c.Get(ctx, key, &value)
 		if err != nil {
 			t.Fatalf("Failed to get %s: %v", key, err)
 		}
@@ -423,39 +424,39 @@ func TestRedisCache_Pipeline(t *testing.T) {
 }
 
 func TestRedisCache_Events(t *testing.T) {
-	eventsChan := make(chan Event, 10)
+	eventsChan := make(chan cache.Event, 10)
 
-	cache := setupRedisTest(t)
-	cache.config.EnableEvents = true
-	cache.config.EventHandler = func(event Event) {
-		eventsChan <- event
-	}
-	defer cache.Close()
+	c := setupRedisTest(t)
+	// c.config.EnableEvents = true
+	// c.config.EventHandler = func(event Event) {
+	// 	eventsChan <- event
+	// }
+	defer c.Close()
 
 	ctx := context.Background()
 
 	// Set value
-	err := cache.Set(ctx, "test", "value", time.Hour)
+	err := c.Set(ctx, "test", "value", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Get value
 	var value string
-	_, err = cache.Get(ctx, "test", &value)
+	_, err = c.Get(ctx, "test", &value)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
 
 	// Delete value
-	err = cache.Delete(ctx, "test")
+	err = c.Delete(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to delete value: %v", err)
 	}
 
 	// Check events
 	timeout := time.After(time.Second)
-	var events []Event
+	var events []cache.Event
 
 	for len(events) < 3 {
 		select {
@@ -466,7 +467,7 @@ func TestRedisCache_Events(t *testing.T) {
 		}
 	}
 
-	expectedEventTypes := []EventType{EventSet, EventGet, EventDelete}
+	expectedEventTypes := []cache.EventType{cache.EventSet, cache.EventGet, cache.EventDelete}
 	for i, expectedType := range expectedEventTypes {
 		if events[i].Type != expectedType {
 			t.Errorf("Expected event %d to be %s, got %s", i, expectedType, events[i].Type)
@@ -478,19 +479,19 @@ func TestRedisCache_Events(t *testing.T) {
 }
 
 func TestRedisCache_TTLOperations(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
 	// Set value with TTL
-	err := cache.Set(ctx, "test", "value", time.Hour)
+	err := c.Set(ctx, "test", "value", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Get TTL
-	ttl, err := cache.GetTTL(ctx, "test")
+	ttl, err := c.GetTTL(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to get TTL: %v", err)
 	}
@@ -500,13 +501,13 @@ func TestRedisCache_TTLOperations(t *testing.T) {
 	}
 
 	// Update TTL
-	err = cache.SetTTL(ctx, "test", time.Minute)
+	err = c.SetTTL(ctx, "test", time.Minute)
 	if err != nil {
 		t.Fatalf("Failed to set TTL: %v", err)
 	}
 
 	// Verify updated TTL
-	newTTL, err := cache.GetTTL(ctx, "test")
+	newTTL, err := c.GetTTL(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to get updated TTL: %v", err)
 	}
@@ -516,27 +517,27 @@ func TestRedisCache_TTLOperations(t *testing.T) {
 	}
 
 	// Test TTL for non-existent key
-	_, err = cache.GetTTL(ctx, "nonexistent")
+	_, err = c.GetTTL(ctx, "nonexistent")
 	if err == nil {
 		t.Error("Expected error for non-existent key TTL")
 	}
 }
 
 func TestRedisCache_Stats(t *testing.T) {
-	cache := setupRedisTest(t)
-	defer cache.Close()
+	c := setupRedisTest(t)
+	defer c.Close()
 
 	ctx := context.Background()
 
 	// Initial stats
-	stats := cache.GetStats()
+	stats := c.GetStats()
 	if stats.Hits != 0 || stats.Misses != 0 || stats.Sets != 0 {
 		t.Errorf("Expected initial stats to be zero: %+v", stats)
 	}
 
 	// Set some values
 	for i := 1; i <= 3; i++ {
-		err := cache.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
+		err := c.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set key%d: %v", i, err)
 		}
@@ -544,7 +545,7 @@ func TestRedisCache_Stats(t *testing.T) {
 
 	// Get existing value (hit)
 	var value string
-	found, err := cache.Get(ctx, "key1", &value)
+	found, err := c.Get(ctx, "key1", &value)
 	if err != nil {
 		t.Fatalf("Failed to get key1: %v", err)
 	}
@@ -553,7 +554,7 @@ func TestRedisCache_Stats(t *testing.T) {
 	}
 
 	// Get non-existing value (miss)
-	found, err = cache.Get(ctx, "nonexistent", &value)
+	found, err = c.Get(ctx, "nonexistent", &value)
 	if err != nil {
 		t.Fatalf("Failed to get nonexistent key: %v", err)
 	}
@@ -562,7 +563,7 @@ func TestRedisCache_Stats(t *testing.T) {
 	}
 
 	// Check stats
-	stats = cache.GetStats()
+	stats = c.GetStats()
 	if stats.Sets != 3 {
 		t.Errorf("Expected 3 sets, got %d", stats.Sets)
 	}

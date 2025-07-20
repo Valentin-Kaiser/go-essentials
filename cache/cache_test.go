@@ -1,4 +1,4 @@
-package cache
+package cache_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/cache"
 )
 
 // TestUser represents a test user struct for testing serialization
@@ -17,23 +18,23 @@ type TestUser struct {
 }
 
 func TestMemoryCache_BasicOperations(t *testing.T) {
-	cache := NewMemoryCache().
+	c := cache.NewMemoryCache().
 		WithMaxSize(100).
 		WithDefaultTTL(time.Hour)
 
-	defer apperror.Catch(cache.Close, "failed to close cache")
+	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Test Set and Get
 	user := TestUser{ID: 1, Name: "John Doe", Email: "john@example.com"}
-	err := cache.Set(ctx, "user:1", user, time.Minute)
+	err := c.Set(ctx, "user:1", user, time.Minute)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	var retrievedUser TestUser
-	found, err := cache.Get(ctx, "user:1", &retrievedUser)
+	found, err := c.Get(ctx, "user:1", &retrievedUser)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
@@ -47,7 +48,7 @@ func TestMemoryCache_BasicOperations(t *testing.T) {
 	}
 
 	// Test Exists
-	exists, err := cache.Exists(ctx, "user:1")
+	exists, err := c.Exists(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to check exists: %v", err)
 	}
@@ -56,12 +57,12 @@ func TestMemoryCache_BasicOperations(t *testing.T) {
 	}
 
 	// Test Delete
-	err = cache.Delete(ctx, "user:1")
+	err = c.Delete(ctx, "user:1")
 	if err != nil {
 		t.Fatalf("Failed to delete value: %v", err)
 	}
 
-	found, err = cache.Get(ctx, "user:1", &retrievedUser)
+	found, err = c.Get(ctx, "user:1", &retrievedUser)
 	if err != nil {
 		t.Fatalf("Failed to get value after delete: %v", err)
 	}
@@ -71,21 +72,21 @@ func TestMemoryCache_BasicOperations(t *testing.T) {
 }
 
 func TestMemoryCache_TTL(t *testing.T) {
-	cache := NewMemoryCache().
+	c := cache.NewMemoryCache().
 		WithDefaultTTL(time.Millisecond * 100)
 
-	apperror.Catch(cache.Close, "failed to close cache")
+	apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Set value with short TTL
-	err := cache.Set(ctx, "test", "value", time.Millisecond*50)
+	err := c.Set(ctx, "test", "value", time.Millisecond*50)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Should exist immediately
-	exists, err := cache.Exists(ctx, "test")
+	exists, err := c.Exists(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to check exists: %v", err)
 	}
@@ -97,7 +98,7 @@ func TestMemoryCache_TTL(t *testing.T) {
 	time.Sleep(time.Millisecond * 60)
 
 	var value string
-	found, err := cache.Get(ctx, "test", &value)
+	found, err := c.Get(ctx, "test", &value)
 	if err != nil {
 		t.Fatalf("Failed to get expired value: %v", err)
 	}
@@ -107,17 +108,17 @@ func TestMemoryCache_TTL(t *testing.T) {
 }
 
 func TestMemoryCache_LRUEviction(t *testing.T) {
-	cache := NewMemoryCache().
+	c := cache.NewMemoryCache().
 		WithMaxSize(3).
 		WithLRUEviction(true)
 
-	apperror.Catch(cache.Close, "failed to close cache")
+	apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Fill cache to capacity
 	for i := 1; i <= 3; i++ {
-		err := cache.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
+		err := c.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set value %d: %v", i, err)
 		}
@@ -125,19 +126,19 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 
 	// Access key1 to make it recently used
 	var value string
-	_, err := cache.Get(ctx, "key1", &value)
+	_, err := c.Get(ctx, "key1", &value)
 	if err != nil {
 		t.Fatalf("Failed to get key1: %v", err)
 	}
 
 	// Add one more item, should evict key2 (least recently used)
-	err = cache.Set(ctx, "key4", "value4", time.Hour)
+	err = c.Set(ctx, "key4", "value4", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set key4: %v", err)
 	}
 
 	// key2 should be evicted
-	exists, err := cache.Exists(ctx, "key2")
+	exists, err := c.Exists(ctx, "key2")
 	if err != nil {
 		t.Fatalf("Failed to check exists for key2: %v", err)
 	}
@@ -147,7 +148,7 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 
 	// key1, key3, key4 should still exist
 	for _, key := range []string{"key1", "key3", "key4"} {
-		exists, err := cache.Exists(ctx, key)
+		exists, err := c.Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check exists for %s: %v", key, err)
 		}
@@ -158,8 +159,8 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 }
 
 func TestMemoryCache_MultiOperations(t *testing.T) {
-	cache := NewMemoryCache()
-	apperror.Catch(cache.Close, "failed to close cache")
+	c := cache.NewMemoryCache()
+	apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
@@ -170,14 +171,14 @@ func TestMemoryCache_MultiOperations(t *testing.T) {
 		"user:3": TestUser{ID: 3, Name: "Charlie", Email: "charlie@example.com"},
 	}
 
-	err := cache.SetMulti(ctx, items, time.Hour)
+	err := c.SetMulti(ctx, items, time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set multiple items: %v", err)
 	}
 
 	// Test GetMulti
 	keys := []string{"user:1", "user:2", "user:3", "user:4"} // user:4 doesn't exist
-	results, err := cache.GetMulti(ctx, keys)
+	results, err := c.GetMulti(ctx, keys)
 	if err != nil {
 		t.Fatalf("Failed to get multiple items: %v", err)
 	}
@@ -188,14 +189,14 @@ func TestMemoryCache_MultiOperations(t *testing.T) {
 
 	// Test DeleteMulti
 	deleteKeys := []string{"user:1", "user:2"}
-	err = cache.DeleteMulti(ctx, deleteKeys)
+	err = c.DeleteMulti(ctx, deleteKeys)
 	if err != nil {
 		t.Fatalf("Failed to delete multiple items: %v", err)
 	}
 
 	// Verify deletions
 	for _, key := range deleteKeys {
-		exists, err := cache.Exists(ctx, key)
+		exists, err := c.Exists(ctx, key)
 		if err != nil {
 			t.Fatalf("Failed to check exists for %s: %v", key, err)
 		}
@@ -205,7 +206,7 @@ func TestMemoryCache_MultiOperations(t *testing.T) {
 	}
 
 	// user:3 should still exist
-	exists, err := cache.Exists(ctx, "user:3")
+	exists, err := c.Exists(ctx, "user:3")
 	if err != nil {
 		t.Fatalf("Failed to check exists for user:3: %v", err)
 	}
@@ -215,22 +216,22 @@ func TestMemoryCache_MultiOperations(t *testing.T) {
 }
 
 func TestMemoryCache_Stats(t *testing.T) {
-	cache := NewMemoryCache().
+	c := cache.NewMemoryCache().
 		WithMaxSize(10)
 
-	apperror.Catch(cache.Close, "failed to close cache")
+	apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Initial stats
-	stats := cache.GetStats()
+	stats := c.GetStats()
 	if stats.Hits != 0 || stats.Misses != 0 || stats.Sets != 0 {
 		t.Errorf("Expected initial stats to be zero: %+v", stats)
 	}
 
 	// Set some values
 	for i := 1; i <= 3; i++ {
-		err := cache.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
+		err := c.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set key%d: %v", i, err)
 		}
@@ -238,7 +239,7 @@ func TestMemoryCache_Stats(t *testing.T) {
 
 	// Get existing value (hit)
 	var value string
-	found, err := cache.Get(ctx, "key1", &value)
+	found, err := c.Get(ctx, "key1", &value)
 	if err != nil {
 		t.Fatalf("Failed to get key1: %v", err)
 	}
@@ -247,7 +248,7 @@ func TestMemoryCache_Stats(t *testing.T) {
 	}
 
 	// Get non-existing value (miss)
-	found, err = cache.Get(ctx, "nonexistent", &value)
+	found, err = c.Get(ctx, "nonexistent", &value)
 	if err != nil {
 		t.Fatalf("Failed to get nonexistent key: %v", err)
 	}
@@ -256,7 +257,7 @@ func TestMemoryCache_Stats(t *testing.T) {
 	}
 
 	// Check stats
-	stats = cache.GetStats()
+	stats = c.GetStats()
 	if stats.Sets != 3 {
 		t.Errorf("Expected 3 sets, got %d", stats.Sets)
 	}
@@ -277,39 +278,39 @@ func TestMemoryCache_Stats(t *testing.T) {
 }
 
 func TestMemoryCache_Events(t *testing.T) {
-	eventsChan := make(chan Event, 10)
+	eventsChan := make(chan cache.Event, 10)
 
-	cache := NewMemoryCache().
-		WithEventHandler(func(event Event) {
+	c := cache.NewMemoryCache().
+		WithEventHandler(func(event cache.Event) {
 			eventsChan <- event
 		})
 
-	apperror.Catch(cache.Close, "failed to close cache")
+	apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Set value
-	err := cache.Set(ctx, "test", "value", time.Hour)
+	err := c.Set(ctx, "test", "value", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Get value
 	var value string
-	_, err = cache.Get(ctx, "test", &value)
+	_, err = c.Get(ctx, "test", &value)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
 
 	// Delete value
-	err = cache.Delete(ctx, "test")
+	err = c.Delete(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to delete value: %v", err)
 	}
 
 	// Check events (with timeout)
 	timeout := time.After(time.Second)
-	var events []Event
+	var events []cache.Event
 
 	for len(events) < 3 {
 		select {
@@ -321,14 +322,14 @@ func TestMemoryCache_Events(t *testing.T) {
 	}
 
 	// Verify we got the expected events (order may vary due to goroutines)
-	eventTypes := make(map[EventType]bool)
+	eventTypes := make(map[cache.EventType]bool)
 	for _, event := range events {
 		if event.Key == "test" {
 			eventTypes[event.Type] = true
 		}
 	}
 
-	expectedTypes := []EventType{EventSet, EventGet, EventDelete}
+	expectedTypes := []cache.EventType{cache.EventSet, cache.EventGet, cache.EventDelete}
 	for _, expectedType := range expectedTypes {
 		if !eventTypes[expectedType] {
 			t.Errorf("Expected event type %s not found", expectedType)
@@ -337,21 +338,21 @@ func TestMemoryCache_Events(t *testing.T) {
 }
 
 func TestMemoryCache_Namespace(t *testing.T) {
-	config := DefaultConfig()
+	config := cache.DefaultConfig()
 	config.Namespace = "test"
 
-	cache := NewMemoryCacheWithConfig(config)
-	apperror.Catch(cache.Close, "failed to close cache")
+	c := cache.NewMemoryCacheWithConfig(config)
+	apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
-	err := cache.Set(ctx, "key", "value", time.Hour)
+	err := c.Set(ctx, "key", "value", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Check that the key is stored with namespace prefix
-	keys := cache.GetKeys()
+	keys := c.GetKeys()
 	if len(keys) != 1 {
 		t.Fatalf("Expected 1 key, got %d", len(keys))
 	}
@@ -363,7 +364,7 @@ func TestMemoryCache_Namespace(t *testing.T) {
 
 	// But we should be able to get it with the original key
 	var value string
-	found, err := cache.Get(ctx, "key", &value)
+	found, err := c.Get(ctx, "key", &value)
 	if err != nil {
 		t.Fatalf("Failed to get value: %v", err)
 	}
@@ -376,38 +377,38 @@ func TestMemoryCache_Namespace(t *testing.T) {
 }
 
 func TestMemoryCache_Clear(t *testing.T) {
-	cache := NewMemoryCache()
-	apperror.Catch(cache.Close, "failed to close cache")
+	c := cache.NewMemoryCache()
+	apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Set multiple values
 	for i := 1; i <= 5; i++ {
-		err := cache.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
+		err := c.Set(ctx, fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i), time.Hour)
 		if err != nil {
 			t.Fatalf("Failed to set key%d: %v", i, err)
 		}
 	}
 
 	// Verify they exist
-	if cache.GetSize() != 5 {
-		t.Errorf("Expected size 5, got %d", cache.GetSize())
+	if c.GetSize() != 5 {
+		t.Errorf("Expected size 5, got %d", c.GetSize())
 	}
 
 	// Clear cache
-	err := cache.Clear(ctx)
+	err := c.Clear(ctx)
 	if err != nil {
 		t.Fatalf("Failed to clear cache: %v", err)
 	}
 
 	// Verify cache is empty
-	if cache.GetSize() != 0 {
-		t.Errorf("Expected size 0 after clear, got %d", cache.GetSize())
+	if c.GetSize() != 0 {
+		t.Errorf("Expected size 0 after clear, got %d", c.GetSize())
 	}
 
 	// Verify no keys exist
 	for i := 1; i <= 5; i++ {
-		exists, err := cache.Exists(ctx, fmt.Sprintf("key%d", i))
+		exists, err := c.Exists(ctx, fmt.Sprintf("key%d", i))
 		if err != nil {
 			t.Fatalf("Failed to check exists for key%d: %v", i, err)
 		}
@@ -418,19 +419,19 @@ func TestMemoryCache_Clear(t *testing.T) {
 }
 
 func TestMemoryCache_TTLOperations(t *testing.T) {
-	cache := NewMemoryCache()
-	apperror.Catch(cache.Close, "failed to close cache")
+	c := cache.NewMemoryCache()
+	apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
 
 	// Set value with TTL
-	err := cache.Set(ctx, "test", "value", time.Hour)
+	err := c.Set(ctx, "test", "value", time.Hour)
 	if err != nil {
 		t.Fatalf("Failed to set value: %v", err)
 	}
 
 	// Get TTL
-	ttl, err := cache.GetTTL(ctx, "test")
+	ttl, err := c.GetTTL(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to get TTL: %v", err)
 	}
@@ -440,13 +441,13 @@ func TestMemoryCache_TTLOperations(t *testing.T) {
 	}
 
 	// Update TTL
-	err = cache.SetTTL(ctx, "test", time.Minute)
+	err = c.SetTTL(ctx, "test", time.Minute)
 	if err != nil {
 		t.Fatalf("Failed to set TTL: %v", err)
 	}
 
 	// Verify updated TTL
-	newTTL, err := cache.GetTTL(ctx, "test")
+	newTTL, err := c.GetTTL(ctx, "test")
 	if err != nil {
 		t.Fatalf("Failed to get updated TTL: %v", err)
 	}
@@ -456,14 +457,14 @@ func TestMemoryCache_TTLOperations(t *testing.T) {
 	}
 
 	// Test TTL for non-existent key
-	_, err = cache.GetTTL(ctx, "nonexistent")
+	_, err = c.GetTTL(ctx, "nonexistent")
 	if err == nil {
 		t.Error("Expected error for non-existent key TTL")
 	}
 }
 
 func TestJSONSerializer(t *testing.T) {
-	serializer := &JSONSerializer{}
+	serializer := &cache.JSONSerializer{}
 
 	user := TestUser{ID: 1, Name: "John", Email: "john@example.com"}
 
@@ -486,7 +487,7 @@ func TestJSONSerializer(t *testing.T) {
 }
 
 func TestNoOpSerializer(t *testing.T) {
-	serializer := &NoOpSerializer{}
+	serializer := &cache.NoOpSerializer{}
 
 	// Test with []byte
 	originalData := []byte("test data")
