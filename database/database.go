@@ -291,7 +291,7 @@ func onConnect(config Config) {
 
 	// Check for the current version in the database
 	revision := version.GetVersion()
-	err = db.Where("git_tag = ? AND git_commit = ?", revision.GitTag, revision.GitCommit).First(&version.Version{}).Error
+	err = db.Where("git_tag = ? AND git_commit = ?", revision.GitTag, revision.GitCommit).First(&version.Release{}).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Fatal().Err(err).Msgf("[Database] version check failed")
 	}
@@ -308,7 +308,7 @@ func onConnect(config Config) {
 			}
 
 			// Check if the key exists as a revision
-			err = db.Where("git_tag = ? AND git_commit = ?", steps[0].Version.GitTag, steps[0].Version.GitCommit).First(&version.Version{}).Error
+			err = db.Where("git_tag = ? AND git_commit = ?", steps[0].Version.GitTag, steps[0].Version.GitCommit).First(&version.Release{}).Error
 			if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
 				for _, step := range steps {
 					// Execute all migration step actions for this version

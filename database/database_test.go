@@ -274,7 +274,7 @@ func TestRegisterSchema(_ *testing.T) {
 
 func TestRegisterMigrationStep(_ *testing.T) {
 	// Test migration step registration
-	v := version.Version{
+	v := version.Release{
 		GitTag:    "v1.0.0",
 		GitCommit: "abc123",
 	}
@@ -285,7 +285,7 @@ func TestRegisterMigrationStep(_ *testing.T) {
 	})
 
 	// Test with migration that returns error
-	database.RegisterMigrationStep(version.Version{
+	database.RegisterMigrationStep(version.Release{
 		GitTag:    "v1.0.1",
 		GitCommit: "def456",
 	}, func(_ *gorm.DB) error {

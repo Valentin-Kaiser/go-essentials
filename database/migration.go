@@ -20,7 +20,7 @@ var (
 // Step represents a migration step with a version and an action to be performed
 // The action is a function that takes a gorm.DB instance and returns an error
 type Step struct {
-	Version version.Version
+	Version version.Release
 	Action  func(db *gorm.DB) error
 }
 
@@ -32,7 +32,7 @@ func RegisterSchema(models ...interface{}) {
 // RegisterMigrationStep registers a new migration step with a version and an action
 // The action is a function that takes a gorm.DB instance and returns an error
 // The version is a struct that must contain the Git tag and commit hash of the migration step
-func RegisterMigrationStep(version version.Version, action func(db *gorm.DB) error) {
+func RegisterMigrationStep(version version.Release, action func(db *gorm.DB) error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -57,7 +57,7 @@ func RegisterMigrationStep(version version.Version, action func(db *gorm.DB) err
 // setup initializes the database schema with the version table
 func setup(db *gorm.DB) error {
 	err := db.AutoMigrate(
-		&version.Version{},
+		&version.Release{},
 	)
 	if err != nil {
 		return apperror.NewError("failed to migrate database schema").AddError(err)
