@@ -427,10 +427,9 @@ func TestRedisCache_Events(t *testing.T) {
 	eventsChan := make(chan cache.Event, 10)
 
 	c := setupRedisTest(t)
-	// c.config.EnableEvents = true
-	// c.config.EventHandler = func(event Event) {
-	// 	eventsChan <- event
-	// }
+	c = c.WithEventHandler(func(event cache.Event) {
+		eventsChan <- event
+	})
 	defer c.Close()
 
 	ctx := context.Background()

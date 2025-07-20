@@ -418,10 +418,9 @@ func TestTieredCache_Events(t *testing.T) {
 	eventsChan := make(chan cache.Event, 20)
 
 	c := setupTieredTest(t)
-	// c.config.EnableEvents = true
-	// c.config.EventHandler = func(event Event) {
-	// 	eventsChan <- event
-	// }
+	c = c.WithEventHandler(func(event cache.Event) {
+		eventsChan <- event
+	})
 	defer apperror.Catch(c.Close, "failed to close cache")
 
 	ctx := context.Background()
