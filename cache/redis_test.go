@@ -1,17 +1,18 @@
 package cache_test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/Valentin-Kaiser/go-core/cache"
 	"github.com/redis/go-redis/v9"
 )
 
 func setupRedisTest(t *testing.T) *cache.RedisCache {
+	t.Helper()
 	// Skip if Redis is not available
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
@@ -26,7 +27,7 @@ func setupRedisTest(t *testing.T) *cache.RedisCache {
 	client := redis.NewClient(opt)
 
 	// Test connection
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err = client.Ping(ctx).Result()
 	if err != nil {
 		t.Skipf("Redis not available: %v", err)
@@ -38,16 +39,17 @@ func setupRedisTest(t *testing.T) *cache.RedisCache {
 	c := cache.NewRedisCacheWithConfig(client, config)
 
 	// Clean up any existing test data
-	c.Clear(ctx)
+	_ = c.Clear(ctx)
 
 	return c
 }
 
 func TestRedisCache_BasicOperations(t *testing.T) {
+	t.Parallel() // Run tests in parallel
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Set and Get
 	user := TestUser{ID: 1, Name: "John Doe", Email: "john@example.com"}
@@ -95,10 +97,11 @@ func TestRedisCache_BasicOperations(t *testing.T) {
 }
 
 func TestRedisCache_TTL(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value with TTL
 	err := c.Set(ctx, "test", "value", time.Second*2)
@@ -139,10 +142,11 @@ func TestRedisCache_TTL(t *testing.T) {
 }
 
 func TestRedisCache_MultiOperations(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test SetMulti
 	items := map[string]interface{}{
@@ -222,10 +226,11 @@ func TestRedisCache_MultiOperations(t *testing.T) {
 }
 
 func TestRedisCache_AtomicOperations(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test SetNX (set if not exists)
 	success, err := c.SetNX(ctx, "atomic:test", "value1", time.Hour)
@@ -283,10 +288,11 @@ func TestRedisCache_AtomicOperations(t *testing.T) {
 }
 
 func TestRedisCache_Increment(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Increment on non-existing key
 	newValue, err := c.Increment(ctx, "counter", 1)
@@ -317,10 +323,11 @@ func TestRedisCache_Increment(t *testing.T) {
 }
 
 func TestRedisCache_Keys(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set some test keys
 	testKeys := []string{"test:1", "test:2", "other:1"}
@@ -344,10 +351,11 @@ func TestRedisCache_Keys(t *testing.T) {
 }
 
 func TestRedisCache_Clear(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set multiple values
 	testKeys := make([]string, 5)
@@ -390,10 +398,11 @@ func TestRedisCache_Clear(t *testing.T) {
 }
 
 func TestRedisCache_Pipeline(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test pipeline operations
 	items := map[string]interface{}{
@@ -424,15 +433,16 @@ func TestRedisCache_Pipeline(t *testing.T) {
 }
 
 func TestRedisCache_Events(t *testing.T) {
+	t.Parallel()
 	eventsChan := make(chan cache.Event, 10)
 
 	c := setupRedisTest(t)
 	c = c.WithEventHandler(func(event cache.Event) {
 		eventsChan <- event
 	})
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value
 	err := c.Set(ctx, "test", "value", time.Hour)
@@ -478,10 +488,11 @@ func TestRedisCache_Events(t *testing.T) {
 }
 
 func TestRedisCache_TTLOperations(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value with TTL
 	err := c.Set(ctx, "test", "value", time.Hour)
@@ -523,10 +534,11 @@ func TestRedisCache_TTLOperations(t *testing.T) {
 }
 
 func TestRedisCache_Stats(t *testing.T) {
+	t.Parallel()
 	c := setupRedisTest(t)
-	defer c.Close()
+	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Initial stats
 	stats := c.GetStats()

@@ -17,6 +17,7 @@ import (
 )
 
 func TestHandle(t *testing.T) {
+	t.Parallel()
 	// Test that Handle recovers from panic
 	defer func() {
 		if r := recover(); r != nil {
@@ -32,6 +33,7 @@ func TestHandle(t *testing.T) {
 }
 
 func TestHandleWithPanic(t *testing.T) {
+	t.Parallel()
 	// Test that Handle actually recovers from panic
 	var handled bool
 
@@ -51,6 +53,7 @@ func TestHandleWithPanic(t *testing.T) {
 }
 
 func TestHandleWithDifferentPanicTypes(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name  string
 		panic interface{}
@@ -64,6 +67,7 @@ func TestHandleWithDifferentPanicTypes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			var handled bool
 
 			func() {
@@ -84,6 +88,7 @@ func TestHandleWithDifferentPanicTypes(t *testing.T) {
 }
 
 func TestHandleInDebugMode(t *testing.T) {
+	t.Parallel()
 	// Save original debug state
 	originalDebug := flag.Debug
 	defer func() { flag.Debug = originalDebug }()
@@ -109,6 +114,7 @@ func TestHandleInDebugMode(t *testing.T) {
 }
 
 func TestHandleInProductionMode(t *testing.T) {
+	t.Parallel()
 	// Save original debug state
 	originalDebug := flag.Debug
 	defer func() { flag.Debug = originalDebug }()
@@ -134,6 +140,7 @@ func TestHandleInProductionMode(t *testing.T) {
 }
 
 func TestHandleNested(t *testing.T) {
+	t.Parallel()
 	// Test nested panic handling
 	var outerHandled, innerHandled bool
 
@@ -167,6 +174,7 @@ func TestHandleNested(t *testing.T) {
 }
 
 func TestHandleMultiple(t *testing.T) {
+	t.Parallel()
 	// Test multiple separate panic recoveries
 	for i := 0; i < 3; i++ {
 		var handled bool
@@ -188,6 +196,7 @@ func TestHandleMultiple(t *testing.T) {
 }
 
 func TestHandleWithoutPanic(t *testing.T) {
+	t.Parallel()
 	// Test that Handle doesn't interfere with normal execution
 	var normalExecution bool
 
@@ -203,6 +212,7 @@ func TestHandleWithoutPanic(t *testing.T) {
 
 // Test that shows Handle can be used in goroutines
 func TestHandleInGoroutine(t *testing.T) {
+	t.Parallel()
 	done := make(chan bool)
 
 	go func() {
@@ -224,6 +234,7 @@ func TestHandleInGoroutine(t *testing.T) {
 }
 
 func TestHandleWithDetailedPanicTypes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		panicData interface{}
@@ -245,6 +256,7 @@ func TestHandleWithDetailedPanicTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("Handle() should not re-panic: %v", r)
@@ -260,6 +272,7 @@ func TestHandleWithDetailedPanicTypes(t *testing.T) {
 }
 
 func TestHandleWithCallStack(t *testing.T) {
+	t.Parallel()
 	// Test that Handle captures the correct caller information
 	originalDebug := flag.Debug
 	defer func() { flag.Debug = originalDebug }()
@@ -298,6 +311,7 @@ func TestHandleWithCallStack(t *testing.T) {
 }
 
 func TestHandleWithGoroutineStack(t *testing.T) {
+	t.Parallel()
 	done := make(chan bool, 1)
 
 	go func() {
@@ -326,6 +340,7 @@ func TestHandleWithGoroutineStack(t *testing.T) {
 }
 
 func TestHandleWithRecursivePanic(t *testing.T) {
+	t.Parallel()
 	depth := 0
 	maxDepth := 5
 
@@ -350,6 +365,7 @@ func TestHandleWithRecursivePanic(t *testing.T) {
 }
 
 func TestHandleCallerInformation(t *testing.T) {
+	t.Parallel()
 	// This test verifies that Handle() captures caller information correctly
 	// We can't easily test the actual log output, but we can ensure it doesn't panic
 
@@ -386,6 +402,7 @@ func TestHandleCallerInformation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			defer func() {
 				if r := recover(); r != nil {
 					t.Errorf("Handle() should not re-panic in %s: %v", tt.name, r)
@@ -398,6 +415,7 @@ func TestHandleCallerInformation(t *testing.T) {
 }
 
 func TestHandleWithRuntimeCallerFailure(t *testing.T) {
+	t.Parallel()
 	// Test what happens when runtime.Caller fails
 	// This is difficult to test directly, but we can ensure Handle() is robust
 
@@ -414,8 +432,9 @@ func TestHandleWithRuntimeCallerFailure(t *testing.T) {
 }
 
 func TestHandleInDifferentDebugModes(t *testing.T) {
+	t.Parallel()
 	originalDebug := flag.Debug
-	defer func() { flag.Debug = originalDebug }()
+	t.Cleanup(func() { flag.Debug = originalDebug })
 
 	modes := []struct {
 		name  string
@@ -427,6 +446,7 @@ func TestHandleInDifferentDebugModes(t *testing.T) {
 
 	for _, mode := range modes {
 		t.Run(mode.name, func(t *testing.T) {
+			t.Parallel()
 			flag.Debug = mode.debug
 
 			defer func() {
@@ -444,6 +464,7 @@ func TestHandleInDifferentDebugModes(t *testing.T) {
 }
 
 func TestHandleWithNilPanic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Handle() should not re-panic with nil panic: %v", r)
@@ -458,6 +479,7 @@ func TestHandleWithNilPanic(t *testing.T) {
 }
 
 func TestHandleWithLargePanicData(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Handle() should not re-panic with large panic data: %v", r)
@@ -477,6 +499,7 @@ func TestHandleWithLargePanicData(t *testing.T) {
 }
 
 func TestHandleFilePathProcessing(t *testing.T) {
+	t.Parallel()
 	// Test that file paths are processed correctly in caller information
 	defer func() {
 		if r := recover(); r != nil {
@@ -492,6 +515,7 @@ func TestHandleFilePathProcessing(t *testing.T) {
 }
 
 func TestHandleWithOSSignals(t *testing.T) {
+	t.Parallel()
 	// Test Handle() behavior when OS signals might be involved
 	// This is more of a robustness test
 
@@ -509,6 +533,7 @@ func TestHandleWithOSSignals(t *testing.T) {
 }
 
 func TestHandleMemoryPressure(t *testing.T) {
+	t.Parallel()
 	// Test Handle() under memory pressure scenarios
 	defer func() {
 		if r := recover(); r != nil {
@@ -524,6 +549,7 @@ func TestHandleMemoryPressure(t *testing.T) {
 }
 
 func TestMultipleHandleRegistrations(t *testing.T) {
+	t.Parallel()
 	// Test that multiple Handle() calls work correctly
 	counter := 0
 
@@ -554,6 +580,7 @@ func TestMultipleHandleRegistrations(t *testing.T) {
 }
 
 func TestHandlePerformance(t *testing.T) {
+	t.Parallel()
 	// Basic performance test to ensure Handle() doesn't introduce significant overhead
 	iterations := 1000
 
@@ -574,14 +601,16 @@ func TestHandlePerformance(t *testing.T) {
 
 // Test runtime characteristics
 func TestHandleRuntimeCharacteristics(t *testing.T) {
+	t.Parallel()
 	// Test that Handle() works correctly with different runtime characteristics
 
 	// Test with different GOMAXPROCS values
 	originalGOMAXPROCS := runtime.GOMAXPROCS(0)
-	defer runtime.GOMAXPROCS(originalGOMAXPROCS)
+	t.Cleanup(func() { runtime.GOMAXPROCS(originalGOMAXPROCS) })
 
 	for _, procs := range []int{1, 2, 4, runtime.NumCPU()} {
 		t.Run(fmt.Sprintf("GOMAXPROCS=%d", procs), func(t *testing.T) {
+			t.Parallel()
 			runtime.GOMAXPROCS(procs)
 
 			defer func() {
@@ -599,18 +628,8 @@ func TestHandleRuntimeCharacteristics(t *testing.T) {
 }
 
 func TestHandleWithEnvironmentVariables(t *testing.T) {
-	// Test Handle() behavior with different environment configurations
-	originalPath := os.Getenv("PATH")
-	defer func() {
-		if err := os.Setenv("PATH", originalPath); err != nil {
-			t.Logf("Failed to restore PATH: %v", err)
-		}
-	}()
-
 	// Test with modified environment
-	if err := os.Setenv("PATH", ""); err != nil {
-		t.Fatalf("Failed to set PATH: %v", err)
-	}
+	t.Setenv("PATH", "")
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -627,6 +646,7 @@ func TestHandleWithEnvironmentVariables(t *testing.T) {
 // OnSignal Tests
 
 func TestOnSignalContextCreation(t *testing.T) {
+	t.Parallel()
 	// Test that OnSignal returns a valid context
 	handler := func() error {
 		return nil
@@ -648,6 +668,7 @@ func TestOnSignalContextCreation(t *testing.T) {
 }
 
 func TestOnSignalHandlerExecution(t *testing.T) {
+	t.Parallel()
 	// Test that handlers execute when manually triggering the context
 	var mu sync.Mutex
 	executed := make([]bool, 3)
@@ -674,7 +695,7 @@ func TestOnSignalHandlerExecution(t *testing.T) {
 	handlers := []func() error{handler1, handler2, handler3}
 
 	// Create a context that we can cancel manually to simulate signal
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	// Use a wait group to synchronize goroutine completion
 	var wg sync.WaitGroup
@@ -709,6 +730,7 @@ func TestOnSignalHandlerExecution(t *testing.T) {
 }
 
 func TestOnSignalWithErrors(t *testing.T) {
+	t.Parallel()
 	// Test handlers that return errors
 	testError := errors.New("handler error")
 
@@ -722,7 +744,7 @@ func TestOnSignalWithErrors(t *testing.T) {
 	handlers := []func() error{errorHandler, successHandler}
 
 	// Create a context that we can cancel manually
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	var mu sync.Mutex
 	var handlerErrors []error
@@ -763,6 +785,7 @@ func TestOnSignalWithErrors(t *testing.T) {
 }
 
 func TestOnSignalNoHandlers(t *testing.T) {
+	t.Parallel()
 	// Test with empty handlers slice
 	ctx := interruption.OnSignal([]func() error{}, syscall.SIGTERM)
 
@@ -781,6 +804,7 @@ func TestOnSignalNoHandlers(t *testing.T) {
 }
 
 func TestOnSignalNilHandlers(t *testing.T) {
+	t.Parallel()
 	// Test with nil handlers slice
 	ctx := interruption.OnSignal(nil, syscall.SIGTERM)
 
@@ -799,6 +823,7 @@ func TestOnSignalNilHandlers(t *testing.T) {
 }
 
 func TestOnSignalHandlerPanic(t *testing.T) {
+	t.Parallel()
 	// Test behavior when handler panics
 	var mu sync.Mutex
 	executed := make([]bool, 2)
@@ -819,7 +844,7 @@ func TestOnSignalHandlerPanic(t *testing.T) {
 	handlers := []func() error{panicHandler, normalHandler}
 
 	// Create a context that we can cancel manually
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	// Use a wait group to synchronize goroutine completion
 	var wg sync.WaitGroup
@@ -860,6 +885,7 @@ func TestOnSignalHandlerPanic(t *testing.T) {
 }
 
 func TestOnSignalLongRunningHandler(t *testing.T) {
+	t.Parallel()
 	// Test with a handler that takes some time
 	var mu sync.Mutex
 	executed := false
@@ -875,7 +901,7 @@ func TestOnSignalLongRunningHandler(t *testing.T) {
 	handlers := []func() error{handler}
 
 	// Create a context that we can cancel manually
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	// Use a wait group to synchronize goroutine completion
 	var wg sync.WaitGroup
@@ -912,6 +938,7 @@ func TestOnSignalLongRunningHandler(t *testing.T) {
 }
 
 func TestOnSignalMultipleSignalTypes(t *testing.T) {
+	t.Parallel()
 	// Test with multiple signal types - just verify the function accepts them
 	handler := func() error {
 		return nil
@@ -934,6 +961,7 @@ func TestOnSignalMultipleSignalTypes(t *testing.T) {
 }
 
 func TestOnSignalContextType(t *testing.T) {
+	t.Parallel()
 	// Test that the returned context is the correct type
 	handler := func() error {
 		return nil
@@ -1045,8 +1073,9 @@ func BenchmarkOnSignalMultipleHandlers(b *testing.B) {
 }
 
 func TestWaitForShutdown(t *testing.T) {
+	t.Parallel()
 	// Test WaitForShutdown with a normal context
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	done := make(chan bool, 1)
 	go func() {
@@ -1075,6 +1104,7 @@ func TestWaitForShutdown(t *testing.T) {
 }
 
 func TestWaitForShutdownWithNilContext(t *testing.T) {
+	t.Parallel()
 	// Test WaitForShutdown with nil context
 	done := make(chan bool, 1)
 	go func() {
@@ -1092,6 +1122,7 @@ func TestWaitForShutdownWithNilContext(t *testing.T) {
 }
 
 func TestWaitForShutdownWithOnSignal(t *testing.T) {
+	t.Parallel()
 	// Skip this test on Windows as signal sending to processes is not supported
 	if runtime.GOOS == "windows" {
 		t.Skip("Signal sending not supported on Windows")
@@ -1151,6 +1182,7 @@ func TestWaitForShutdownWithOnSignal(t *testing.T) {
 }
 
 func TestSetupGracefulShutdown(t *testing.T) {
+	t.Parallel()
 	// Test SetupGracefulShutdown function
 	var mu sync.Mutex
 	executed := false
@@ -1193,6 +1225,7 @@ func TestSetupGracefulShutdown(t *testing.T) {
 }
 
 func TestSetupGracefulShutdownWithNoHandlers(t *testing.T) {
+	t.Parallel()
 	// Test with no handlers
 	shutdownFunc := interruption.SetupGracefulShutdown([]func() error{}, syscall.SIGTERM)
 
@@ -1217,6 +1250,7 @@ func TestSetupGracefulShutdownWithNoHandlers(t *testing.T) {
 }
 
 func TestSetupGracefulShutdownWithNilHandlers(t *testing.T) {
+	t.Parallel()
 	// Test with nil handlers
 	shutdownFunc := interruption.SetupGracefulShutdown(nil, syscall.SIGTERM)
 

@@ -179,11 +179,6 @@ type Manager struct {
 	progressChan     chan progressUpdate
 }
 
-type progressUpdate struct {
-	jobID    string
-	progress float64
-}
-
 // NewManager creates a new queue manager with default settings
 func NewManager() *Manager {
 	return &Manager{
@@ -198,6 +193,48 @@ func NewManager() *Manager {
 		stats:            &Stats{},
 		progressChan:     make(chan progressUpdate, 100),
 	}
+}
+
+type progressUpdate struct {
+	jobID    string
+	progress float64
+}
+
+// RetryableError represents an error that should trigger a retry
+type RetryableError struct {
+	Err error
+}
+
+// NewRetryableError creates a new retryable error
+func NewRetryableError(err error) *RetryableError {
+	return &RetryableError{Err: err}
+}
+
+func (e *RetryableError) Error() string {
+	return e.Err.Error()
+}
+
+// JobProgress represents job progress information
+type JobProgress struct {
+	JobID    string  `json:"job_id"`
+	Progress float64 `json:"progress"`
+	Message  string  `json:"message,omitempty"`
+}
+
+// WithRabbitMQ sets the queue to use RabbitMQ with the given configuration
+func (m *Manager) WithRabbitMQ(config RabbitMQConfig) *Manager {
+	if queue, err := NewRabbitMQQueue(config); err == nil {
+		m.queue = queue
+	}
+	return m
+}
+
+// WithRabbitMQFromURL sets the queue to use RabbitMQ with the given URL
+func (m *Manager) WithRabbitMQFromURL(url string) *Manager {
+	if queue, err := NewRabbitMQQueueFromURL(url); err == nil {
+		m.queue = queue
+	}
+	return m
 }
 
 // WithQueue sets the queue implementation
@@ -554,41 +591,4 @@ func (m *Manager) progressReporter() {
 			Float64("progress", update.progress).
 			Msg("job progress updated")
 	}
-}
-
-// RetryableError represents an error that should trigger a retry
-type RetryableError struct {
-	Err error
-}
-
-func (e *RetryableError) Error() string {
-	return e.Err.Error()
-}
-
-// NewRetryableError creates a new retryable error
-func NewRetryableError(err error) *RetryableError {
-	return &RetryableError{Err: err}
-}
-
-// JobProgress represents job progress information
-type JobProgress struct {
-	JobID    string  `json:"job_id"`
-	Progress float64 `json:"progress"`
-	Message  string  `json:"message,omitempty"`
-}
-
-// WithRabbitMQ sets the queue to use RabbitMQ with the given configuration
-func (m *Manager) WithRabbitMQ(config RabbitMQConfig) *Manager {
-	if queue, err := NewRabbitMQQueue(config); err == nil {
-		m.queue = queue
-	}
-	return m
-}
-
-// WithRabbitMQFromURL sets the queue to use RabbitMQ with the given URL
-func (m *Manager) WithRabbitMQFromURL(url string) *Manager {
-	if queue, err := NewRabbitMQQueueFromURL(url); err == nil {
-		m.queue = queue
-	}
-	return m
 }

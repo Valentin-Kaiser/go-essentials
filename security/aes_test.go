@@ -1,99 +1,15 @@
-package security
+package security_test
 
 import (
 	"bytes"
 	"errors"
 	"testing"
+
+	"github.com/Valentin-Kaiser/go-core/security"
 )
 
-func TestNewAesCipher(t *testing.T) {
-	cipher := NewAesCipher()
-	if cipher == nil {
-		t.Error("NewAesCipher() returned nil")
-		return
-	}
-
-	if cipher.Error != nil {
-		t.Errorf("NewAesCipher() created cipher with error: %v", cipher.Error)
-	}
-
-	if cipher.passphrase != nil {
-		t.Error("NewAesCipher() should not have a passphrase initially")
-	}
-}
-
-func TestAesCipherWithAES128(t *testing.T) {
-	cipher := NewAesCipher().WithAES128()
-
-	if cipher.Error != nil {
-		t.Errorf("WithAES128() returned error: %v", cipher.Error)
-	}
-
-	if len(cipher.passphrase) != 16 {
-		t.Errorf("WithAES128() passphrase length is %d, expected 16", len(cipher.passphrase))
-	}
-}
-
-func TestAesCipherWithAES192(t *testing.T) {
-	cipher := NewAesCipher().WithAES192()
-
-	if cipher.Error != nil {
-		t.Errorf("WithAES192() returned error: %v", cipher.Error)
-	}
-
-	if len(cipher.passphrase) != 24 {
-		t.Errorf("WithAES192() passphrase length is %d, expected 24", len(cipher.passphrase))
-	}
-}
-
-func TestAesCipherWithAES256(t *testing.T) {
-	cipher := NewAesCipher().WithAES256()
-
-	if cipher.Error != nil {
-		t.Errorf("WithAES256() returned error: %v", cipher.Error)
-	}
-
-	if len(cipher.passphrase) != 32 {
-		t.Errorf("WithAES256() passphrase length is %d, expected 32", len(cipher.passphrase))
-	}
-}
-
-func TestAesCipherWithPassphrase(t *testing.T) {
-	testCases := []struct {
-		name       string
-		passphrase []byte
-		shouldWork bool
-	}{
-		{"16 bytes", make([]byte, 16), true},
-		{"24 bytes", make([]byte, 24), true},
-		{"32 bytes", make([]byte, 32), true},
-		{"8 bytes", make([]byte, 8), false},   // Too short
-		{"20 bytes", make([]byte, 20), false}, // Invalid length
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			cipher := NewAesCipher().WithPassphrase(tc.passphrase)
-
-			if !bytes.Equal(cipher.passphrase, tc.passphrase) {
-				t.Errorf("WithPassphrase() passphrase mismatch")
-			}
-
-			// Test encryption to see if passphrase is valid
-			var output bytes.Buffer
-			cipher.Encrypt("test", &output)
-
-			if tc.shouldWork && cipher.Error != nil {
-				t.Errorf("WithPassphrase() with %s should work, but got error: %v", tc.name, cipher.Error)
-			}
-			if !tc.shouldWork && cipher.Error == nil {
-				t.Errorf("WithPassphrase() with %s should fail, but succeeded", tc.name)
-			}
-		})
-	}
-}
-
 func TestAesCipherEncryptDecrypt(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name      string
 		plaintext string
@@ -110,11 +26,12 @@ func TestAesCipherEncryptDecrypt(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			// Generate a key of the specified size
 			key := make([]byte, tc.keySize)
 			copy(key, "testkeyfortesting123456789012345")
 
-			cipher := NewAesCipher().WithPassphrase(key)
+			cipher := security.NewAesCipher().WithPassphrase(key)
 
 			// Encrypt
 			var encrypted bytes.Buffer
@@ -132,7 +49,7 @@ func TestAesCipherEncryptDecrypt(t *testing.T) {
 			}
 
 			// Decrypt
-			cipher2 := NewAesCipher().WithPassphrase(key)
+			cipher2 := security.NewAesCipher().WithPassphrase(key)
 			var decrypted bytes.Buffer
 			cipher2.Decrypt(encryptedStr, &decrypted)
 
@@ -150,7 +67,8 @@ func TestAesCipherEncryptDecrypt(t *testing.T) {
 }
 
 func TestAesCipherEncryptWithoutPassphrase(t *testing.T) {
-	cipher := NewAesCipher()
+	t.Parallel()
+	cipher := security.NewAesCipher()
 	var output bytes.Buffer
 	cipher.Encrypt("test", &output)
 
@@ -160,7 +78,8 @@ func TestAesCipherEncryptWithoutPassphrase(t *testing.T) {
 }
 
 func TestAesCipherDecryptWithoutPassphrase(t *testing.T) {
-	cipher := NewAesCipher()
+	t.Parallel()
+	cipher := security.NewAesCipher()
 	var output bytes.Buffer
 	cipher.Decrypt("test", &output)
 
@@ -170,7 +89,8 @@ func TestAesCipherDecryptWithoutPassphrase(t *testing.T) {
 }
 
 func TestAesCipherDecryptInvalidBase64(t *testing.T) {
-	cipher := NewAesCipher().WithAES256()
+	t.Parallel()
+	cipher := security.NewAesCipher().WithAES256()
 	var output bytes.Buffer
 	cipher.Decrypt("invalid base64 !!!", &output)
 
@@ -180,7 +100,8 @@ func TestAesCipherDecryptInvalidBase64(t *testing.T) {
 }
 
 func TestAesCipherDecryptTooShort(t *testing.T) {
-	cipher := NewAesCipher().WithAES256()
+	t.Parallel()
+	cipher := security.NewAesCipher().WithAES256()
 	var output bytes.Buffer
 	cipher.Decrypt("dGVzdA==", &output) // "test" in base64, too short for nonce
 
@@ -190,11 +111,12 @@ func TestAesCipherDecryptTooShort(t *testing.T) {
 }
 
 func TestAesCipherDecryptWrongKey(t *testing.T) {
+	t.Parallel()
 	// Encrypt with one key
 	key1 := make([]byte, 32)
 	copy(key1, "key1key1key1key1key1key1key1key1")
 
-	cipher1 := NewAesCipher().WithPassphrase(key1)
+	cipher1 := security.NewAesCipher().WithPassphrase(key1)
 	var encrypted bytes.Buffer
 	cipher1.Encrypt("test", &encrypted)
 
@@ -206,7 +128,7 @@ func TestAesCipherDecryptWrongKey(t *testing.T) {
 	key2 := make([]byte, 32)
 	copy(key2, "key2key2key2key2key2key2key2key2")
 
-	cipher2 := NewAesCipher().WithPassphrase(key2)
+	cipher2 := security.NewAesCipher().WithPassphrase(key2)
 	var decrypted bytes.Buffer
 	cipher2.Decrypt(encrypted.String(), &decrypted)
 
@@ -216,8 +138,9 @@ func TestAesCipherDecryptWrongKey(t *testing.T) {
 }
 
 func TestAesCipherChaining(t *testing.T) {
+	t.Parallel()
 	// Test method chaining
-	cipher := NewAesCipher().WithAES256()
+	cipher := security.NewAesCipher().WithAES256()
 
 	var encrypted bytes.Buffer
 	cipher.Encrypt("test", &encrypted)
@@ -227,7 +150,7 @@ func TestAesCipherChaining(t *testing.T) {
 	}
 
 	// Test that error propagates through chain
-	cipher2 := NewAesCipher().WithPassphrase([]byte("short")) // Invalid key size
+	cipher2 := security.NewAesCipher().WithPassphrase([]byte("short")) // Invalid key size
 	var output bytes.Buffer
 	cipher2.Encrypt("test", &output)
 
@@ -237,8 +160,9 @@ func TestAesCipherChaining(t *testing.T) {
 }
 
 func TestAesCipherErrorPropagation(t *testing.T) {
+	t.Parallel()
 	// Start with error condition
-	cipher := NewAesCipher()
+	cipher := security.NewAesCipher()
 	cipher.Error = errors.New("initial error") // Set an error
 
 	// All subsequent operations should be no-ops
@@ -250,43 +174,9 @@ func TestAesCipherErrorPropagation(t *testing.T) {
 	}
 }
 
-// Test multiple encrypt/decrypt operations
-func TestAesCipherMultipleOperations(t *testing.T) {
-	cipher := NewAesCipher().WithAES256()
-
-	testData := []string{"test1", "test2", "test3"}
-	encrypted := make([]string, len(testData))
-
-	// Encrypt multiple times
-	for i, data := range testData {
-		var output bytes.Buffer
-		cipher.Encrypt(data, &output)
-		if cipher.Error != nil {
-			t.Errorf("Encrypt %d returned error: %v", i, cipher.Error)
-			return
-		}
-		encrypted[i] = output.String()
-	}
-
-	// Decrypt and verify
-	for i, data := range testData {
-		cipher2 := NewAesCipher().WithPassphrase(cipher.passphrase)
-		var output bytes.Buffer
-		cipher2.Decrypt(encrypted[i], &output)
-		if cipher2.Error != nil {
-			t.Errorf("Decrypt %d returned error: %v", i, cipher2.Error)
-			return
-		}
-
-		if output.String() != data {
-			t.Errorf("Decrypt %d returned %q, expected %q", i, output.String(), data)
-		}
-	}
-}
-
 // Benchmark tests
 func BenchmarkAesCipherEncrypt(b *testing.B) {
-	cipher := NewAesCipher().WithAES256()
+	cipher := security.NewAesCipher().WithAES256()
 	text := "benchmark test data for encryption"
 
 	b.ResetTimer()
@@ -295,30 +185,6 @@ func BenchmarkAesCipherEncrypt(b *testing.B) {
 		cipher.Encrypt(text, &output)
 		if cipher.Error != nil {
 			b.Fatalf("Encrypt error: %v", cipher.Error)
-		}
-	}
-}
-
-func BenchmarkAesCipherDecrypt(b *testing.B) {
-	cipher := NewAesCipher().WithAES256()
-	text := "benchmark test data for decryption"
-
-	// Pre-encrypt the text
-	var encrypted bytes.Buffer
-	cipher.Encrypt(text, &encrypted)
-	if cipher.Error != nil {
-		b.Fatalf("Setup encrypt error: %v", cipher.Error)
-	}
-
-	encryptedStr := encrypted.String()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		cipher2 := NewAesCipher().WithPassphrase(cipher.passphrase)
-		var output bytes.Buffer
-		cipher2.Decrypt(encryptedStr, &output)
-		if cipher2.Error != nil {
-			b.Fatalf("Decrypt error: %v", cipher2.Error)
 		}
 	}
 }

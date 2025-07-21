@@ -30,7 +30,7 @@ func TestLoggerInit(t *testing.T) {
 
 	// Save original flag.Path
 	originalPath := flag.Path
-	defer func() { flag.Path = originalPath }()
+	t.Cleanup(func() { flag.Path = originalPath })
 
 	flag.Path = tempDir
 
@@ -304,7 +304,7 @@ func TestLoggerWriteWithLevel(t *testing.T) {
 	}
 }
 
-func TestLoggerStop(_ *testing.T) {
+func TestLoggerStop(t *testing.T) {
 	logger := zlog.Logger()
 
 	// Test Stop without file (should not panic)
@@ -315,7 +315,7 @@ func TestLoggerStop(_ *testing.T) {
 	logger.Stop()
 }
 
-func TestLoggerRotate(_ *testing.T) {
+func TestLoggerRotate(t *testing.T) {
 	logger := zlog.Logger().WithLogFile()
 
 	// Test Rotate (should not panic)
@@ -376,7 +376,7 @@ func TestLoggerChaining(t *testing.T) {
 	}
 }
 
-func TestLoggerImplementsWriter(_ *testing.T) {
+func TestLoggerImplementsWriter(t *testing.T) {
 	var _ io.Writer = zlog.Logger()
 }
 

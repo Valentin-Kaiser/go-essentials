@@ -1,7 +1,6 @@
 package cache_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -18,13 +17,14 @@ type TestUser struct {
 }
 
 func TestMemoryCache_BasicOperations(t *testing.T) {
+	t.Parallel()
 	c := cache.NewMemoryCache().
 		WithMaxSize(100).
 		WithDefaultTTL(time.Hour)
 
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Set and Get
 	user := TestUser{ID: 1, Name: "John Doe", Email: "john@example.com"}
@@ -72,12 +72,13 @@ func TestMemoryCache_BasicOperations(t *testing.T) {
 }
 
 func TestMemoryCache_TTL(t *testing.T) {
+	t.Parallel()
 	c := cache.NewMemoryCache().
 		WithDefaultTTL(time.Millisecond * 100)
 
 	apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value with short TTL
 	err := c.Set(ctx, "test", "value", time.Millisecond*50)
@@ -108,13 +109,14 @@ func TestMemoryCache_TTL(t *testing.T) {
 }
 
 func TestMemoryCache_LRUEviction(t *testing.T) {
+	t.Parallel()
 	c := cache.NewMemoryCache().
 		WithMaxSize(3).
 		WithLRUEviction(true)
 
 	apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Fill cache to capacity
 	for i := 1; i <= 3; i++ {
@@ -159,10 +161,11 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 }
 
 func TestMemoryCache_MultiOperations(t *testing.T) {
+	t.Parallel()
 	c := cache.NewMemoryCache()
 	apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test SetMulti
 	items := map[string]interface{}{
@@ -216,12 +219,13 @@ func TestMemoryCache_MultiOperations(t *testing.T) {
 }
 
 func TestMemoryCache_Stats(t *testing.T) {
+	t.Parallel()
 	c := cache.NewMemoryCache().
 		WithMaxSize(10)
 
 	apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Initial stats
 	stats := c.GetStats()
@@ -278,6 +282,7 @@ func TestMemoryCache_Stats(t *testing.T) {
 }
 
 func TestMemoryCache_Events(t *testing.T) {
+	t.Parallel()
 	eventsChan := make(chan cache.Event, 10)
 
 	c := cache.NewMemoryCache().
@@ -287,7 +292,7 @@ func TestMemoryCache_Events(t *testing.T) {
 
 	apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value
 	err := c.Set(ctx, "test", "value", time.Hour)
@@ -338,13 +343,14 @@ func TestMemoryCache_Events(t *testing.T) {
 }
 
 func TestMemoryCache_Namespace(t *testing.T) {
+	t.Parallel()
 	config := cache.DefaultConfig()
 	config.Namespace = "test"
 
 	c := cache.NewMemoryCacheWithConfig(config)
 	apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	err := c.Set(ctx, "key", "value", time.Hour)
 	if err != nil {
@@ -377,10 +383,11 @@ func TestMemoryCache_Namespace(t *testing.T) {
 }
 
 func TestMemoryCache_Clear(t *testing.T) {
+	t.Parallel()
 	c := cache.NewMemoryCache()
 	apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set multiple values
 	for i := 1; i <= 5; i++ {
@@ -419,10 +426,11 @@ func TestMemoryCache_Clear(t *testing.T) {
 }
 
 func TestMemoryCache_TTLOperations(t *testing.T) {
+	t.Parallel()
 	c := cache.NewMemoryCache()
 	apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value with TTL
 	err := c.Set(ctx, "test", "value", time.Hour)
@@ -464,6 +472,7 @@ func TestMemoryCache_TTLOperations(t *testing.T) {
 }
 
 func TestJSONSerializer(t *testing.T) {
+	t.Parallel()
 	serializer := &cache.JSONSerializer{}
 
 	user := TestUser{ID: 1, Name: "John", Email: "john@example.com"}
@@ -487,6 +496,7 @@ func TestJSONSerializer(t *testing.T) {
 }
 
 func TestNoOpSerializer(t *testing.T) {
+	t.Parallel()
 	serializer := &cache.NoOpSerializer{}
 
 	// Test with []byte

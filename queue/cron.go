@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	// Presets are predefined cron expressions for common schedules
 	Presets = map[string]string{
 		"@yearly":   "0 0 0 1 1 *", // Run once a year, midnight, Jan. 1st
 		"@annually": "0 0 0 1 1 *", // Alias for @yearly
@@ -20,10 +21,12 @@ var (
 		"@midnight": "0 0 0 * * *", // Alias for @daily
 		"@hourly":   "0 0 * * * *", // Run once an hour, beginning of hour
 	}
+	// Months is a map of month names to their numeric values
 	Months = map[string]int{
 		"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
 		"JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
 	}
+	// Days is a map of day names to their numeric values
 	Days = map[string]int{
 		"SUN": 0, "MON": 1, "TUE": 2, "WED": 3, "THU": 4, "FRI": 5, "SAT": 6,
 	}

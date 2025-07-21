@@ -1,7 +1,6 @@
 package queue_test
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -12,6 +11,7 @@ import (
 )
 
 func TestRabbitMQQueue(t *testing.T) {
+	t.Parallel()
 	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_queue",
@@ -27,11 +27,16 @@ func TestRabbitMQQueue(t *testing.T) {
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ test: %v", err)
 	}
-	defer apperror.Handle(q.Close(), "failed to close queue")
+	t.Cleanup(func() {
+		if err := q.Close(); err != nil {
+			t.Logf("Warning: failed to close queue: %v", err)
+		}
+	})
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("BasicEnqueueDequeue", func(t *testing.T) {
+		t.Parallel()
 		job := queue.NewJob("test-job").
 			WithID("test-1").
 			WithPayload(map[string]interface{}{"message": "hello world"}).
@@ -74,6 +79,7 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("ScheduledJobs", func(t *testing.T) {
+		t.Parallel()
 		job := queue.NewJob("scheduled-job").
 			WithID("scheduled-1").
 			WithDelay(time.Millisecond * 200).
@@ -103,6 +109,7 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("PriorityJobs", func(t *testing.T) {
+		t.Parallel()
 		lowJob := queue.NewJob("low-job").
 			WithID("low-1").
 			WithPriority(queue.PriorityLow).
@@ -158,6 +165,7 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("JobOperations", func(t *testing.T) {
+		t.Parallel()
 		job := queue.NewJob("test-ops").
 			WithID("ops-1").
 			WithPayload(map[string]interface{}{"operation": "test"}).
@@ -215,6 +223,7 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("Connection", func(t *testing.T) {
+		t.Parallel()
 		if !q.IsConnectionOpen() {
 			t.Error("Expected connection to be open")
 		}
@@ -236,6 +245,7 @@ func TestRabbitMQQueue(t *testing.T) {
 }
 
 func TestRabbitMQReconnection(t *testing.T) {
+	t.Parallel()
 	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_reconnect",
@@ -262,6 +272,7 @@ func TestRabbitMQReconnection(t *testing.T) {
 }
 
 func TestRabbitMQWithClosedConnection(t *testing.T) {
+	t.Parallel()
 	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_closed",
@@ -280,7 +291,7 @@ func TestRabbitMQWithClosedConnection(t *testing.T) {
 		t.Logf("Warning: failed to close queue: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	job := queue.NewJob("test-closed").WithID("closed-1").Build()
 
@@ -331,7 +342,7 @@ func BenchmarkRabbitMQEnqueue(b *testing.B) {
 	}
 	defer apperror.Handle(q.Close(), "failed to close queue")
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -367,7 +378,7 @@ func BenchmarkRabbitMQDequeue(b *testing.B) {
 	}
 	defer apperror.Handle(q.Close(), "failed to close queue")
 
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Pre-populate queue with jobs
 	for i := 0; i < b.N; i++ {

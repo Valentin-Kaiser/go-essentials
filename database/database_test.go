@@ -132,6 +132,7 @@ func TestConfig_Validate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			err := tc.config.Validate()
 			if tc.valid && err != nil {
 				t.Errorf("Expected valid config, got error: %v", err)
@@ -144,6 +145,7 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestConnected(t *testing.T) {
+	t.Parallel()
 	// Initially should not be connected
 	if database.Connected() {
 		t.Error("Expected not connected initially")
@@ -157,6 +159,7 @@ func TestConnected(t *testing.T) {
 }
 
 func TestExecuteWithoutConnection(t *testing.T) {
+	t.Parallel()
 	// Test Execute when not connected
 	err := database.Execute(func(_ *gorm.DB) error {
 		return nil
@@ -168,6 +171,7 @@ func TestExecuteWithoutConnection(t *testing.T) {
 }
 
 func TestReconnect(t *testing.T) {
+	t.Parallel()
 	// Test that Reconnect doesn't panic
 	database.Reconnect()
 
@@ -178,6 +182,7 @@ func TestReconnect(t *testing.T) {
 }
 
 func TestAwaitConnectionTimeout(t *testing.T) {
+	t.Parallel()
 	// Test AwaitConnection with timeout to avoid hanging
 	done := make(chan bool)
 
@@ -196,6 +201,7 @@ func TestAwaitConnectionTimeout(t *testing.T) {
 }
 
 func TestConnectWithInvalidConfig(t *testing.T) {
+	t.Parallel()
 	// Test Connect with invalid config
 	config := database.Config{
 		Driver: "invalid-driver",
@@ -217,6 +223,7 @@ func TestConnectWithInvalidConfig(t *testing.T) {
 }
 
 func TestConnectWithSQLiteConfig(t *testing.T) {
+	t.Parallel()
 	// Test Connect with SQLite config (should work without external database)
 	config := database.Config{
 		Driver: "sqlite",
@@ -253,7 +260,8 @@ func TestConnectWithSQLiteConfig(t *testing.T) {
 	// due to the asynchronous nature of the connection management
 }
 
-func TestRegisterSchema(_ *testing.T) {
+func TestRegisterSchema(t *testing.T) {
+	t.Parallel()
 	// Test schema registration
 	type TestModel struct {
 		ID   uint   `gorm:"primaryKey"`
@@ -272,7 +280,8 @@ func TestRegisterSchema(_ *testing.T) {
 	database.RegisterSchema(&TestModel{}, &AnotherModel{})
 }
 
-func TestRegisterMigrationStep(_ *testing.T) {
+func TestRegisterMigrationStep(t *testing.T) {
+	t.Parallel()
 	// Test migration step registration
 	v := version.Release{
 		GitTag:    "v1.0.0",
@@ -294,6 +303,7 @@ func TestRegisterMigrationStep(_ *testing.T) {
 }
 
 func TestRegisterOnConnectHandler(t *testing.T) {
+	t.Parallel()
 	// Test OnConnect handler registration
 	var handlerCalled bool
 
@@ -314,6 +324,7 @@ func TestRegisterOnConnectHandler(t *testing.T) {
 }
 
 func TestDisconnectWithoutConnection(t *testing.T) {
+	t.Parallel()
 	// Test Disconnect when not connected
 	// The Disconnect function works by sending a signal through a channel
 	// Even when not connected, it should still handle the disconnect signal
@@ -336,6 +347,7 @@ func TestDisconnectWithoutConnection(t *testing.T) {
 }
 
 func TestConfigStruct(t *testing.T) {
+	t.Parallel()
 	// Test that Config struct has proper fields
 	config := database.Config{
 		Driver:   "mysql",
@@ -372,6 +384,7 @@ func TestConfigStruct(t *testing.T) {
 }
 
 func TestConfigImplementsInterface(t *testing.T) {
+	t.Parallel()
 	// Test that Config implements the config.Config interface
 	var cfg database.Config
 	err := cfg.Validate()

@@ -55,12 +55,6 @@ const (
 	MiddlewareOrderGzip MiddlewareOrder = 127
 )
 
-// securityHeaderMiddleware is a middleware that adds security headers to the response
-// It is used to prevent attacks like XSS, clickjacking, etc.
-func securityHeaderMiddleware(next http.Handler) http.Handler {
-	return securityHeaderMiddlewareWithServer(Instance())(next)
-}
-
 // securityHeaderMiddlewareWithServer creates a security header middleware with access to server configuration
 func securityHeaderMiddlewareWithServer(server *Server) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

@@ -1,7 +1,6 @@
 package cache_test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -13,6 +12,7 @@ import (
 )
 
 func setupTieredTest(t *testing.T) *cache.TieredCache {
+	t.Helper()
 	// Setup L1 cache (memory)
 	l1Config := cache.DefaultConfig()
 	l1Config.MaxSize = 5 // Small L1 cache to test eviction
@@ -32,7 +32,7 @@ func setupTieredTest(t *testing.T) *cache.TieredCache {
 	client := redis.NewClient(opt)
 
 	// Test connection
-	ctx := context.Background()
+	ctx := t.Context()
 	_, err = client.Ping(ctx).Result()
 	if err != nil {
 		t.Skipf("Redis not available: %v", err)
@@ -56,10 +56,11 @@ func setupTieredTest(t *testing.T) *cache.TieredCache {
 }
 
 func TestTieredCache_BasicOperations(t *testing.T) {
+	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test Set and Get
 	user := TestUser{ID: 1, Name: "John Doe", Email: "john@example.com"}
@@ -132,10 +133,11 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 }
 
 func TestTieredCache_L1Eviction(t *testing.T) {
+	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Fill L1 cache beyond its capacity (L1 has maxSize of 5)
 	for i := 1; i <= 7; i++ {
@@ -180,10 +182,11 @@ func TestTieredCache_L1Eviction(t *testing.T) {
 }
 
 func TestTieredCache_L2Backfill(t *testing.T) {
+	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value in L2 directly (simulating L1 eviction)
 	user := TestUser{ID: 1, Name: "John Doe", Email: "john@example.com"}
@@ -235,10 +238,11 @@ func TestTieredCache_L2Backfill(t *testing.T) {
 }
 
 func TestTieredCache_TTL(t *testing.T) {
+	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test TTL operations
 	err := c.Set(ctx, "test", "value", time.Hour)
@@ -257,10 +261,11 @@ func TestTieredCache_TTL(t *testing.T) {
 }
 
 func TestTieredCache_TTLPropagation(t *testing.T) {
+	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value with short TTL
 	err := c.Set(ctx, "test", "value", time.Second*2)
@@ -299,10 +304,11 @@ func TestTieredCache_TTLPropagation(t *testing.T) {
 }
 
 func TestTieredCache_MultiOperations(t *testing.T) {
+	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test SetMulti
 	items := map[string]interface{}{
@@ -372,10 +378,11 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 }
 
 func TestTieredCache_Clear(t *testing.T) {
+	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set multiple values
 	testKeys := make([]string, 5)
@@ -415,6 +422,7 @@ func TestTieredCache_Clear(t *testing.T) {
 }
 
 func TestTieredCache_Events(t *testing.T) {
+	t.Parallel()
 	eventsChan := make(chan cache.Event, 20)
 
 	c := setupTieredTest(t)
@@ -423,7 +431,7 @@ func TestTieredCache_Events(t *testing.T) {
 	})
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set value (should generate events from both L1 and L2)
 	err := c.Set(ctx, "test", "value", time.Hour)
@@ -479,10 +487,11 @@ eventLoop:
 }
 
 func TestTieredCache_Stats(t *testing.T) {
+	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Set some values
 	for i := 1; i <= 3; i++ {

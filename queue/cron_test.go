@@ -7,6 +7,7 @@ import (
 )
 
 func TestValidateCronSpec(t *testing.T) {
+	t.Parallel()
 	scheduler := &queue.TaskScheduler{}
 
 	tests := []struct {
@@ -53,6 +54,7 @@ func TestValidateCronSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := scheduler.ValidateCronSpec(tt.cronSpec)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateCronSpec() error = %v, wantErr %v", err, tt.wantErr)
@@ -62,6 +64,7 @@ func TestValidateCronSpec(t *testing.T) {
 }
 
 func TestParseCronSpec(t *testing.T) {
+	t.Parallel()
 	scheduler := &queue.TaskScheduler{}
 
 	tests := []struct {
@@ -145,6 +148,7 @@ func TestParseCronSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			expr, err := scheduler.ParseCronSpec(tt.cronSpec)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseCronSpec() error = %v, wantErr %v", err, tt.wantErr)

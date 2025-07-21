@@ -7,6 +7,7 @@ import (
 )
 
 func TestGetVersion(t *testing.T) {
+	t.Parallel()
 	version := version.GetVersion()
 	if version == nil {
 		t.Error("GetVersion() returned nil")
@@ -43,6 +44,7 @@ func TestGetVersion(t *testing.T) {
 }
 
 func TestMajor(t *testing.T) {
+	t.Parallel()
 	// Test with default tag
 	originalTag := version.GitTag
 	defer func() { version.GitTag = originalTag }()
@@ -62,6 +64,7 @@ func TestMajor(t *testing.T) {
 }
 
 func TestMinor(t *testing.T) {
+	t.Parallel()
 	originalTag := version.GitTag
 	defer func() { version.GitTag = originalTag }()
 
@@ -80,6 +83,7 @@ func TestMinor(t *testing.T) {
 }
 
 func TestPatch(t *testing.T) {
+	t.Parallel()
 	originalTag := version.GitTag
 	defer func() { version.GitTag = originalTag }()
 
@@ -98,6 +102,7 @@ func TestPatch(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
+	t.Parallel()
 	originalTag := version.GitTag
 	defer func() { version.GitTag = originalTag }()
 
@@ -116,6 +121,7 @@ func TestString(t *testing.T) {
 }
 
 func TestIsGitTag(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		tag      string
 		expected bool
@@ -139,6 +145,7 @@ func TestIsGitTag(t *testing.T) {
 }
 
 func TestParseTagSegment(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		tag      string
 		segment  int
@@ -161,6 +168,7 @@ func TestParseTagSegment(t *testing.T) {
 }
 
 func TestParseTagVersion(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		tag      string
 		expected string
@@ -180,6 +188,7 @@ func TestParseTagVersion(t *testing.T) {
 }
 
 func TestVersionCompare(t *testing.T) {
+	t.Parallel()
 	v1 := &version.Release{
 		GitTag:    "v1.2.3",
 		GitCommit: "abc123",
@@ -210,6 +219,7 @@ func TestVersionCompare(t *testing.T) {
 }
 
 func TestVersionCompareTag(t *testing.T) {
+	t.Parallel()
 	v1 := &version.Release{GitTag: "v1.2.3"}
 	v2 := &version.Release{GitTag: "v1.2.3"}
 	v3 := &version.Release{GitTag: "v1.2.4"}
@@ -224,6 +234,7 @@ func TestVersionCompareTag(t *testing.T) {
 }
 
 func TestVersionCompareCommit(t *testing.T) {
+	t.Parallel()
 	v1 := &version.Release{GitCommit: "abc123", GitShort: "abc"}
 	v2 := &version.Release{GitCommit: "abc123", GitShort: "abc"}
 	v3 := &version.Release{GitCommit: "def456", GitShort: "def"}
@@ -238,6 +249,7 @@ func TestVersionCompareCommit(t *testing.T) {
 }
 
 func TestVersionValidate(t *testing.T) {
+	t.Parallel()
 	v := &version.Release{}
 
 	// Test valid version
@@ -269,6 +281,7 @@ func TestVersionValidate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			if err := v.Validate(tc.version); err == nil {
 				t.Errorf("Expected validation to fail for %s", tc.name)
 			}
