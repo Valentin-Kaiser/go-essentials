@@ -2,6 +2,7 @@ package cache_test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func setupRedisTest(t *testing.T) *cache.RedisCache {
 	}
 
 	config := cache.DefaultConfig()
-	config.Namespace = fmt.Sprintf("test:%d", time.Now().UnixNano())
+	config.Namespace = fmt.Sprintf("test:%s:%d:%d", t.Name(), time.Now().UnixNano(), rand.Int63())
 
 	c := cache.NewRedisCacheWithConfig(client, config)
 

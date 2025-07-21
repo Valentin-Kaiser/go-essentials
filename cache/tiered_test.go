@@ -2,6 +2,7 @@ package cache_test
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func setupTieredTest(t *testing.T) *cache.TieredCache {
 	}
 
 	l2Config := cache.DefaultConfig()
-	l2Config.Namespace = fmt.Sprintf("tiered-test:%d", time.Now().UnixNano())
+	l2Config.Namespace = fmt.Sprintf("tiered-test:%s:%d:%d", t.Name(), time.Now().UnixNano(), rand.Int63())
 	l2Cache := cache.NewRedisCacheWithConfig(client, l2Config)
 
 	// Clean up any existing test data
@@ -49,7 +50,7 @@ func setupTieredTest(t *testing.T) *cache.TieredCache {
 
 	// Create tiered cache
 	tieredConfig := cache.DefaultConfig()
-	tieredConfig.Namespace = fmt.Sprintf("tiered:%d", time.Now().UnixNano())
+	tieredConfig.Namespace = fmt.Sprintf("tiered:%s:%d:%d", t.Name(), time.Now().UnixNano(), rand.Int63())
 
 	c := cache.NewTieredCacheWithConfig(l1Cache, l2Cache, tieredConfig)
 	return c
