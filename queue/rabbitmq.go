@@ -95,7 +95,7 @@ func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 		"direct",            // type
 		config.Durable,      // durable
 		config.AutoDelete,   // auto-deleted
-		config.Exclusive,    // internal
+		config.Exclusive,    // exclusive
 		config.NoWait,       // no-wait
 		nil,                 // arguments
 	)

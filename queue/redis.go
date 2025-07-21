@@ -88,7 +88,7 @@ func (rq *RedisQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job,
 
 	memberStr, ok := result.Member.(string)
 	if !ok {
-		return nil, apperror.NewError("invalid member type in redis result")
+		return nil, apperror.NewErrorf("invalid member type in redis result: expected string, got %T", result.Member)
 	}
 	jobData, err := rq.client.HGet(ctx, rq.jobKey(memberStr), "data").Result()
 	if err != nil {

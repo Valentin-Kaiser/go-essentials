@@ -397,12 +397,11 @@ func (m *Manager) GetStats() *Stats {
 	m.statsMutex.RLock()
 	defer m.statsMutex.RUnlock()
 
-	if ctx := context.Background(); ctx != nil {
-		if queueStats, err := m.queue.GetStats(ctx); err == nil {
-			queueStats.WorkersActive = atomic.LoadInt64(&m.stats.WorkersActive)
-			queueStats.WorkersBusy = atomic.LoadInt64(&m.stats.WorkersBusy)
-			return queueStats
-		}
+	ctx := context.Background()
+	if queueStats, err := m.queue.GetStats(ctx); err == nil {
+		queueStats.WorkersActive = atomic.LoadInt64(&m.stats.WorkersActive)
+		queueStats.WorkersBusy = atomic.LoadInt64(&m.stats.WorkersBusy)
+		return queueStats
 	}
 
 	// Fallback to manager stats only

@@ -375,21 +375,7 @@ func (s *TaskScheduler) runTask(ctx context.Context, task *Task) {
 			task.LastError = ""
 			task.UpdatedAt = time.Now()
 
-			if task.Type == TaskTypeCron {
-				nextRun, calcErr := s.calculateNextCronRun(task.CronSpec, time.Now())
-				if calcErr != nil {
-					log.Error().
-						Err(calcErr).
-						Str("task_name", task.Name).
-						Msg("Failed to calculate next cron run time")
-				}
-				if calcErr == nil {
-					task.NextRun = nextRun
-				}
-			}
-			if task.Type == TaskTypeInterval {
-				task.NextRun = time.Now().Add(task.Interval)
-			}
+			s.updateNextRun(task)
 			s.tasksMutex.Unlock()
 
 			log.Info().
@@ -423,21 +409,7 @@ func (s *TaskScheduler) runTask(ctx context.Context, task *Task) {
 	task.LastError = lastError.Error()
 	task.UpdatedAt = time.Now()
 
-	if task.Type == TaskTypeCron {
-		nextRun, calcErr := s.calculateNextCronRun(task.CronSpec, time.Now())
-		if calcErr != nil {
-			log.Error().
-				Err(calcErr).
-				Str("task_name", task.Name).
-				Msg("Failed to calculate next cron run time")
-		}
-		if calcErr == nil {
-			task.NextRun = nextRun
-		}
-	}
-	if task.Type == TaskTypeInterval {
-		task.NextRun = time.Now().Add(task.Interval)
-	}
+	s.updateNextRun(task)
 	s.tasksMutex.Unlock()
 
 	log.Error().
@@ -446,6 +418,20 @@ func (s *TaskScheduler) runTask(ctx context.Context, task *Task) {
 		Int64("error_count", task.ErrorCount).
 		Time("next_run", task.NextRun).
 		Msg("Task execution failed after all retries")
+}
+
+func (s *TaskScheduler) updateNextRun(task *Task) error {
+	switch task.Type {
+	case TaskTypeCron:
+		nextRun, err := s.calculateNextCronRun(task.CronSpec, time.Now())
+		if err != nil {
+			return fmt.Errorf("failed to calculate next run time: %w", err)
+		}
+		task.NextRun = nextRun
+	case TaskTypeInterval:
+		task.NextRun = time.Now().Add(task.Interval)
+	}
+	return nil
 }
 
 // GetTask returns a task by name
