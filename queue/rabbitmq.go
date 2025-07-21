@@ -225,7 +225,7 @@ func (rq *RabbitMQQueue) Enqueue(ctx context.Context, job *Job) error {
 	}
 
 	if job.IsScheduled() {
-		return rq.scheduleJob(ctx, job, message)
+		return rq.scheduleJob(ctx, message)
 	}
 
 	return rq.channel.PublishWithContext(
@@ -239,9 +239,7 @@ func (rq *RabbitMQQueue) Enqueue(ctx context.Context, job *Job) error {
 }
 
 // scheduleJob handles scheduled job publishing
-func (rq *RabbitMQQueue) scheduleJob(ctx context.Context, _ *Job, message amqp.Publishing) error {
-	// For simplicity, we'll publish scheduled jobs immediately
-	// The application-level scheduler will handle the timing
+func (rq *RabbitMQQueue) scheduleJob(ctx context.Context, message amqp.Publishing) error {
 	return rq.channel.PublishWithContext(
 		ctx,
 		rq.exchangeName,

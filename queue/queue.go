@@ -121,6 +121,7 @@ package queue
 
 import (
 	"context"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -546,11 +547,13 @@ func (m *Manager) processJob(ctx context.Context, job *Job, workerID int) {
 
 // calculateRetryDelay calculates the retry delay with exponential backoff
 func (m *Manager) calculateRetryDelay(attempt int) time.Duration {
-	delay := float64(m.retryDelay.Nanoseconds())
-	for i := 1; i < attempt; i++ {
-		delay *= m.retryBackoff
+	if attempt <= 1 {
+		return m.retryDelay
 	}
-	return time.Duration(delay)
+	
+	delay := float64(m.retryDelay.Nanoseconds())
+	multiplier := math.Pow(m.retryBackoff, float64(attempt-1))
+	return time.Duration(delay * multiplier)
 }
 
 // scheduleProcessor processes scheduled jobs

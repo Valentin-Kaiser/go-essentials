@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -544,5 +545,5 @@ func (s *TaskScheduler) IsRunning() bool {
 
 // generateTaskID generates a unique task ID
 func generateTaskID() string {
-	return fmt.Sprintf("task_%d", time.Now().UnixNano())
+	return uuid.New().String()
 }
