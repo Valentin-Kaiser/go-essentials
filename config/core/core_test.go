@@ -111,7 +111,7 @@ func TestConfigWithErrorValidation(t *testing.T) {
 	}
 }
 
-func TestConfigInterface(t *testing.T) {
+func TestConfigInterface(_ *testing.T) {
 	// Test that our test configs implement the Config interface
 	var _ core.Config = &TestConfig{}
 	var _ core.Config = &TestConfigWithError{}
@@ -169,7 +169,7 @@ func TestFileOperations(t *testing.T) {
 	}
 }
 
-func TestGetWithoutRegistration(t *testing.T) {
+func TestGetWithoutRegistration(_ *testing.T) {
 	// Test Get() when no config is registered
 	// This should return nil or the previously registered config
 	result := core.Get()
@@ -178,7 +178,7 @@ func TestGetWithoutRegistration(t *testing.T) {
 	_ = result
 }
 
-func TestPackageConstants(t *testing.T) {
+func TestPackageConstants(_ *testing.T) {
 	// Test that we can access package-level functions
 	_ = core.Get()
 
@@ -189,7 +189,7 @@ func TestPackageConstants(t *testing.T) {
 }
 
 // Test concurrent access safety
-func TestConcurrentAccess(t *testing.T) {
+func TestConcurrentAccess(_ *testing.T) {
 	done := make(chan bool, 10)
 
 	// Test concurrent Get operations

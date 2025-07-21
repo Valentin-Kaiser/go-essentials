@@ -375,7 +375,13 @@ func (s *TaskScheduler) runTask(ctx context.Context, task *Task) {
 			task.LastError = ""
 			task.UpdatedAt = time.Now()
 
-			s.updateNextRun(task)
+			err = s.updateNextRun(task)
+			if err != nil {
+				log.Error().
+					Err(err).
+					Str("task_name", task.Name).
+					Msg("Failed to update next run time")
+			}
 			s.tasksMutex.Unlock()
 
 			log.Info().
@@ -409,7 +415,13 @@ func (s *TaskScheduler) runTask(ctx context.Context, task *Task) {
 	task.LastError = lastError.Error()
 	task.UpdatedAt = time.Now()
 
-	s.updateNextRun(task)
+	err := s.updateNextRun(task)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("task_name", task.Name).
+			Msg("Failed to update next run time after retries")
+	}
 	s.tasksMutex.Unlock()
 
 	log.Error().

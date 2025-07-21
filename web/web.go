@@ -114,6 +114,8 @@ func init() {
 
 // Instance returns the singleton instance of the web server
 func Instance() *Server {
+	mutex.Lock()
+	defer mutex.Unlock()
 	return instance
 }
 
@@ -176,11 +178,15 @@ func (s *Server) Start() *Server {
 		}
 
 		g.Go(func() error {
+			s.mutex.Lock()
 			s.server.TLSConfig = s.tlsConfig
 			s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
-			log.Info().Msgf("[Web] listening on https at %s", s.server.Addr)
+			server := s.server
+			s.mutex.Unlock()
+			
+			log.Info().Msgf("[Web] listening on https at %s", server.Addr)
 
-			err := s.server.ListenAndServeTLS("", "")
+			err := server.ListenAndServeTLS("", "")
 			if err != nil && err != http.ErrServerClosed {
 				return apperror.NewError("failed to start webserver").AddError(err)
 			}
@@ -194,8 +200,17 @@ func (s *Server) Start() *Server {
 	}
 
 	log.Info().Msgf("[Web] listening on http at %s:%d", s.host, s.port)
+	
+	s.mutex.Lock()
 	s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
-	err := s.server.ListenAndServe()
+	s.mutex.Unlock()
+	
+	// Get a reference to the server while holding the lock
+	s.mutex.RLock()
+	server := s.server
+	s.mutex.RUnlock()
+	
+	err := server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		s.Error = apperror.NewError("failed to start webserver").AddError(err)
 	}

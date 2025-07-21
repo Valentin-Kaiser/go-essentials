@@ -8,7 +8,6 @@ import (
 )
 
 func TestDefaultFlags(t *testing.T) {
-	t.Parallel()
 	// Test that default flags are properly initialized
 	if flag.Path != "./data" {
 		t.Errorf("Expected default Path to be './data', got '%s'", flag.Path)
@@ -27,8 +26,7 @@ func TestDefaultFlags(t *testing.T) {
 	}
 }
 
-func TestRegisterFlag(t *testing.T) {
-	t.Parallel()
+func TestRegisterFlag(_ *testing.T) {
 	// Test registering a string flag
 	var stringFlag string
 	flag.RegisterFlag("test-string", &stringFlag, "A test string flag")
@@ -77,7 +75,6 @@ func TestRegisterFlag(t *testing.T) {
 }
 
 func TestRegisterFlagPanics(t *testing.T) {
-	t.Parallel()
 	// Test that registering a duplicate flag panics
 	var testFlag string
 	flag.RegisterFlag("unique-flag", &testFlag, "A unique flag")
@@ -91,7 +88,6 @@ func TestRegisterFlagPanics(t *testing.T) {
 }
 
 func TestRegisterFlagNonPointer(t *testing.T) {
-	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic when registering non-pointer flag")
@@ -102,7 +98,6 @@ func TestRegisterFlagNonPointer(t *testing.T) {
 }
 
 func TestRegisterFlagNilPointer(t *testing.T) {
-	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic when registering nil pointer flag")
@@ -113,7 +108,6 @@ func TestRegisterFlagNilPointer(t *testing.T) {
 }
 
 func TestRegisterFlagUnsupportedType(t *testing.T) {
-	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("Expected panic when registering unsupported type")
@@ -123,8 +117,7 @@ func TestRegisterFlagUnsupportedType(t *testing.T) {
 	flag.RegisterFlag("unsupported", &testFlag, "An unsupported type flag")
 }
 
-func TestInit(t *testing.T) {
-	t.Parallel()
+func TestInit(_ *testing.T) {
 	// Save original args
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
@@ -140,16 +133,14 @@ func TestInit(t *testing.T) {
 	flag.Init()
 }
 
-func TestPrint(t *testing.T) {
-	t.Parallel()
+func TestPrint(_ *testing.T) {
 	// Test that Print doesn't panic
 	// We can't easily test the output, but we can ensure it doesn't crash
 	flag.Print()
 }
 
 // Test flag registration with default values
-func TestRegisterFlagWithDefaults(t *testing.T) {
-	t.Parallel()
+func TestRegisterFlagWithDefaults(_ *testing.T) {
 	var stringFlag = "default"
 	flag.RegisterFlag("default-string", &stringFlag, "A string flag with default")
 
@@ -164,8 +155,7 @@ func TestRegisterFlagWithDefaults(t *testing.T) {
 }
 
 // Test integration with actual command line parsing
-func TestCommandLineIntegration(t *testing.T) {
-	t.Parallel()
+func TestCommandLineIntegration(_ *testing.T) {
 	// Save original args
 	originalArgs := os.Args
 	defer func() { os.Args = originalArgs }()
@@ -194,8 +184,7 @@ func TestCommandLineIntegration(t *testing.T) {
 }
 
 // Test that flags are properly bound to pflag
-func TestFlagBinding(t *testing.T) {
-	t.Parallel()
+func TestFlagBinding(_ *testing.T) {
 	var testFlag string
 	flag.RegisterFlag("binding-test", &testFlag, "A binding test flag")
 

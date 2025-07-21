@@ -15,6 +15,7 @@ var (
 	mutex          = &sync.RWMutex{}
 	migrationSteps = map[string]map[string][]Step{}
 	schema         = make([]interface{}, 0)
+	schemaMutex    = &sync.RWMutex{}
 )
 
 // Step represents a migration step with a version and an action to be performed
@@ -26,6 +27,8 @@ type Step struct {
 
 // RegisterSchema registers a new schema model to be migrated
 func RegisterSchema(models ...interface{}) {
+	schemaMutex.Lock()
+	defer schemaMutex.Unlock()
 	schema = append(schema, models...)
 }
 
@@ -68,6 +71,9 @@ func setup(db *gorm.DB) error {
 
 // migrateSchema automatically migrates the database with the database model structs
 func migrateSchema(db *gorm.DB) error {
+	schemaMutex.RLock()
+	defer schemaMutex.RUnlock()
+	
 	if len(schema) == 0 {
 		return nil
 	}

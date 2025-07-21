@@ -73,6 +73,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -91,22 +92,28 @@ import (
 
 var (
 	db               *gorm.DB
+	dbMutex          sync.RWMutex
 	connected        atomic.Bool
 	failed           atomic.Bool
 	cancel           atomic.Bool
 	done             = make(chan bool)
 	onConnectHandler []func(db *gorm.DB, config Config) error
+	handlerMutex     sync.Mutex
 )
 
 // Execute executes a function with a database connection.
 // It will return an error if the database is not connected or if the function returns an error.
 // The function will be executed with a new session, so it will not affect the current transaction.
 func Execute(call func(db *gorm.DB) error) error {
-	if !connected.Load() || db == nil {
+	dbMutex.RLock()
+	dbInstance := db
+	dbMutex.RUnlock()
+	
+	if !connected.Load() || dbInstance == nil {
 		return apperror.NewErrorf("database is not connected")
 	}
 
-	err := call(db.Session(&gorm.Session{}))
+	err := call(dbInstance.Session(&gorm.Session{}))
 	if err != nil {
 		return err
 	}
@@ -153,7 +160,7 @@ func Connect(interval time.Duration, config Config) {
 				// If we are not connected to the database, try to connect
 				if !connected.Load() {
 					var err error
-					db, err = connect(config)
+					dbInstance, err := connect(config)
 					if err != nil {
 						// Prevent spamming the logs with connection errors
 						if !failed.Load() {
@@ -163,9 +170,18 @@ func Connect(interval time.Duration, config Config) {
 						return
 					}
 
+					dbMutex.Lock()
+					db = dbInstance
+					dbMutex.Unlock()
+
 					onConnect(config)
-					for _, handler := range onConnectHandler {
-						err := handler(db, config)
+					handlerMutex.Lock()
+					handlers := make([]func(db *gorm.DB, config Config) error, len(onConnectHandler))
+					copy(handlers, onConnectHandler)
+					handlerMutex.Unlock()
+					
+					for _, handler := range handlers {
+						err := handler(dbInstance, config)
 						if err != nil {
 							log.Error().Err(err).Msg("[Database] onConnect handler failed")
 							failed.Store(true)
@@ -184,11 +200,17 @@ func Connect(interval time.Duration, config Config) {
 
 				// Verify that we are indeed connected, if 'SELECT 1;' fails we assume
 				// that the database is currently unavailable
-				err := db.Exec("SELECT 1;").Error
-				if err != nil && connected.Load() {
-					log.Error().Err(err).Msg("[Database] connection lost")
-					connected.Store(false)
-					failed.Store(true)
+				dbMutex.RLock()
+				dbInstance := db
+				dbMutex.RUnlock()
+				
+				if dbInstance != nil {
+					err := dbInstance.Exec("SELECT 1;").Error
+					if err != nil && connected.Load() {
+						log.Error().Err(err).Msg("[Database] connection lost")
+						connected.Store(false)
+						failed.Store(true)
+					}
 				}
 			}()
 
@@ -206,6 +228,8 @@ func RegisterOnConnectHandler(handler func(db *gorm.DB, config Config) error) {
 		return
 	}
 
+	handlerMutex.Lock()
+	defer handlerMutex.Unlock()
 	onConnectHandler = append(onConnectHandler, handler)
 }
 
@@ -245,12 +269,12 @@ func connect(config Config) (*gorm.DB, error) {
 		}
 
 		var err error
-		db, err = gorm.Open(sqlite.Open(dbPath), cfg)
+		gormDB, err := gorm.Open(sqlite.Open(dbPath), cfg)
 		if err != nil {
 			return nil, err
 		}
 
-		sqlDB, err := db.DB()
+		sqlDB, err := gormDB.DB()
 		if err != nil {
 			return nil, err
 		}
@@ -258,7 +282,12 @@ func connect(config Config) (*gorm.DB, error) {
 		sqlDB.SetMaxIdleConns(10)
 		sqlDB.SetMaxOpenConns(100)
 
-		return db, nil
+		// Set global db with proper locking
+		dbMutex.Lock()
+		db = gormDB
+		dbMutex.Unlock()
+
+		return gormDB, nil
 	case "mysql", "mariadb":
 		dsn := fmt.Sprintf(
 			"%v:%v@tcp(%v:%v)/%v?charset=utf8mb4&parseTime=True&loc=Local",
@@ -270,12 +299,17 @@ func connect(config Config) (*gorm.DB, error) {
 		)
 
 		var err error
-		db, err = gorm.Open(mysql.Open(dsn), cfg)
+		gormDB, err := gorm.Open(mysql.Open(dsn), cfg)
 		if err != nil {
 			return nil, err
 		}
 
-		return db, nil
+		// Set global db with proper locking
+		dbMutex.Lock()
+		db = gormDB
+		dbMutex.Unlock()
+
+		return gormDB, nil
 	default:
 		return nil, apperror.NewErrorf("unsupported database driver: %v", config.Driver)
 	}
