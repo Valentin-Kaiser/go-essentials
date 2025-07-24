@@ -14,7 +14,6 @@ import (
 )
 
 func TestServerInstance(t *testing.T) {
-	t.Parallel()
 	server1 := web.Instance()
 	server2 := web.Instance()
 
@@ -24,7 +23,6 @@ func TestServerInstance(t *testing.T) {
 }
 
 func TestServerWithRedirect(t *testing.T) {
-	t.Parallel()
 	server := web.New()
 
 	// Setup TLS first
@@ -45,7 +43,6 @@ func TestServerWithRedirect(t *testing.T) {
 }
 
 func TestServerWithRedirectWithoutTLS(t *testing.T) {
-	t.Parallel()
 	server := web.New()
 	result := server.WithRedirectToHTTPS(8080)
 
@@ -59,7 +56,6 @@ func TestServerWithRedirectWithoutTLS(t *testing.T) {
 }
 
 func TestServerStartAsync(t *testing.T) {
-	t.Parallel()
 	server := web.New()
 	server.WithHost("localhost").WithPort(0) // Use any available port
 
@@ -88,7 +84,6 @@ func TestServerStartAsync(t *testing.T) {
 }
 
 func TestServerRestart(t *testing.T) {
-	t.Parallel()
 	server := web.New()
 	server.WithHost("localhost").WithPort(0)
 
@@ -113,7 +108,6 @@ func TestServerRestart(t *testing.T) {
 }
 
 func TestServerErrorHandling(t *testing.T) {
-	t.Parallel()
 	server := web.New()
 
 	// Simulate an error condition
@@ -133,7 +127,6 @@ func TestServerErrorHandling(t *testing.T) {
 }
 
 func TestServerMemoryUsage(t *testing.T) {
-	t.Parallel()
 	// Test that creating many servers doesn't cause memory leaks
 	for i := 0; i < 100; i++ {
 		server := web.New()

@@ -17,7 +17,6 @@ type TestUser struct {
 }
 
 func TestMemoryCache_BasicOperations(t *testing.T) {
-	t.Parallel()
 	c := cache.NewMemoryCache().
 		WithMaxSize(100).
 		WithDefaultTTL(time.Hour)
@@ -72,7 +71,6 @@ func TestMemoryCache_BasicOperations(t *testing.T) {
 }
 
 func TestMemoryCache_TTL(t *testing.T) {
-	t.Parallel()
 	c := cache.NewMemoryCache().
 		WithDefaultTTL(time.Millisecond * 100)
 
@@ -109,7 +107,6 @@ func TestMemoryCache_TTL(t *testing.T) {
 }
 
 func TestMemoryCache_LRUEviction(t *testing.T) {
-	t.Parallel()
 	c := cache.NewMemoryCache().
 		WithMaxSize(3).
 		WithLRUEviction(true)
@@ -161,7 +158,6 @@ func TestMemoryCache_LRUEviction(t *testing.T) {
 }
 
 func TestMemoryCache_MultiOperations(t *testing.T) {
-	t.Parallel()
 	c := cache.NewMemoryCache()
 	apperror.Catch(c.Close, "failed to close cache")
 
@@ -219,7 +215,6 @@ func TestMemoryCache_MultiOperations(t *testing.T) {
 }
 
 func TestMemoryCache_Stats(t *testing.T) {
-	t.Parallel()
 	c := cache.NewMemoryCache().
 		WithMaxSize(10)
 
@@ -282,7 +277,6 @@ func TestMemoryCache_Stats(t *testing.T) {
 }
 
 func TestMemoryCache_Events(t *testing.T) {
-	t.Parallel()
 	eventsChan := make(chan cache.Event, 10)
 
 	c := cache.NewMemoryCache().
@@ -343,7 +337,6 @@ func TestMemoryCache_Events(t *testing.T) {
 }
 
 func TestMemoryCache_Namespace(t *testing.T) {
-	t.Parallel()
 	config := cache.DefaultConfig()
 	config.Namespace = "test"
 
@@ -383,7 +376,6 @@ func TestMemoryCache_Namespace(t *testing.T) {
 }
 
 func TestMemoryCache_Clear(t *testing.T) {
-	t.Parallel()
 	c := cache.NewMemoryCache()
 	apperror.Catch(c.Close, "failed to close cache")
 
@@ -426,7 +418,6 @@ func TestMemoryCache_Clear(t *testing.T) {
 }
 
 func TestMemoryCache_TTLOperations(t *testing.T) {
-	t.Parallel()
 	c := cache.NewMemoryCache()
 	apperror.Catch(c.Close, "failed to close cache")
 
@@ -472,7 +463,6 @@ func TestMemoryCache_TTLOperations(t *testing.T) {
 }
 
 func TestJSONSerializer(t *testing.T) {
-	t.Parallel()
 	serializer := &cache.JSONSerializer{}
 
 	user := TestUser{ID: 1, Name: "John", Email: "john@example.com"}
@@ -496,7 +486,6 @@ func TestJSONSerializer(t *testing.T) {
 }
 
 func TestNoOpSerializer(t *testing.T) {
-	t.Parallel()
 	serializer := &cache.NoOpSerializer{}
 
 	// Test with []byte

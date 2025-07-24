@@ -10,7 +10,6 @@ import (
 )
 
 func TestNewError(t *testing.T) {
-	t.Parallel()
 	msg := "test error message"
 	err := apperror.NewError(msg)
 
@@ -28,7 +27,6 @@ func TestNewError(t *testing.T) {
 }
 
 func TestNewErrorf(t *testing.T) {
-	t.Parallel()
 	format := "test error with number %d and string %s"
 	err := apperror.NewErrorf(format, 42, "hello")
 
@@ -43,7 +41,6 @@ func TestNewErrorf(t *testing.T) {
 }
 
 func TestWrap(t *testing.T) {
-	t.Parallel()
 	// Test wrapping nil
 	wrapped := apperror.Wrap(nil)
 	if wrapped != nil {
@@ -80,7 +77,6 @@ func TestWrap(t *testing.T) {
 }
 
 func TestAddError(t *testing.T) {
-	t.Parallel()
 	err := apperror.NewError("main error")
 	additionalErr := errors.New("additional error")
 
@@ -96,7 +92,6 @@ func TestAddError(t *testing.T) {
 }
 
 func TestAddErrors(t *testing.T) {
-	t.Parallel()
 	err := apperror.NewError("main error")
 	additionalErrs := []error{
 		errors.New("error 1"),
@@ -118,7 +113,6 @@ func TestAddErrors(t *testing.T) {
 }
 
 func TestAddErrorWithAppError(t *testing.T) {
-	t.Parallel()
 	mainErr := apperror.NewError("main error")
 	appErr := apperror.NewError("app error").AddError(errors.New("nested error"))
 
@@ -131,7 +125,6 @@ func TestAddErrorWithAppError(t *testing.T) {
 }
 
 func TestErrorString(t *testing.T) {
-	// Not using t.Parallel() to avoid data race on global flag.Debug
 	// Save original debug state
 	originalDebug := flag.Debug
 	defer func() { flag.Debug = originalDebug }()
@@ -166,7 +159,6 @@ func TestErrorString(t *testing.T) {
 }
 
 func TestSplit(t *testing.T) {
-	t.Parallel()
 	// Test with standard error
 	standardErr := errors.New("standard error")
 	msg, trace, errs := apperror.Split(standardErr)
@@ -197,7 +189,6 @@ func TestSplit(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-	t.Parallel()
 	// Test simple parsing
 	err := apperror.Parse("simple error")
 	if err.Message != "simple error" {
@@ -213,7 +204,6 @@ func TestParse(t *testing.T) {
 }
 
 func TestWhere(t *testing.T) {
-	t.Parallel()
 	where := apperror.Where(2)
 	if where == "unknown" {
 		t.Error("Where should return caller information")
@@ -225,7 +215,6 @@ func TestWhere(t *testing.T) {
 
 // Test error formatting variables
 func TestErrorFormatting(t *testing.T) {
-	t.Parallel()
 	// Test that formatting variables exist and can be read
 	if apperror.TraceDelimiter == "" {
 		t.Error("TraceDelimiter should not be empty")
@@ -248,7 +237,6 @@ func TestErrorFormatting(t *testing.T) {
 }
 
 func TestErrorWithMultipleAdditionalErrors(t *testing.T) {
-	t.Parallel()
 	err := apperror.NewError("main error")
 	err = err.AddError(errors.New("error 1"))
 	err = err.AddError(errors.New("error 2"))
@@ -268,7 +256,6 @@ func TestErrorWithMultipleAdditionalErrors(t *testing.T) {
 }
 
 func TestErrorImplementsErrorInterface(t *testing.T) {
-	t.Parallel()
 	var err error = apperror.NewError("test error")
 
 	if err.Error() != "test error" {

@@ -13,7 +13,6 @@ import (
 )
 
 func TestTaskScheduler_RegisterIntervalTask(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler()
 
 	var executed int32
@@ -56,7 +55,6 @@ func TestTaskScheduler_RegisterIntervalTask(t *testing.T) {
 }
 
 func TestTaskScheduler_RegisterCronTask(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler()
 
 	var executed int32
@@ -104,7 +102,6 @@ func TestTaskScheduler_RegisterCronTask(t *testing.T) {
 }
 
 func TestTaskScheduler_StartStop(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler()
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second*5)
@@ -138,7 +135,6 @@ func TestTaskScheduler_StartStop(t *testing.T) {
 }
 
 func TestTaskScheduler_IntervalTaskExecution(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler().WithCheckInterval(time.Millisecond * 100)
 
 	var executed int32
@@ -192,7 +188,6 @@ func TestTaskScheduler_IntervalTaskExecution(t *testing.T) {
 }
 
 func TestTaskScheduler_TaskRetry(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler().
 		WithCheckInterval(time.Millisecond * 50).
 		WithRetryDelay(time.Millisecond * 50)
@@ -263,7 +258,6 @@ func TestTaskScheduler_TaskRetry(t *testing.T) {
 }
 
 func TestTaskScheduler_TaskFailure(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler().
 		WithCheckInterval(time.Millisecond * 50).
 		WithRetryDelay(time.Millisecond * 30)
@@ -321,7 +315,6 @@ func TestTaskScheduler_TaskFailure(t *testing.T) {
 }
 
 func TestTaskScheduler_EnableDisableTask(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler()
 
 	taskFunc := func(_ context.Context) error {
@@ -376,7 +369,6 @@ func TestTaskScheduler_EnableDisableTask(t *testing.T) {
 }
 
 func TestTaskScheduler_RemoveTask(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler()
 
 	taskFunc := func(_ context.Context) error {
@@ -408,7 +400,6 @@ func TestTaskScheduler_RemoveTask(t *testing.T) {
 }
 
 func TestTaskScheduler_GetTasks(t *testing.T) {
-	t.Parallel()
 	scheduler := queue.NewTaskScheduler()
 
 	taskFunc := func(_ context.Context) error {

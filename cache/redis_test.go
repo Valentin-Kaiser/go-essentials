@@ -45,8 +45,7 @@ func setupRedisTest(t *testing.T) *cache.RedisCache {
 	return c
 }
 
-func TestRedisCache_BasicOperations(t *testing.T) {
-	t.Parallel() // Run tests in parallel
+func TestRedisCache_BasicOperations(t *testing.T) { // Run tests in parallel
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -98,7 +97,6 @@ func TestRedisCache_BasicOperations(t *testing.T) {
 }
 
 func TestRedisCache_TTL(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -143,7 +141,6 @@ func TestRedisCache_TTL(t *testing.T) {
 }
 
 func TestRedisCache_MultiOperations(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -227,7 +224,6 @@ func TestRedisCache_MultiOperations(t *testing.T) {
 }
 
 func TestRedisCache_AtomicOperations(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -289,7 +285,6 @@ func TestRedisCache_AtomicOperations(t *testing.T) {
 }
 
 func TestRedisCache_Increment(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -324,7 +319,6 @@ func TestRedisCache_Increment(t *testing.T) {
 }
 
 func TestRedisCache_Keys(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -352,7 +346,6 @@ func TestRedisCache_Keys(t *testing.T) {
 }
 
 func TestRedisCache_Clear(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -399,7 +392,6 @@ func TestRedisCache_Clear(t *testing.T) {
 }
 
 func TestRedisCache_Pipeline(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -434,7 +426,6 @@ func TestRedisCache_Pipeline(t *testing.T) {
 }
 
 func TestRedisCache_Events(t *testing.T) {
-	t.Parallel()
 	eventsChan := make(chan cache.Event, 10)
 
 	c := setupRedisTest(t)
@@ -489,7 +480,6 @@ func TestRedisCache_Events(t *testing.T) {
 }
 
 func TestRedisCache_TTLOperations(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 
@@ -535,7 +525,6 @@ func TestRedisCache_TTLOperations(t *testing.T) {
 }
 
 func TestRedisCache_Stats(t *testing.T) {
-	t.Parallel()
 	c := setupRedisTest(t)
 	defer apperror.Catch(c.Close, "Failed to close Redis cache")
 

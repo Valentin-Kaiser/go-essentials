@@ -9,7 +9,6 @@ import (
 )
 
 func TestAesCipherEncryptDecrypt(t *testing.T) {
-	t.Parallel()
 	testCases := []struct {
 		name      string
 		plaintext string
@@ -26,7 +25,6 @@ func TestAesCipherEncryptDecrypt(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
 			// Generate a key of the specified size
 			key := make([]byte, tc.keySize)
 			copy(key, "testkeyfortesting123456789012345")
@@ -67,7 +65,6 @@ func TestAesCipherEncryptDecrypt(t *testing.T) {
 }
 
 func TestAesCipherEncryptWithoutPassphrase(t *testing.T) {
-	t.Parallel()
 	cipher := security.NewAesCipher()
 	var output bytes.Buffer
 	cipher.Encrypt("test", &output)
@@ -78,7 +75,6 @@ func TestAesCipherEncryptWithoutPassphrase(t *testing.T) {
 }
 
 func TestAesCipherDecryptWithoutPassphrase(t *testing.T) {
-	t.Parallel()
 	cipher := security.NewAesCipher()
 	var output bytes.Buffer
 	cipher.Decrypt("test", &output)
@@ -89,7 +85,6 @@ func TestAesCipherDecryptWithoutPassphrase(t *testing.T) {
 }
 
 func TestAesCipherDecryptInvalidBase64(t *testing.T) {
-	t.Parallel()
 	cipher := security.NewAesCipher().WithAES256()
 	var output bytes.Buffer
 	cipher.Decrypt("invalid base64 !!!", &output)
@@ -100,7 +95,6 @@ func TestAesCipherDecryptInvalidBase64(t *testing.T) {
 }
 
 func TestAesCipherDecryptTooShort(t *testing.T) {
-	t.Parallel()
 	cipher := security.NewAesCipher().WithAES256()
 	var output bytes.Buffer
 	cipher.Decrypt("dGVzdA==", &output) // "test" in base64, too short for nonce
@@ -111,7 +105,6 @@ func TestAesCipherDecryptTooShort(t *testing.T) {
 }
 
 func TestAesCipherDecryptWrongKey(t *testing.T) {
-	t.Parallel()
 	// Encrypt with one key
 	key1 := make([]byte, 32)
 	copy(key1, "key1key1key1key1key1key1key1key1")
@@ -138,7 +131,6 @@ func TestAesCipherDecryptWrongKey(t *testing.T) {
 }
 
 func TestAesCipherChaining(t *testing.T) {
-	t.Parallel()
 	// Test method chaining
 	cipher := security.NewAesCipher().WithAES256()
 
@@ -160,7 +152,6 @@ func TestAesCipherChaining(t *testing.T) {
 }
 
 func TestAesCipherErrorPropagation(t *testing.T) {
-	t.Parallel()
 	// Start with error condition
 	cipher := security.NewAesCipher()
 	cipher.Error = errors.New("initial error") // Set an error

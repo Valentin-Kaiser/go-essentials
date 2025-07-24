@@ -11,7 +11,6 @@ import (
 )
 
 func TestRabbitMQQueue(t *testing.T) {
-	t.Parallel()
 	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_queue",
@@ -36,7 +35,6 @@ func TestRabbitMQQueue(t *testing.T) {
 	ctx := t.Context()
 
 	t.Run("BasicEnqueueDequeue", func(t *testing.T) {
-		t.Parallel()
 		job := queue.NewJob("test-job").
 			WithID("test-1").
 			WithPayload(map[string]interface{}{"message": "hello world"}).
@@ -79,7 +77,6 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("ScheduledJobs", func(t *testing.T) {
-		t.Parallel()
 		job := queue.NewJob("scheduled-job").
 			WithID("scheduled-1").
 			WithDelay(time.Millisecond * 200).
@@ -109,7 +106,6 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("PriorityJobs", func(t *testing.T) {
-		t.Parallel()
 		lowJob := queue.NewJob("low-job").
 			WithID("low-1").
 			WithPriority(queue.PriorityLow).
@@ -165,7 +161,6 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("JobOperations", func(t *testing.T) {
-		t.Parallel()
 		job := queue.NewJob("test-ops").
 			WithID("ops-1").
 			WithPayload(map[string]interface{}{"operation": "test"}).
@@ -223,7 +218,6 @@ func TestRabbitMQQueue(t *testing.T) {
 	})
 
 	t.Run("Connection", func(t *testing.T) {
-		t.Parallel()
 		if !q.IsConnectionOpen() {
 			t.Error("Expected connection to be open")
 		}
@@ -245,7 +239,6 @@ func TestRabbitMQQueue(t *testing.T) {
 }
 
 func TestRabbitMQReconnection(t *testing.T) {
-	t.Parallel()
 	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_reconnect",
@@ -272,7 +265,6 @@ func TestRabbitMQReconnection(t *testing.T) {
 }
 
 func TestRabbitMQWithClosedConnection(t *testing.T) {
-	t.Parallel()
 	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_closed",

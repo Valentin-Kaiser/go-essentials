@@ -11,7 +11,6 @@ import (
 )
 
 func TestConfig_Validate(t *testing.T) {
-	t.Parallel()
 	testCases := []struct {
 		name   string
 		config database.Config
@@ -132,7 +131,7 @@ func TestConfig_Validate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+
 			err := tc.config.Validate()
 			if tc.valid && err != nil {
 				t.Errorf("Expected valid config, got error: %v", err)
@@ -145,7 +144,6 @@ func TestConfig_Validate(t *testing.T) {
 }
 
 func TestConnected(t *testing.T) {
-	t.Parallel()
 	// Test that we can call the function without panic
 	// Note: We don't test the initial state since other tests may have connected
 	result := database.Connected()
@@ -157,7 +155,6 @@ func TestConnected(t *testing.T) {
 }
 
 func TestExecuteWithoutConnection(t *testing.T) {
-	t.Parallel()
 	// Ensure we're in a disconnected state for this test
 	// Only disconnect if currently connected to avoid hanging
 	if database.Connected() {
@@ -176,7 +173,6 @@ func TestExecuteWithoutConnection(t *testing.T) {
 }
 
 func TestReconnect(t *testing.T) {
-	t.Parallel()
 	// Test that Reconnect doesn't panic
 	database.Reconnect()
 
@@ -187,9 +183,19 @@ func TestReconnect(t *testing.T) {
 }
 
 func TestAwaitConnectionTimeout(t *testing.T) {
-	t.Parallel()
+	// Ensure we start in a disconnected state for this test
+	if database.Connected() {
+		database.Disconnect()
+		time.Sleep(200 * time.Millisecond) // Wait for disconnection
+	}
+
+	// Verify we're actually disconnected
+	if database.Connected() {
+		t.Skip("Cannot test AwaitConnection timeout - database is still connected")
+	}
+
 	// Test AwaitConnection with timeout to avoid hanging
-	done := make(chan bool)
+	done := make(chan bool, 1)
 
 	go func() {
 		// This should block since we're not connected
@@ -202,11 +208,12 @@ func TestAwaitConnectionTimeout(t *testing.T) {
 		t.Error("AwaitConnection should have blocked when not connected")
 	case <-time.After(100 * time.Millisecond):
 		// Expected behavior - AwaitConnection should block
+		// Note: The goroutine will continue running, but that's expected
+		// since AwaitConnection is designed to block until connected
 	}
 }
 
 func TestConnectWithInvalidConfig(t *testing.T) {
-	// Not using t.Parallel() to avoid conflicts with other connection tests
 	// Test Connect with invalid config
 	config := database.Config{
 		Driver: "invalid-driver",
@@ -228,7 +235,6 @@ func TestConnectWithInvalidConfig(t *testing.T) {
 }
 
 func TestConnectWithSQLiteConfig(t *testing.T) {
-	// Not using t.Parallel() to avoid conflicts with other connection tests
 	// Test Connect with SQLite config (should work without external database)
 	config := database.Config{
 		Driver: "sqlite",
@@ -266,7 +272,6 @@ func TestConnectWithSQLiteConfig(t *testing.T) {
 }
 
 func TestRegisterSchema(t *testing.T) {
-	t.Parallel()
 	// Test schema registration
 	type TestModel struct {
 		ID   uint   `gorm:"primaryKey"`
@@ -286,7 +291,6 @@ func TestRegisterSchema(t *testing.T) {
 }
 
 func TestRegisterMigrationStep(t *testing.T) {
-	t.Parallel()
 	// Test migration step registration
 	v1 := version.Release{
 		GitTag:    "v1.0.0",
@@ -312,7 +316,6 @@ func TestRegisterMigrationStep(t *testing.T) {
 }
 
 func TestRegisterOnConnectHandler(t *testing.T) {
-	t.Parallel()
 	// Test OnConnect handler registration
 	var handlerCalled bool
 
@@ -333,7 +336,6 @@ func TestRegisterOnConnectHandler(t *testing.T) {
 }
 
 func TestDisconnectWithoutConnection(t *testing.T) {
-	// Not using t.Parallel() to avoid conflicts with other connection tests
 	// Test Disconnect when not connected
 	// The Disconnect function works by sending a signal through a channel
 	// Even when not connected, it should still handle the disconnect signal
@@ -356,7 +358,6 @@ func TestDisconnectWithoutConnection(t *testing.T) {
 }
 
 func TestConfigStruct(t *testing.T) {
-	t.Parallel()
 	// Test that Config struct has proper fields
 	config := database.Config{
 		Driver:   "mysql",
@@ -393,7 +394,6 @@ func TestConfigStruct(t *testing.T) {
 }
 
 func TestConfigImplementsInterface(t *testing.T) {
-	t.Parallel()
 	// Test that Config implements the config.Config interface
 	var cfg database.Config
 	err := cfg.Validate()

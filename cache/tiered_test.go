@@ -57,7 +57,6 @@ func setupTieredTest(t *testing.T) *cache.TieredCache {
 }
 
 func TestTieredCache_BasicOperations(t *testing.T) {
-	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
@@ -134,7 +133,6 @@ func TestTieredCache_BasicOperations(t *testing.T) {
 }
 
 func TestTieredCache_L1Eviction(t *testing.T) {
-	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
@@ -183,7 +181,6 @@ func TestTieredCache_L1Eviction(t *testing.T) {
 }
 
 func TestTieredCache_L2Backfill(t *testing.T) {
-	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
@@ -239,7 +236,6 @@ func TestTieredCache_L2Backfill(t *testing.T) {
 }
 
 func TestTieredCache_TTL(t *testing.T) {
-	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
@@ -262,7 +258,6 @@ func TestTieredCache_TTL(t *testing.T) {
 }
 
 func TestTieredCache_TTLPropagation(t *testing.T) {
-	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
@@ -305,7 +300,6 @@ func TestTieredCache_TTLPropagation(t *testing.T) {
 }
 
 func TestTieredCache_MultiOperations(t *testing.T) {
-	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
@@ -379,7 +373,6 @@ func TestTieredCache_MultiOperations(t *testing.T) {
 }
 
 func TestTieredCache_Clear(t *testing.T) {
-	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 
@@ -423,7 +416,6 @@ func TestTieredCache_Clear(t *testing.T) {
 }
 
 func TestTieredCache_Events(t *testing.T) {
-	t.Parallel()
 	eventsChan := make(chan cache.Event, 20)
 
 	c := setupTieredTest(t)
@@ -488,7 +480,6 @@ eventLoop:
 }
 
 func TestTieredCache_Stats(t *testing.T) {
-	t.Parallel()
 	c := setupTieredTest(t)
 	defer apperror.Catch(c.Close, "failed to close cache")
 

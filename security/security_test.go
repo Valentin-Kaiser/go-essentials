@@ -14,7 +14,6 @@ import (
 )
 
 func TestGetRandomBytes(t *testing.T) {
-	t.Parallel()
 	testCases := []uint{1, 16, 32, 64, 128}
 
 	for _, size := range testCases {
@@ -43,7 +42,6 @@ func TestGetRandomBytes(t *testing.T) {
 }
 
 func TestGetRandomBytesZero(t *testing.T) {
-	t.Parallel()
 	bytes, err := security.GetRandomBytes(0)
 	if err != nil {
 		t.Errorf("GetRandomBytes(0) returned error: %v", err)
@@ -54,7 +52,6 @@ func TestGetRandomBytesZero(t *testing.T) {
 }
 
 func TestSHA256(t *testing.T) {
-	t.Parallel()
 	testCases := []struct {
 		input    string
 		expected string
@@ -74,7 +71,6 @@ func TestSHA256(t *testing.T) {
 }
 
 func TestXX(t *testing.T) {
-	t.Parallel()
 	testCases := []struct {
 		input string
 	}{
@@ -95,7 +91,6 @@ func TestXX(t *testing.T) {
 }
 
 func TestMd5(t *testing.T) {
-	t.Parallel()
 	testCases := []struct {
 		input    interface{}
 		expected string
@@ -116,7 +111,6 @@ func TestMd5(t *testing.T) {
 }
 
 func TestStringToKey32Bytes(t *testing.T) {
-	t.Parallel()
 	testCases := []string{
 		"",
 		"password",
@@ -139,7 +133,6 @@ func TestStringToKey32Bytes(t *testing.T) {
 }
 
 func TestStringToKey32(t *testing.T) {
-	t.Parallel()
 	testCases := []string{
 		"",
 		"password",
@@ -170,7 +163,6 @@ func TestStringToKey32(t *testing.T) {
 }
 
 func TestGetRandomBytesBase64(t *testing.T) {
-	t.Parallel()
 	testCases := []uint{1, 16, 32, 64}
 
 	for _, size := range testCases {
@@ -199,7 +191,6 @@ func TestGetRandomBytesBase64(t *testing.T) {
 }
 
 func TestGenerateRandomPassword(t *testing.T) {
-	t.Parallel()
 	testCases := []int{1, 8, 16, 32, 64}
 
 	for _, length := range testCases {
@@ -225,7 +216,6 @@ func TestGenerateRandomPassword(t *testing.T) {
 }
 
 func TestGenerateRandomPasswordZero(t *testing.T) {
-	t.Parallel()
 	password, err := security.GenerateRandomPassword(0)
 	if err != nil {
 		t.Errorf("GenerateRandomPassword(0) returned error: %v", err)
@@ -236,7 +226,6 @@ func TestGenerateRandomPasswordZero(t *testing.T) {
 }
 
 func TestReadOrSavePassphrase(t *testing.T) {
-	t.Parallel()
 	// Create a temporary directory for test
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "test_passphrase.txt")
@@ -273,7 +262,6 @@ func TestReadOrSavePassphrase(t *testing.T) {
 }
 
 func TestReadOrSavePassphraseTooShort(t *testing.T) {
-	t.Parallel()
 	// Create a temporary file with short content
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "short_passphrase.txt")
@@ -291,7 +279,6 @@ func TestReadOrSavePassphraseTooShort(t *testing.T) {
 }
 
 func TestReadOrSavePassphraseFilePermissions(t *testing.T) {
-	t.Parallel()
 	// Create a temporary directory for test
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "perm_test.txt")
@@ -317,7 +304,6 @@ func TestReadOrSavePassphraseFilePermissions(t *testing.T) {
 }
 
 func TestStringToKey32BytesEdgeCases(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		input string
@@ -331,7 +317,6 @@ func TestStringToKey32BytesEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := security.StringToKey32Bytes(tt.input)
 			if len(result) != 32 {
 				t.Errorf("StringToKey32Bytes() returned %d bytes, expected 32", len(result))
@@ -347,7 +332,6 @@ func TestStringToKey32BytesEdgeCases(t *testing.T) {
 }
 
 func TestStringToKey32EdgeCases(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		input string
@@ -360,7 +344,6 @@ func TestStringToKey32EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := security.StringToKey32(tt.input)
 			if len(result) != 32 {
 				t.Errorf("StringToKey32() returned %d characters, expected 32", len(result))
@@ -376,7 +359,6 @@ func TestStringToKey32EdgeCases(t *testing.T) {
 }
 
 func TestSHA256EdgeCases(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		input []byte
@@ -390,7 +372,6 @@ func TestSHA256EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := security.SHA256(tt.input)
 			if len(result) != 64 { // SHA256 hex string is 64 characters
 				t.Errorf("SHA256() returned %d characters, expected 64", len(result))
@@ -406,7 +387,6 @@ func TestSHA256EdgeCases(t *testing.T) {
 }
 
 func TestXXHashEdgeCases(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		input []byte
@@ -419,7 +399,6 @@ func TestXXHashEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := security.XX(tt.input)
 
 			// Test consistency
@@ -432,7 +411,6 @@ func TestXXHashEdgeCases(t *testing.T) {
 }
 
 func TestMd5EdgeCases(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name  string
 		input interface{}
@@ -448,7 +426,6 @@ func TestMd5EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result := security.Md5(tt.input)
 			if len(result) != 32 { // MD5 hex string is 32 characters
 				t.Errorf("Md5() returned %d characters, expected 32", len(result))
@@ -464,7 +441,6 @@ func TestMd5EdgeCases(t *testing.T) {
 }
 
 func TestGenerateRandomPasswordEdgeCases(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name   string
 		length int
@@ -479,7 +455,6 @@ func TestGenerateRandomPasswordEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			result, err := security.GenerateRandomPassword(tt.length)
 
 			if tt.valid {
@@ -500,7 +475,6 @@ func TestGenerateRandomPasswordEdgeCases(t *testing.T) {
 }
 
 func TestReadOrSavePassphraseFileOperations(t *testing.T) {
-	t.Parallel()
 	tempDir := t.TempDir()
 
 	tests := []struct {
@@ -563,7 +537,6 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			filePath := filepath.Join(tempDir, tt.filename)
 
 			if tt.setup != nil {
@@ -601,7 +574,6 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 	// Separate Windows-specific permission test using a different approach
 	if runtime.GOOS == "windows" {
 		t.Run("windows permission test - invalid path", func(t *testing.T) {
-			t.Parallel()
 			// On Windows, test with an invalid path that should cause an error
 			invalidPath := filepath.Join("Z:\\nonexistent\\path\\that\\should\\not\\exist", "passphrase.txt")
 			_, err := security.ReadOrSavePassphrase(invalidPath, 16)
@@ -613,7 +585,6 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 }
 
 func TestPGPCipherWithoutKeysOrPassphrase(t *testing.T) {
-	t.Parallel()
 	cipher := security.NewPGPCipher(nil)
 	var buf bytes.Buffer
 
@@ -634,7 +605,6 @@ func TestPGPCipherWithoutKeysOrPassphrase(t *testing.T) {
 
 // Test TLS functions
 func TestNewTLSConfig(t *testing.T) {
-	t.Parallel()
 	// Generate a self-signed certificate for testing
 	subject := pkix.Name{
 		Organization:  []string{"Test"},
@@ -675,7 +645,6 @@ func TestNewTLSConfig(t *testing.T) {
 }
 
 func TestGenerateSelfSignedCertificate(t *testing.T) {
-	t.Parallel()
 	subject := pkix.Name{
 		Organization:  []string{"Test Org"},
 		Country:       []string{"US"},
@@ -715,7 +684,6 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 }
 
 func TestValidateCertificate(t *testing.T) {
-	t.Parallel()
 	// Test with empty certificate
 	emptyCert := tls.Certificate{}
 	err := security.ValidateCertificate(emptyCert)
@@ -737,7 +705,6 @@ func TestValidateCertificate(t *testing.T) {
 }
 
 func TestIsCertificateExpired(t *testing.T) {
-	t.Parallel()
 	// Test with empty certificate
 	emptyCert := tls.Certificate{}
 	_, err := security.IsCertificateExpired(emptyCert)
@@ -762,7 +729,6 @@ func TestIsCertificateExpired(t *testing.T) {
 }
 
 func TestLoadCertAndConfig(t *testing.T) {
-	t.Parallel()
 	// This test will fail because we don't have actual cert files
 	// but it tests the error handling path
 	_, err := security.LoadCertAndConfig("nonexistent.crt", "nonexistent.key", "nonexistent.ca", tls.NoClientCert)
@@ -772,7 +738,6 @@ func TestLoadCertAndConfig(t *testing.T) {
 }
 
 func TestLoadCertificate(t *testing.T) {
-	t.Parallel()
 	// Test with nonexistent files
 	_, err := security.LoadCertificate("nonexistent.crt", "nonexistent.key")
 	if err == nil {
@@ -781,7 +746,6 @@ func TestLoadCertificate(t *testing.T) {
 }
 
 func TestLoadCACertPool(t *testing.T) {
-	t.Parallel()
 	// Test with nonexistent file
 	_, err := security.LoadCACertPool("nonexistent.ca")
 	if err == nil {

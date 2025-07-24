@@ -14,7 +14,6 @@ import (
 )
 
 func TestNewJob(t *testing.T) {
-	t.Parallel()
 	builder := queue.NewJob("test-job")
 	job := builder.Build()
 	if job.Type != "test-job" {
@@ -31,7 +30,6 @@ func TestNewJob(t *testing.T) {
 }
 
 func TestJobBuilder(t *testing.T) {
-	t.Parallel()
 	payload := map[string]interface{}{
 		"email": "test@example.com",
 		"name":  "Test User",
@@ -82,7 +80,6 @@ func TestJobBuilder(t *testing.T) {
 }
 
 func TestJobBuilderWithPayloadJSON(t *testing.T) {
-	t.Parallel()
 	jsonData := []byte(`{"email": "test@example.com", "count": 42}`)
 
 	job := queue.NewJob("email").
@@ -105,7 +102,6 @@ func TestJobBuilderWithPayloadJSON(t *testing.T) {
 }
 
 func TestJobStatus(t *testing.T) {
-	t.Parallel()
 	job := &queue.Job{
 		Status:      queue.StatusPending,
 		MaxAttempts: 3,
@@ -134,7 +130,6 @@ func TestJobStatus(t *testing.T) {
 }
 
 func TestPriorityString(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		priority queue.Priority
 		expected string
@@ -154,7 +149,6 @@ func TestPriorityString(t *testing.T) {
 }
 
 func TestStatusString(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		status   queue.Status
 		expected string
@@ -177,7 +171,6 @@ func TestStatusString(t *testing.T) {
 }
 
 func TestMemoryQueue(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	q := queue.NewMemoryQueue()
 
@@ -253,7 +246,6 @@ func TestMemoryQueue(t *testing.T) {
 }
 
 func TestMemoryQueueScheduled(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	q := queue.NewMemoryQueue()
 
@@ -295,7 +287,6 @@ func TestMemoryQueueScheduled(t *testing.T) {
 }
 
 func TestMemoryQueuePriority(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	q := queue.NewMemoryQueue()
 
@@ -334,7 +325,6 @@ func TestMemoryQueuePriority(t *testing.T) {
 }
 
 func TestManager(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	manager := queue.NewManager().
 		WithWorkers(2).
@@ -397,7 +387,6 @@ func TestManager(t *testing.T) {
 }
 
 func TestManagerRetry(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	manager := queue.NewManager().
 		WithWorkers(1).
@@ -461,7 +450,6 @@ func TestManagerRetry(t *testing.T) {
 }
 
 func TestManagerScheduled(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	manager := queue.NewManager().
 		WithWorkers(1).
@@ -524,7 +512,6 @@ func TestManagerScheduled(t *testing.T) {
 }
 
 func TestBatchManager(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	manager := queue.NewManager().WithWorkers(2)
 
@@ -599,7 +586,6 @@ func TestBatchManager(t *testing.T) {
 }
 
 func TestMiddleware(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	job := queue.NewJob("test").WithID("middleware-test").Build()
 
@@ -657,7 +643,6 @@ func TestMiddleware(t *testing.T) {
 }
 
 func TestJobContext(t *testing.T) {
-	t.Parallel()
 	ctx := t.Context()
 	job := queue.NewJob("test").
 		WithPayload(map[string]interface{}{
@@ -698,7 +683,6 @@ func TestJobContext(t *testing.T) {
 }
 
 func TestRetryableError(t *testing.T) {
-	t.Parallel()
 	err := queue.NewRetryableError(errors.New("test error"))
 
 	if err.Error() != "test error" {
