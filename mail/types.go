@@ -4,6 +4,7 @@ import (
 	"context"
 	"html/template"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"time"
 )
@@ -277,6 +278,12 @@ type TemplateManager interface {
 
 	// ReloadTemplates reloads all templates
 	ReloadTemplates() error
+
+	// WithFS configures the template manager to load templates from a filesystem
+	WithFS(filesystem fs.FS) TemplateManager
+
+	// WithFileServer configures the template manager to load templates from a file path
+	WithFileServer(templatesPath string) TemplateManager
 }
 
 // Sender is the interface for sending emails

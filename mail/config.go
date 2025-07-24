@@ -2,6 +2,7 @@ package mail
 
 import (
 	"crypto/tls"
+	"io/fs"
 	"time"
 )
 
@@ -133,14 +134,17 @@ type QueueConfig struct {
 
 // TemplateConfig holds the template configuration
 type TemplateConfig struct {
-	// TemplatesPath is the path to custom email templates
-	TemplatesPath string `yaml:"templates_path" json:"templates_path"`
-
 	// DefaultTemplate is the name of the default template
 	DefaultTemplate string `yaml:"default_template" json:"default_template"`
 
 	// AutoReload indicates if templates should be reloaded on change
 	AutoReload bool `yaml:"auto_reload" json:"auto_reload"`
+
+	// FileSystem for loading templates (internal use - not serializable)
+	FileSystem fs.FS `yaml:"-" json:"-"`
+
+	// TemplatesPath is the path to custom email templates (used with WithFileServer)
+	TemplatesPath string `yaml:"templates_path" json:"templates_path"`
 }
 
 // DefaultConfig returns a default configuration
@@ -181,7 +185,6 @@ func DefaultConfig() *Config {
 			JobTimeout:  60 * time.Second,
 		},
 		Templates: TemplateConfig{
-			TemplatesPath:   "templates",
 			DefaultTemplate: "default.html",
 			AutoReload:      true,
 		},

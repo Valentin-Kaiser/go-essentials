@@ -2,6 +2,9 @@ package mail
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,17 +55,78 @@ func TestMessageBuilder(t *testing.T) {
 
 func TestTemplateManager(t *testing.T) {
 	config := TemplateConfig{
-		TemplatesPath:   "",
 		DefaultTemplate: "default.html",
 		AutoReload:      true,
 	}
 
 	tm := NewTemplateManager(config)
 
-	// Test loading embedded template
-	template, err := tm.LoadTemplate("default.html")
+	// Test that template manager is created
+	if tm == nil {
+		t.Error("Expected template manager to be created, got nil")
+	}
+
+	// Test loading template without any configured source should fail
+	_, err := tm.LoadTemplate("default.html")
+	if err == nil {
+		t.Error("Expected error when loading template without configured source")
+	}
+
+	// Test WithFS method exists
+	if tm.WithFS(nil) == nil {
+		t.Error("Expected WithFS to return template manager")
+	}
+
+	// Test WithFileServer method exists
+	if tm.WithFileServer("") == nil {
+		t.Error("Expected WithFileServer to return template manager")
+	}
+}
+
+// TestTemplateManagerWithFS tests the template manager with filesystem
+func TestTemplateManagerWithFS(t *testing.T) {
+	config := TemplateConfig{
+		DefaultTemplate: "test.html",
+		AutoReload:      true,
+	}
+
+	tm := NewTemplateManager(config)
+
+	// Test that WithFS method works (we can't test with real filesystem without test data)
+	result := tm.WithFS(nil)
+	if result != tm {
+		t.Error("Expected WithFS to return same template manager instance")
+	}
+} // TestTemplateManagerWithFileServer tests the template manager with file server
+func TestTemplateManagerWithFileServer(t *testing.T) {
+	// Create a temporary directory with a test template
+	tempDir, err := os.MkdirTemp("", "mail_templates_test")
 	if err != nil {
-		t.Errorf("Failed to load default template: %v", err)
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a test template file
+	templateContent := `<html><body><h1>{{.Subject}}</h1><p>{{.Message}}</p></body></html>`
+	templatePath := filepath.Join(tempDir, "test.html")
+	if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+		t.Fatalf("Failed to write test template: %v", err)
+	}
+
+	config := TemplateConfig{
+		DefaultTemplate: "test.html",
+		AutoReload:      true,
+	}
+
+	tm := NewTemplateManager(config)
+
+	// Configure with file server
+	tm.WithFileServer(tempDir)
+
+	// Test loading template
+	template, err := tm.LoadTemplate("test.html")
+	if err != nil {
+		t.Errorf("Failed to load template from file server: %v", err)
 	}
 
 	if template == nil {
@@ -75,13 +139,22 @@ func TestTemplateManager(t *testing.T) {
 		"Message": "Test message content",
 	}
 
-	rendered, err := tm.RenderTemplate("default.html", data)
+	rendered, err := tm.RenderTemplate("test.html", data)
 	if err != nil {
 		t.Errorf("Failed to render template: %v", err)
 	}
 
 	if rendered == "" {
 		t.Error("Expected rendered template to have content")
+	}
+
+	// Check that the rendered content contains our data
+	if !strings.Contains(rendered, "Test Subject") {
+		t.Error("Expected rendered template to contain subject")
+	}
+
+	if !strings.Contains(rendered, "Test message content") {
+		t.Error("Expected rendered template to contain message")
 	}
 }
 
@@ -211,5 +284,31 @@ func BenchmarkTemplateRendering(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = tm.RenderTemplate("default.html", data)
+	}
+}
+
+// TestManagerTemplateConfiguration tests the manager's template configuration methods
+func TestManagerTemplateConfiguration(t *testing.T) {
+	config := DefaultConfig()
+	queueManager := queue.NewManager()
+
+	manager := NewManager(config, queueManager)
+
+	// Test WithFileServer method
+	result := manager.WithFileServer("/tmp")
+	if result != manager {
+		t.Error("Expected WithFileServer to return same manager instance")
+	}
+
+	// Test WithFS method
+	result = manager.WithFS(nil)
+	if result != manager {
+		t.Error("Expected WithFS to return same manager instance")
+	}
+
+	// Test GetTemplateManager method
+	tm := manager.GetTemplateManager()
+	if tm == nil {
+		t.Error("Expected GetTemplateManager to return template manager")
 	}
 }

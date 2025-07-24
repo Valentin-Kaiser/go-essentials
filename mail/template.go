@@ -2,9 +2,9 @@ package mail
 
 import (
 	"bytes"
-	"embed"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,11 +12,6 @@ import (
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/rs/zerolog/log"
-)
-
-var (
-	//go:embed template
-	embeddedTemplates embed.FS
 )
 
 // templateManager implements the TemplateManager interface
@@ -33,11 +28,46 @@ func NewTemplateManager(config TemplateConfig) TemplateManager {
 		templates: make(map[string]*template.Template),
 	}
 
-	// Load templates on initialization
-	if err := tm.ReloadTemplates(); err != nil {
-		log.Error().Err(err).Msg("[Mail] Failed to load templates during initialization")
+	// Load templates on initialization if filesystem is configured
+	if config.FileSystem != nil || config.TemplatesPath != "" {
+		if err := tm.ReloadTemplates(); err != nil {
+			log.Error().Err(err).Msg("[Mail] Failed to load templates during initialization")
+		}
 	}
 
+	return tm
+}
+
+// WithFS configures the template manager to load templates from a filesystem
+func (tm *templateManager) WithFS(filesystem fs.FS) TemplateManager {
+	tm.config.FileSystem = filesystem
+	tm.config.TemplatesPath = ""
+	
+	// Reload templates from the new filesystem
+	if err := tm.ReloadTemplates(); err != nil {
+		log.Error().Err(err).Msg("[Mail] Failed to load templates from filesystem")
+	}
+	
+	return tm
+}
+
+// WithFileServer configures the template manager to load templates from a file path
+func (tm *templateManager) WithFileServer(templatesPath string) TemplateManager {
+	if templatesPath != "" {
+		if _, err := os.Stat(templatesPath); os.IsNotExist(err) {
+			log.Error().Err(err).Str("path", templatesPath).Msg("[Mail] Templates path does not exist")
+			return tm
+		}
+	}
+	
+	tm.config.TemplatesPath = templatesPath
+	tm.config.FileSystem = nil
+	
+	// Reload templates from the new path
+	if err := tm.ReloadTemplates(); err != nil {
+		log.Error().Err(err).Msg("[Mail] Failed to load templates from file path")
+	}
+	
 	return tm
 }
 
@@ -78,20 +108,55 @@ func (tm *templateManager) ReloadTemplates() error {
 	// Clear existing templates
 	tm.templates = make(map[string]*template.Template)
 
-	// Load templates from custom path if specified
-	if tm.config.TemplatesPath != "" {
+	// Load templates from filesystem if configured
+	if tm.config.FileSystem != nil {
+		if err := tm.loadTemplatesFromFS(tm.config.FileSystem); err != nil {
+			return apperror.Wrap(err)
+		}
+	} else if tm.config.TemplatesPath != "" {
+		// Load templates from file path
 		if err := tm.loadTemplatesFromPath(tm.config.TemplatesPath); err != nil {
-			log.Warn().Err(err).Str("path", tm.config.TemplatesPath).Msg("[Mail] Failed to load custom templates, falling back to embedded")
+			return apperror.Wrap(err)
 		}
 	}
 
-	// Load embedded templates
-	if err := tm.loadEmbeddedTemplates(); err != nil {
-		return apperror.Wrap(err)
+	if len(tm.templates) > 0 {
+		log.Info().Int("count", len(tm.templates)).Msg("[Mail] Templates loaded successfully")
+	} else {
+		log.Warn().Msg("[Mail] No templates loaded - templates will be unavailable")
 	}
-
-	log.Info().Int("count", len(tm.templates)).Msg("[Mail] Templates loaded successfully")
+	
 	return nil
+}
+
+// loadTemplatesFromFS loads templates from a filesystem
+func (tm *templateManager) loadTemplatesFromFS(filesystem fs.FS) error {
+	return fs.WalkDir(filesystem, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() || !strings.HasSuffix(path, ".html") {
+			return nil
+		}
+
+		// Read template content
+		content, err := fs.ReadFile(filesystem, path)
+		if err != nil {
+			return apperror.NewError("failed to read template file").AddError(err)
+		}
+
+		// Parse template
+		tmpl, err := tm.parseTemplate(path, string(content))
+		if err != nil {
+			return apperror.Wrap(err)
+		}
+
+		tm.templates[path] = tmpl
+		log.Debug().Str("template", path).Msg("[Mail] Loaded template from filesystem")
+
+		return nil
+	})
 }
 
 // loadTemplatesFromPath loads templates from the specified file path
@@ -134,66 +199,30 @@ func (tm *templateManager) loadTemplatesFromPath(templatesPath string) error {
 	})
 }
 
-// loadEmbeddedTemplates loads templates from embedded filesystem
-func (tm *templateManager) loadEmbeddedTemplates() error {
-	entries, err := embeddedTemplates.ReadDir("template")
-	if err != nil {
-		return apperror.NewError("failed to read embedded templates directory").AddError(err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".html") {
-			continue
-		}
-
-		// Skip if template already loaded from custom path
-		if _, exists := tm.templates[entry.Name()]; exists {
-			continue
-		}
-
-		// Read embedded template content using forward slash path (embed always uses forward slash)
-		content, err := embeddedTemplates.ReadFile("template/" + entry.Name())
-		if err != nil {
-			log.Warn().Err(err).Str("template", entry.Name()).Msg("[Mail] Failed to read embedded template")
-			continue
-		}
-
-		// Parse template
-		tmpl, err := tm.parseTemplate(entry.Name(), string(content))
-		if err != nil {
-			log.Warn().Err(err).Str("template", entry.Name()).Msg("[Mail] Failed to parse embedded template")
-			continue
-		}
-
-		tm.templates[entry.Name()] = tmpl
-		log.Debug().Str("template", entry.Name()).Msg("[Mail] Loaded embedded template")
-	}
-
-	return nil
-}
-
-// loadTemplateFromDisk loads a single template from disk
+// loadTemplateFromDisk loads a single template from the configured source
 func (tm *templateManager) loadTemplateFromDisk(name string) (*template.Template, error) {
 	var content []byte
 	var err error
 
-	// Try to load from custom path first
-	if tm.config.TemplatesPath != "" {
+	// Try to load from filesystem first
+	if tm.config.FileSystem != nil {
+		content, err = fs.ReadFile(tm.config.FileSystem, name)
+		if err != nil {
+			return nil, apperror.NewError("template not found in filesystem").AddError(err)
+		}
+	} else if tm.config.TemplatesPath != "" {
+		// Try to load from custom path
 		customPath := filepath.Join(tm.config.TemplatesPath, name)
 		if _, err := os.Stat(customPath); err == nil {
 			content, err = os.ReadFile(customPath)
 			if err != nil {
-				return nil, apperror.NewError("failed to read custom template").AddError(err)
+				return nil, apperror.NewError("failed to read template file").AddError(err)
 			}
+		} else {
+			return nil, apperror.NewError("template not found in templates path").AddError(err)
 		}
-	}
-
-	// Fall back to embedded template
-	if content == nil {
-		content, err = embeddedTemplates.ReadFile("template/" + name)
-		if err != nil {
-			return nil, apperror.NewError("template not found").AddError(err)
-		}
+	} else {
+		return nil, apperror.NewError("no template source configured - use WithFS or WithFileServer")
 	}
 
 	// Parse template

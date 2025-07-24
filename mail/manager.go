@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"encoding/json"
+	"io/fs"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -272,9 +273,17 @@ func (m *Manager) IsRunning() bool {
 	return atomic.LoadInt32(&m.running) == 1
 }
 
-// GetTemplateManager returns the template manager
-func (m *Manager) GetTemplateManager() TemplateManager {
-	return m.templateManager
+// SendTestEmail sends a test email
+func (m *Manager) SendTestEmail(ctx context.Context, to string) error {
+	testMessage := &Message{
+		From:    m.config.SMTP.From,
+		To:      []string{to},
+		Subject: "Test Email",
+		TextBody: "This is a test email from the mail manager.",
+		HTMLBody: "<p>This is a test email from the mail manager.</p>",
+	}
+
+	return m.Send(ctx, testMessage)
 }
 
 // handleMailJob handles queued mail jobs
@@ -471,4 +480,33 @@ func (m *Manager) jobDataToMessage(jobData map[string]interface{}) (*Message, er
 	}
 
 	return message, nil
+}
+
+// WithFS configures the template manager to load templates from a filesystem
+func (m *Manager) WithFS(filesystem fs.FS) *Manager {
+	if m.templateManager != nil {
+		m.templateManager.WithFS(filesystem)
+	}
+	return m
+}
+
+// WithFileServer configures the template manager to load templates from a file path
+func (m *Manager) WithFileServer(templatesPath string) *Manager {
+	if m.templateManager != nil {
+		m.templateManager.WithFileServer(templatesPath)
+	}
+	return m
+}
+
+// ReloadTemplates reloads all templates
+func (m *Manager) ReloadTemplates() error {
+	if m.templateManager != nil {
+		return m.templateManager.ReloadTemplates()
+	}
+	return apperror.NewError("template manager is not initialized")
+}
+
+// GetTemplateManager returns the template manager for advanced configuration
+func (m *Manager) GetTemplateManager() TemplateManager {
+	return m.templateManager
 }
