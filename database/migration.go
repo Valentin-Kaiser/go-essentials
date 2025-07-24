@@ -73,7 +73,7 @@ func setup(db *gorm.DB) error {
 func migrateSchema(db *gorm.DB) error {
 	schemaMutex.RLock()
 	defer schemaMutex.RUnlock()
-	
+
 	if len(schema) == 0 {
 		return nil
 	}

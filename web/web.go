@@ -183,7 +183,7 @@ func (s *Server) Start() *Server {
 			s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
 			server := s.server
 			s.mutex.Unlock()
-			
+
 			log.Info().Msgf("[Web] listening on https at %s", server.Addr)
 
 			err := server.ListenAndServeTLS("", "")
@@ -200,16 +200,16 @@ func (s *Server) Start() *Server {
 	}
 
 	log.Info().Msgf("[Web] listening on http at %s:%d", s.host, s.port)
-	
+
 	s.mutex.Lock()
 	s.server.Addr = fmt.Sprintf("%s:%d", s.host, s.port)
 	s.mutex.Unlock()
-	
+
 	// Get a reference to the server while holding the lock
 	s.mutex.RLock()
 	server := s.server
 	s.mutex.RUnlock()
-	
+
 	err := server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		s.Error = apperror.NewError("failed to start webserver").AddError(err)

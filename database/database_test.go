@@ -149,7 +149,7 @@ func TestConnected(t *testing.T) {
 	// Test that we can call the function without panic
 	// Note: We don't test the initial state since other tests may have connected
 	result := database.Connected()
-	
+
 	// The result should be a boolean (true or false)
 	if result != true && result != false {
 		t.Error("Connected() should return a boolean value")
@@ -164,7 +164,7 @@ func TestExecuteWithoutConnection(t *testing.T) {
 		database.Disconnect()
 		time.Sleep(100 * time.Millisecond) // Wait for disconnection
 	}
-	
+
 	// Test Execute when not connected
 	err := database.Execute(func(_ *gorm.DB) error {
 		return nil
@@ -303,7 +303,7 @@ func TestRegisterMigrationStep(t *testing.T) {
 		GitTag:    "v1.0.1",
 		GitCommit: "def456",
 	}
-	
+
 	// This should also not panic during registration
 	database.RegisterMigrationStep(v2, func(_ *gorm.DB) error {
 		// Just return nil for testing - we don't want to actually fail migrations

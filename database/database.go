@@ -108,7 +108,7 @@ func Execute(call func(db *gorm.DB) error) error {
 	dbMutex.RLock()
 	dbInstance := db
 	dbMutex.RUnlock()
-	
+
 	if !connected.Load() || dbInstance == nil {
 		return apperror.NewErrorf("database is not connected")
 	}
@@ -179,7 +179,7 @@ func Connect(interval time.Duration, config Config) {
 					handlers := make([]func(db *gorm.DB, config Config) error, len(onConnectHandler))
 					copy(handlers, onConnectHandler)
 					handlerMutex.Unlock()
-					
+
 					for _, handler := range handlers {
 						err := handler(dbInstance, config)
 						if err != nil {
@@ -203,7 +203,7 @@ func Connect(interval time.Duration, config Config) {
 				dbMutex.RLock()
 				dbInstance := db
 				dbMutex.RUnlock()
-				
+
 				if dbInstance != nil {
 					err := dbInstance.Exec("SELECT 1;").Error
 					if err != nil && connected.Load() {

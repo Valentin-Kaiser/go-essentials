@@ -550,7 +550,7 @@ func (m *Manager) calculateRetryDelay(attempt int) time.Duration {
 	if attempt <= 1 {
 		return m.retryDelay
 	}
-	
+
 	delay := float64(m.retryDelay.Nanoseconds())
 	multiplier := math.Pow(m.retryBackoff, float64(attempt-1))
 	return time.Duration(delay * multiplier)

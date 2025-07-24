@@ -131,7 +131,7 @@ func TestAddErrorWithAppError(t *testing.T) {
 }
 
 func TestErrorString(t *testing.T) {
-	t.Parallel()
+	// Not using t.Parallel() to avoid data race on global flag.Debug
 	// Save original debug state
 	originalDebug := flag.Debug
 	defer func() { flag.Debug = originalDebug }()
