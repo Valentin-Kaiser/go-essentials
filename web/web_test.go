@@ -126,7 +126,7 @@ func TestServerErrorHandling(t *testing.T) {
 	}
 }
 
-func TestServerMemoryUsage(t *testing.T) {
+func TestServerMemoryUsage(_ *testing.T) {
 	// Test that creating many servers doesn't cause memory leaks
 	for i := 0; i < 100; i++ {
 		server := web.New()

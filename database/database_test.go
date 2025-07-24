@@ -131,7 +131,6 @@ func TestConfig_Validate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-
 			err := tc.config.Validate()
 			if tc.valid && err != nil {
 				t.Errorf("Expected valid config, got error: %v", err)
@@ -271,7 +270,7 @@ func TestConnectWithSQLiteConfig(t *testing.T) {
 	// due to the asynchronous nature of the connection management
 }
 
-func TestRegisterSchema(t *testing.T) {
+func TestRegisterSchema(_ *testing.T) {
 	// Test schema registration
 	type TestModel struct {
 		ID   uint   `gorm:"primaryKey"`
@@ -290,7 +289,7 @@ func TestRegisterSchema(t *testing.T) {
 	database.RegisterSchema(&TestModel{}, &AnotherModel{})
 }
 
-func TestRegisterMigrationStep(t *testing.T) {
+func TestRegisterMigrationStep(_ *testing.T) {
 	// Test migration step registration
 	v1 := version.Release{
 		GitTag:    "v1.0.0",
