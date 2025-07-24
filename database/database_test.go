@@ -158,6 +158,13 @@ func TestConnected(t *testing.T) {
 
 func TestExecuteWithoutConnection(t *testing.T) {
 	t.Parallel()
+	// Ensure we're in a disconnected state for this test
+	// Only disconnect if currently connected to avoid hanging
+	if database.Connected() {
+		database.Disconnect()
+		time.Sleep(100 * time.Millisecond) // Wait for disconnection
+	}
+	
 	// Test Execute when not connected
 	err := database.Execute(func(_ *gorm.DB) error {
 		return nil

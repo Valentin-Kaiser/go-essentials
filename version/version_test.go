@@ -44,7 +44,7 @@ func TestGetVersion(t *testing.T) {
 }
 
 func TestMajor(t *testing.T) {
-	t.Parallel()
+	// Not using t.Parallel() to avoid data race on global version.GitTag
 	// Test with default tag
 	originalTag := version.GitTag
 	defer func() { version.GitTag = originalTag }()
@@ -64,7 +64,7 @@ func TestMajor(t *testing.T) {
 }
 
 func TestMinor(t *testing.T) {
-	t.Parallel()
+	// Not using t.Parallel() to avoid data race on global version.GitTag
 	originalTag := version.GitTag
 	defer func() { version.GitTag = originalTag }()
 
@@ -83,7 +83,7 @@ func TestMinor(t *testing.T) {
 }
 
 func TestPatch(t *testing.T) {
-	t.Parallel()
+	// Not using t.Parallel() to avoid data race on global version.GitTag
 	originalTag := version.GitTag
 	defer func() { version.GitTag = originalTag }()
 
@@ -102,7 +102,7 @@ func TestPatch(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	t.Parallel()
+	// Not using t.Parallel() to avoid data race on global version.GitTag
 	originalTag := version.GitTag
 	defer func() { version.GitTag = originalTag }()
 
