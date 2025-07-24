@@ -203,6 +203,17 @@ func (l *logger) GetPath() string {
 	return l.file.Filename
 }
 
+func (l *logger) GetOutputs() []io.Writer {
+	return l.outputs
+}
+
+func (l *logger) GetFile() *lumberjack.Logger {
+	if l.file == nil {
+		return nil
+	}
+	return l.file
+}
+
 func (l *logger) Write(p []byte) (n int, err error) {
 	log.WithLevel(l.level).Msg(strings.TrimSpace(string(p)))
 	return len(p), nil

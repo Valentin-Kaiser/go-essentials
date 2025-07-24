@@ -34,7 +34,7 @@ import (
 // SizeOf returns the number of bytes that 'value' takes up in memory, without using reflect or unsafe
 // this functions has minor overhead for the encoding process.
 func SizeOf(value interface{}) (int64, error) {
-	if interfaceIsNullPointer(value) {
+	if InterfaceIsNullPointer(value) {
 		return 0, nil
 	}
 	buff := new(bytes.Buffer)
@@ -60,8 +60,8 @@ func ToByteString(b int64) string {
 		float64(b)/float64(div), "kMGTPE"[exp])
 }
 
-// interfaceIsNullPointer returns true if the interface is nil or if the interface is a pointer, map, chan, or slice and is nil
-func interfaceIsNullPointer(i interface{}) bool {
+// InterfaceIsNullPointer returns true if the interface is nil or if the interface is a pointer, map, chan, or slice and is nil
+func InterfaceIsNullPointer(i interface{}) bool {
 	if i == nil {
 		return true
 	}

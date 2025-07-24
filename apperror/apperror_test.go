@@ -1,16 +1,17 @@
-package apperror
+package apperror_test
 
 import (
 	"errors"
 	"strings"
 	"testing"
 
+	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/Valentin-Kaiser/go-core/flag"
 )
 
 func TestNewError(t *testing.T) {
 	msg := "test error message"
-	err := NewError(msg)
+	err := apperror.NewError(msg)
 
 	if err.Message != msg {
 		t.Errorf("Expected message '%s', got '%s'", msg, err.Message)
@@ -27,7 +28,7 @@ func TestNewError(t *testing.T) {
 
 func TestNewErrorf(t *testing.T) {
 	format := "test error with number %d and string %s"
-	err := NewErrorf(format, 42, "hello")
+	err := apperror.NewErrorf(format, 42, "hello")
 
 	expected := "test error with number 42 and string hello"
 	if err.Message != expected {
@@ -41,19 +42,19 @@ func TestNewErrorf(t *testing.T) {
 
 func TestWrap(t *testing.T) {
 	// Test wrapping nil
-	wrapped := Wrap(nil)
+	wrapped := apperror.Wrap(nil)
 	if wrapped != nil {
 		t.Error("Wrapping nil should return nil")
 	}
 
 	// Test wrapping standard error
 	originalErr := errors.New("original error")
-	wrapped = Wrap(originalErr)
+	wrapped = apperror.Wrap(originalErr)
 	if wrapped == nil {
 		t.Error("Wrapping error should not return nil")
 	}
 
-	appErr, ok := wrapped.(Error)
+	appErr, ok := wrapped.(apperror.Error)
 	if !ok {
 		t.Error("Wrapped error should be of type Error")
 	}
@@ -63,9 +64,9 @@ func TestWrap(t *testing.T) {
 	}
 
 	// Test wrapping Error type
-	appError := NewError("app error")
-	wrapped = Wrap(appError)
-	wrappedAppErr, ok := wrapped.(Error)
+	appError := apperror.NewError("app error")
+	wrapped = apperror.Wrap(appError)
+	wrappedAppErr, ok := wrapped.(apperror.Error)
 	if !ok {
 		t.Error("Wrapped Error should be of type Error")
 	}
@@ -76,7 +77,7 @@ func TestWrap(t *testing.T) {
 }
 
 func TestAddError(t *testing.T) {
-	err := NewError("main error")
+	err := apperror.NewError("main error")
 	additionalErr := errors.New("additional error")
 
 	newErr := err.AddError(additionalErr)
@@ -91,7 +92,7 @@ func TestAddError(t *testing.T) {
 }
 
 func TestAddErrors(t *testing.T) {
-	err := NewError("main error")
+	err := apperror.NewError("main error")
 	additionalErrs := []error{
 		errors.New("error 1"),
 		errors.New("error 2"),
@@ -112,8 +113,8 @@ func TestAddErrors(t *testing.T) {
 }
 
 func TestAddErrorWithAppError(t *testing.T) {
-	mainErr := NewError("main error")
-	appErr := NewError("app error").AddError(errors.New("nested error"))
+	mainErr := apperror.NewError("main error")
+	appErr := apperror.NewError("app error").AddError(errors.New("nested error"))
 
 	newErr := mainErr.AddError(appErr)
 
@@ -130,7 +131,7 @@ func TestErrorString(t *testing.T) {
 
 	// Test without debug mode
 	flag.Debug = false
-	err := NewError("test error")
+	err := apperror.NewError("test error")
 
 	if err.Error() != "test error" {
 		t.Errorf("Expected 'test error', got '%s'", err.Error())
@@ -145,7 +146,7 @@ func TestErrorString(t *testing.T) {
 
 	// Test with debug mode
 	flag.Debug = true
-	err = NewError("test error")
+	err = apperror.NewError("test error")
 	errorStr := err.Error()
 
 	if !strings.Contains(errorStr, "test error") {
@@ -160,7 +161,7 @@ func TestErrorString(t *testing.T) {
 func TestSplit(t *testing.T) {
 	// Test with standard error
 	standardErr := errors.New("standard error")
-	msg, trace, errs := Split(standardErr)
+	msg, trace, errs := apperror.Split(standardErr)
 
 	if msg != "standard error" {
 		t.Errorf("Expected message 'standard error', got '%s'", msg)
@@ -173,8 +174,8 @@ func TestSplit(t *testing.T) {
 	}
 
 	// Test with app error
-	appErr := NewError("app error").AddError(errors.New("additional error"))
-	msg, trace, errs = Split(appErr)
+	appErr := apperror.NewError("app error").AddError(errors.New("additional error"))
+	msg, trace, errs = apperror.Split(appErr)
 
 	if msg != "app error" {
 		t.Errorf("Expected message 'app error', got '%s'", msg)
@@ -189,21 +190,21 @@ func TestSplit(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	// Test simple parsing
-	err := Parse("simple error")
+	err := apperror.Parse("simple error")
 	if err.Message != "simple error" {
 		t.Errorf("Expected message 'simple error', got '%s'", err.Message)
 	}
 
 	// Test parsing with trace
 	traceStr := "func1+123 -> func2+456 -> simple error"
-	err = Parse(traceStr)
+	err = apperror.Parse(traceStr)
 	if !strings.Contains(err.Error(), "simple error") {
 		t.Error("Parsed error should contain the original message")
 	}
 }
 
 func TestWhere(t *testing.T) {
-	where := Where(2)
+	where := apperror.Where(2)
 	if where == "unknown" {
 		t.Error("Where should return caller information")
 	}
@@ -215,28 +216,28 @@ func TestWhere(t *testing.T) {
 // Test error formatting variables
 func TestErrorFormatting(t *testing.T) {
 	// Test that formatting variables exist and can be read
-	if TraceDelimiter == "" {
+	if apperror.TraceDelimiter == "" {
 		t.Error("TraceDelimiter should not be empty")
 	}
-	if ErrorDelimiter == "" {
+	if apperror.ErrorDelimiter == "" {
 		t.Error("ErrorDelimiter should not be empty")
 	}
-	if TraceFormat == "" {
+	if apperror.TraceFormat == "" {
 		t.Error("TraceFormat should not be empty")
 	}
-	if ErrorFormat == "" {
+	if apperror.ErrorFormat == "" {
 		t.Error("ErrorFormat should not be empty")
 	}
-	if ErrorTraceFormat == "" {
+	if apperror.ErrorTraceFormat == "" {
 		t.Error("ErrorTraceFormat should not be empty")
 	}
-	if FullFormat == "" {
+	if apperror.FullFormat == "" {
 		t.Error("FullFormat should not be empty")
 	}
 }
 
 func TestErrorWithMultipleAdditionalErrors(t *testing.T) {
-	err := NewError("main error")
+	err := apperror.NewError("main error")
 	err = err.AddError(errors.New("error 1"))
 	err = err.AddError(errors.New("error 2"))
 	err = err.AddError(errors.New("error 3"))
@@ -255,7 +256,7 @@ func TestErrorWithMultipleAdditionalErrors(t *testing.T) {
 }
 
 func TestErrorImplementsErrorInterface(t *testing.T) {
-	var err error = NewError("test error")
+	var err error = apperror.NewError("test error")
 
 	if err.Error() != "test error" {
 		t.Error("Error should implement the error interface correctly")
@@ -265,7 +266,7 @@ func TestErrorImplementsErrorInterface(t *testing.T) {
 // Benchmark tests
 func BenchmarkNewError(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		NewError("benchmark error")
+		_ = apperror.NewError("benchmark error")
 	}
 }
 
@@ -274,12 +275,12 @@ func BenchmarkWrap(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		Wrap(baseErr)
+		_ = apperror.Wrap(baseErr)
 	}
 }
 
 func BenchmarkErrorString(b *testing.B) {
-	err := NewError("benchmark error").AddError(errors.New("additional"))
+	err := apperror.NewError("benchmark error").AddError(errors.New("additional"))
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {

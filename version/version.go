@@ -76,9 +76,9 @@ func init() {
 	}
 }
 
-// Version represents the version information of the application.
+// Release represents the version information of the application.
 // It includes the Git tag, commit hash, build date, Go version, platform, and a list of modules.
-type Version struct {
+type Release struct {
 	ID        uint64    `json:"-" gorm:"primaryKey"`
 	GitTag    string    `json:"gitTag" gorm:"uniqueIndex:idx_version_module"`
 	GitCommit string    `json:"gitCommit" gorm:"uniqueIndex:idx_version_module"`
@@ -99,8 +99,8 @@ type Module struct {
 }
 
 // GetVersion returns the current version information of the application.
-func GetVersion() *Version {
-	return &Version{
+func GetVersion() *Release {
+	return &Release{
 		GitTag:    GitTag,
 		GitCommit: GitCommit,
 		GitShort:  GitShort,
@@ -169,22 +169,22 @@ func ParseTagVersion(tag string) string {
 }
 
 // Compare compares the Git tag and commit hash of the current version with another version.
-func (v *Version) Compare(c *Version) bool {
+func (v *Release) Compare(c *Release) bool {
 	return v.CompareTag(c) && v.CompareCommit(c)
 }
 
 // CompareTag compares the Git tag of the current version with another version.
-func (v *Version) CompareTag(c *Version) bool {
+func (v *Release) CompareTag(c *Release) bool {
 	return v.GitTag == c.GitTag
 }
 
 // CompareCommit compares the Git commit hash and short hash of the current version with another version.
-func (v *Version) CompareCommit(c *Version) bool {
+func (v *Release) CompareCommit(c *Release) bool {
 	return v.GitCommit == c.GitCommit && v.GitShort == c.GitShort
 }
 
 // Validate checks if the provided version information is valid.
-func (v *Version) Validate(change *Version) error {
+func (v *Release) Validate(change *Release) error {
 	if strings.TrimSpace(change.GitTag) == "" {
 		return errors.New("tag cannot be empty")
 	}

@@ -1,4 +1,4 @@
-package zlog
+package zlog_test
 
 import (
 	"bytes"
@@ -7,17 +7,18 @@ import (
 	"testing"
 
 	"github.com/Valentin-Kaiser/go-core/flag"
+	"github.com/Valentin-Kaiser/go-core/zlog"
 	"github.com/rs/zerolog"
 )
 
 func TestLogger(t *testing.T) {
-	logger := Logger()
+	logger := zlog.Logger()
 	if logger == nil {
 		t.Error("Logger() returned nil")
 	}
 
 	// Test singleton pattern
-	logger2 := Logger()
+	logger2 := zlog.Logger()
 	if logger != logger2 {
 		t.Error("Logger() should return singleton instance")
 	}
@@ -29,7 +30,7 @@ func TestLoggerInit(t *testing.T) {
 
 	// Save original flag.Path
 	originalPath := flag.Path
-	defer func() { flag.Path = originalPath }()
+	t.Cleanup(func() { flag.Path = originalPath })
 
 	flag.Path = tempDir
 
@@ -46,7 +47,7 @@ func TestLoggerInit(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			logger := Logger()
+			logger := zlog.Logger()
 			logger.Init(tc.logname, tc.level)
 
 			if zerolog.GlobalLevel() != tc.level {
@@ -57,8 +58,8 @@ func TestLoggerInit(t *testing.T) {
 }
 
 func TestLoggerWithConsole(t *testing.T) {
-	logger := Logger()
-	initialOutputs := len(logger.outputs)
+	logger := zlog.Logger()
+	initialOutputs := len(logger.GetOutputs())
 
 	result := logger.WithConsole()
 
@@ -66,14 +67,14 @@ func TestLoggerWithConsole(t *testing.T) {
 		t.Error("WithConsole() should return self for chaining")
 	}
 
-	if len(logger.outputs) != initialOutputs+1 {
+	if len(logger.GetOutputs()) != initialOutputs+1 {
 		t.Error("WithConsole() should add one output")
 	}
 }
 
 func TestLoggerWithLogFile(t *testing.T) {
-	logger := Logger()
-	initialOutputs := len(logger.outputs)
+	logger := zlog.Logger()
+	initialOutputs := len(logger.GetOutputs())
 
 	result := logger.WithLogFile()
 
@@ -81,32 +82,32 @@ func TestLoggerWithLogFile(t *testing.T) {
 		t.Error("WithLogFile() should return self for chaining")
 	}
 
-	if len(logger.outputs) != initialOutputs+1 {
+	if len(logger.GetOutputs()) != initialOutputs+1 {
 		t.Error("WithLogFile() should add one output")
 	}
 
-	if logger.file == nil {
+	if logger.GetFile() == nil {
 		t.Error("WithLogFile() should set file property")
 	}
 
 	// Check default values
-	if logger.file.MaxSize != 10 {
-		t.Errorf("Expected MaxSize 10, got %d", logger.file.MaxSize)
+	if logger.GetFile().MaxSize != 10 {
+		t.Errorf("Expected MaxSize 10, got %d", logger.GetFile().MaxSize)
 	}
-	if logger.file.MaxAge != 28 {
-		t.Errorf("Expected MaxAge 28, got %d", logger.file.MaxAge)
+	if logger.GetFile().MaxAge != 28 {
+		t.Errorf("Expected MaxAge 28, got %d", logger.GetFile().MaxAge)
 	}
-	if logger.file.MaxBackups != 10 {
-		t.Errorf("Expected MaxBackups 10, got %d", logger.file.MaxBackups)
+	if logger.GetFile().MaxBackups != 10 {
+		t.Errorf("Expected MaxBackups 10, got %d", logger.GetFile().MaxBackups)
 	}
-	if !logger.file.Compress {
+	if !logger.GetFile().Compress {
 		t.Error("Expected Compress to be true")
 	}
 }
 
 func TestLoggerWith(t *testing.T) {
-	logger := Logger()
-	initialOutputs := len(logger.outputs)
+	logger := zlog.Logger()
+	initialOutputs := len(logger.GetOutputs())
 
 	var buffer bytes.Buffer
 	result := logger.With(&buffer)
@@ -115,7 +116,7 @@ func TestLoggerWith(t *testing.T) {
 		t.Error("With() should return self for chaining")
 	}
 
-	if len(logger.outputs) != initialOutputs+1 {
+	if len(logger.GetOutputs()) != initialOutputs+1 {
 		t.Error("With() should add one output")
 	}
 
@@ -124,13 +125,13 @@ func TestLoggerWith(t *testing.T) {
 	var buffer3 bytes.Buffer
 	logger.With(&buffer2, &buffer3)
 
-	if len(logger.outputs) != initialOutputs+3 {
+	if len(logger.GetOutputs()) != initialOutputs+3 {
 		t.Error("With() should add all provided outputs")
 	}
 }
 
 func TestLoggerSetLevel(t *testing.T) {
-	logger := Logger()
+	logger := zlog.Logger()
 
 	testLevels := []zerolog.Level{
 		zerolog.DebugLevel,
@@ -158,7 +159,7 @@ func TestLoggerSetLevel(t *testing.T) {
 }
 
 func TestLoggerWithLevel(t *testing.T) {
-	logger := Logger()
+	logger := zlog.Logger()
 	originalLevel := logger.GetLevel()
 
 	newLogger := logger.WithLevel(zerolog.DebugLevel)
@@ -167,8 +168,8 @@ func TestLoggerWithLevel(t *testing.T) {
 		t.Error("WithLevel() should return new logger instance")
 	}
 
-	if newLogger.level != zerolog.DebugLevel {
-		t.Errorf("Expected new logger level %v, got %v", zerolog.DebugLevel, newLogger.level)
+	if newLogger.GetLevel() != zerolog.DebugLevel {
+		t.Errorf("Expected new logger level %v, got %v", zerolog.DebugLevel, newLogger.GetLevel())
 	}
 
 	// Original logger should be unchanged
@@ -178,15 +179,15 @@ func TestLoggerWithLevel(t *testing.T) {
 }
 
 func TestLoggerFileOperations(t *testing.T) {
-	logger := Logger().WithLogFile()
+	logger := zlog.Logger().WithLogFile()
 
 	// Test SetMaxSize
 	result := logger.SetMaxSize(50)
 	if result != logger {
 		t.Error("SetMaxSize() should return self for chaining")
 	}
-	if logger.file.MaxSize != 50 {
-		t.Errorf("Expected MaxSize 50, got %d", logger.file.MaxSize)
+	if logger.GetFile().MaxSize != 50 {
+		t.Errorf("Expected MaxSize 50, got %d", logger.GetFile().MaxSize)
 	}
 
 	// Test SetMaxAge
@@ -194,8 +195,8 @@ func TestLoggerFileOperations(t *testing.T) {
 	if result != logger {
 		t.Error("SetMaxAge() should return self for chaining")
 	}
-	if logger.file.MaxAge != 7 {
-		t.Errorf("Expected MaxAge 7, got %d", logger.file.MaxAge)
+	if logger.GetFile().MaxAge != 7 {
+		t.Errorf("Expected MaxAge 7, got %d", logger.GetFile().MaxAge)
 	}
 
 	// Test SetMaxBackups
@@ -203,8 +204,8 @@ func TestLoggerFileOperations(t *testing.T) {
 	if result != logger {
 		t.Error("SetMaxBackups() should return self for chaining")
 	}
-	if logger.file.MaxBackups != 5 {
-		t.Errorf("Expected MaxBackups 5, got %d", logger.file.MaxBackups)
+	if logger.GetFile().MaxBackups != 5 {
+		t.Errorf("Expected MaxBackups 5, got %d", logger.GetFile().MaxBackups)
 	}
 
 	// Test SetCompress
@@ -212,13 +213,13 @@ func TestLoggerFileOperations(t *testing.T) {
 	if result != logger {
 		t.Error("SetCompress() should return self for chaining")
 	}
-	if logger.file.Compress != false {
-		t.Errorf("Expected Compress false, got %v", logger.file.Compress)
+	if logger.GetFile().Compress != false {
+		t.Errorf("Expected Compress false, got %v", logger.GetFile().Compress)
 	}
 }
 
 func TestLoggerFileOperationsWithoutFile(t *testing.T) {
-	logger := Logger()
+	logger := zlog.Logger()
 	// Don't call WithLogFile()
 
 	// All file operations should be no-ops when file is nil
@@ -253,7 +254,7 @@ func TestLoggerGetPath(t *testing.T) {
 
 	flag.Path = tempDir
 
-	logger := Logger()
+	logger := zlog.Logger()
 
 	// Test without file
 	path := logger.GetPath()
@@ -273,7 +274,7 @@ func TestLoggerGetPath(t *testing.T) {
 }
 
 func TestLoggerWrite(t *testing.T) {
-	logger := Logger()
+	logger := zlog.Logger()
 
 	// Test Write interface
 	testMessage := "test log message"
@@ -289,7 +290,7 @@ func TestLoggerWrite(t *testing.T) {
 }
 
 func TestLoggerWriteWithLevel(t *testing.T) {
-	logger := Logger().WithLevel(zerolog.WarnLevel)
+	logger := zlog.Logger().WithLevel(zerolog.WarnLevel)
 
 	testMessage := "test warning message"
 	n, err := logger.Write([]byte(testMessage))
@@ -303,8 +304,8 @@ func TestLoggerWriteWithLevel(t *testing.T) {
 	}
 }
 
-func TestLoggerStop(t *testing.T) {
-	logger := Logger()
+func TestLoggerStop(_ *testing.T) {
+	logger := zlog.Logger()
 
 	// Test Stop without file (should not panic)
 	logger.Stop()
@@ -314,8 +315,8 @@ func TestLoggerStop(t *testing.T) {
 	logger.Stop()
 }
 
-func TestLoggerRotate(t *testing.T) {
-	logger := Logger().WithLogFile()
+func TestLoggerRotate(_ *testing.T) {
+	logger := zlog.Logger().WithLogFile()
 
 	// Test Rotate (should not panic)
 	logger.Rotate()
@@ -334,7 +335,7 @@ func TestLoggerChaining(t *testing.T) {
 	var buffer bytes.Buffer
 
 	// Test method chaining
-	logger := Logger().
+	logger := zlog.Logger().
 		WithConsole().
 		WithLogFile().
 		With(&buffer).
@@ -349,34 +350,34 @@ func TestLoggerChaining(t *testing.T) {
 		t.Error("Chained SetLevel() not applied")
 	}
 
-	if logger.file == nil {
+	if logger.GetFile() == nil {
 		t.Error("Chained WithLogFile() not applied")
 	}
 
-	if logger.file.MaxSize != 25 {
+	if logger.GetFile().MaxSize != 25 {
 		t.Error("Chained SetMaxSize() not applied")
 	}
 
-	if logger.file.MaxAge != 14 {
+	if logger.GetFile().MaxAge != 14 {
 		t.Error("Chained SetMaxAge() not applied")
 	}
 
-	if logger.file.MaxBackups != 3 {
+	if logger.GetFile().MaxBackups != 3 {
 		t.Error("Chained SetMaxBackups() not applied")
 	}
 
-	if !logger.file.Compress {
+	if !logger.GetFile().Compress {
 		t.Error("Chained SetCompress() not applied")
 	}
 
 	// Should have console + file + buffer outputs
-	if len(logger.outputs) < 3 {
+	if len(logger.GetOutputs()) < 3 {
 		t.Error("Chained With() operations not applied")
 	}
 }
 
-func TestLoggerImplementsWriter(t *testing.T) {
-	var _ io.Writer = Logger()
+func TestLoggerImplementsWriter(_ *testing.T) {
+	var _ io.Writer = zlog.Logger()
 }
 
 // Integration test
@@ -394,7 +395,7 @@ func TestLoggerIntegration(t *testing.T) {
 	var buffer bytes.Buffer
 
 	// Initialize logger
-	logger := Logger().
+	logger := zlog.Logger().
 		WithConsole().
 		WithLogFile().
 		With(&buffer).
@@ -428,14 +429,14 @@ func TestLoggerIntegration(t *testing.T) {
 // Test that the package-level functions exist
 func TestPackageLevelFunctions(t *testing.T) {
 	// Test that we can import and use the package
-	if Logger() == nil {
-		t.Error("Package-level Logger() function not working")
+	if zlog.Logger() == nil {
+		t.Error("Package-level zlog.Logger() function not working")
 	}
 }
 
 // Test edge cases
 func TestLoggerEdgeCases(t *testing.T) {
-	logger := Logger()
+	logger := zlog.Logger()
 
 	// Test Write with empty slice
 	n, err := logger.Write([]byte{})
@@ -458,17 +459,19 @@ func TestLoggerEdgeCases(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkLoggerWrite(b *testing.B) {
-	logger := Logger()
+	logger := zlog.Logger()
 	message := []byte("benchmark test message")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		logger.Write(message)
+		if _, err := logger.Write(message); err != nil {
+			b.Logf("Failed to write log: %v", err)
+		}
 	}
 }
 
 func BenchmarkLoggerWithLevel(b *testing.B) {
-	logger := Logger()
+	logger := zlog.Logger()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -481,7 +484,7 @@ func BenchmarkLoggerChaining(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Logger().
+		zlog.Logger().
 			WithConsole().
 			WithLogFile().
 			With(&buffer).

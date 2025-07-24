@@ -1,7 +1,9 @@
-package memsize
+package memsize_test
 
 import (
 	"testing"
+
+	"github.com/Valentin-Kaiser/go-core/memsize"
 )
 
 func TestSizeOf(t *testing.T) {
@@ -26,7 +28,7 @@ func TestSizeOf(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			size, err := SizeOf(tc.value)
+			size, err := memsize.SizeOf(tc.value)
 			if tc.hasError {
 				if err == nil {
 					t.Errorf("Expected error for %s, but got none", tc.name)
@@ -68,7 +70,7 @@ func TestSizeOfComplexStructure(t *testing.T) {
 		}{Value: "nested"},
 	}
 
-	size, err := SizeOf(value)
+	size, err := memsize.SizeOf(value)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -101,7 +103,7 @@ func TestToByteString(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := ToByteString(tc.bytes)
+		result := memsize.ToByteString(tc.bytes)
 		if result != tc.expected {
 			t.Errorf("ToByteString(%d) = %s, expected %s", tc.bytes, result, tc.expected)
 		}
@@ -131,7 +133,7 @@ func TestInterfaceIsNullPointer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := interfaceIsNullPointer(tc.value)
+			result := memsize.InterfaceIsNullPointer(tc.value)
 			if result != tc.expected {
 				t.Errorf("interfaceIsNullPointer(%s) = %v, expected %v", tc.name, result, tc.expected)
 			}
@@ -143,7 +145,7 @@ func TestInterfaceIsNullPointer(t *testing.T) {
 func TestSizeOfUnencodableType(t *testing.T) {
 	// Functions are not encodable by gob
 	fn := func() {}
-	_, err := SizeOf(fn)
+	_, err := memsize.SizeOf(fn)
 	if err == nil {
 		t.Error("Expected error when trying to encode function, but got none")
 	}
@@ -163,7 +165,7 @@ func BenchmarkSizeOf(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := SizeOf(testValue)
+		_, err := memsize.SizeOf(testValue)
 		if err != nil {
 			b.Fatalf("Unexpected error: %v", err)
 		}
@@ -176,7 +178,7 @@ func BenchmarkToByteString(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for _, value := range testValues {
-			ToByteString(value)
+			memsize.ToByteString(value)
 		}
 	}
 }

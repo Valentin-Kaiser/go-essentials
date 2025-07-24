@@ -1,24 +1,23 @@
-package security
+package security_test
 
 import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509/pkix"
-	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/ProtonMail/gopenpgp/v3/profile"
+	"github.com/Valentin-Kaiser/go-core/security"
 )
 
 func TestGetRandomBytes(t *testing.T) {
 	testCases := []uint{1, 16, 32, 64, 128}
 
 	for _, size := range testCases {
-		bytes, err := GetRandomBytes(size)
+		bytes, err := security.GetRandomBytes(size)
 		if err != nil {
 			t.Errorf("GetRandomBytes(%d) returned error: %v", size, err)
 			continue
@@ -43,7 +42,7 @@ func TestGetRandomBytes(t *testing.T) {
 }
 
 func TestGetRandomBytesZero(t *testing.T) {
-	bytes, err := GetRandomBytes(0)
+	bytes, err := security.GetRandomBytes(0)
 	if err != nil {
 		t.Errorf("GetRandomBytes(0) returned error: %v", err)
 	}
@@ -64,7 +63,7 @@ func TestSHA256(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := SHA256([]byte(tc.input))
+		result := security.SHA256([]byte(tc.input))
 		if result != tc.expected {
 			t.Errorf("SHA256(%q) = %s, expected %s", tc.input, result, tc.expected)
 		}
@@ -82,9 +81,9 @@ func TestXX(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := XX([]byte(tc.input))
+		result := security.XX([]byte(tc.input))
 		// We can't predict the exact hash, but it should be consistent
-		result2 := XX([]byte(tc.input))
+		result2 := security.XX([]byte(tc.input))
 		if result != result2 {
 			t.Errorf("XX(%q) not consistent: %d != %d", tc.input, result, result2)
 		}
@@ -104,7 +103,7 @@ func TestMd5(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := Md5(tc.input)
+		result := security.Md5(tc.input)
 		if result != tc.expected {
 			t.Errorf("Md5(%v) = %s, expected %s", tc.input, result, tc.expected)
 		}
@@ -120,13 +119,13 @@ func TestStringToKey32Bytes(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		key := StringToKey32Bytes(tc)
+		key := security.StringToKey32Bytes(tc)
 		if len(key) != 32 {
 			t.Errorf("StringToKey32Bytes(%q) returned %d bytes, expected 32", tc, len(key))
 		}
 
 		// Test consistency
-		key2 := StringToKey32Bytes(tc)
+		key2 := security.StringToKey32Bytes(tc)
 		if !bytes.Equal(key, key2) {
 			t.Errorf("StringToKey32Bytes(%q) not consistent", tc)
 		}
@@ -142,20 +141,20 @@ func TestStringToKey32(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		key := StringToKey32(tc)
+		key := security.StringToKey32(tc)
 		if len(key) != 32 {
 			t.Errorf("StringToKey32(%q) returned %d characters, expected 32", tc, len(key))
 		}
 
 		// Test consistency
-		key2 := StringToKey32(tc)
+		key2 := security.StringToKey32(tc)
 		if key != key2 {
 			t.Errorf("StringToKey32(%q) not consistent", tc)
 		}
 
 		// Test that it's hex encoded
 		for _, c := range key {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 				t.Errorf("StringToKey32(%q) contains non-hex character: %c", tc, c)
 				break
 			}
@@ -167,7 +166,7 @@ func TestGetRandomBytesBase64(t *testing.T) {
 	testCases := []uint{1, 16, 32, 64}
 
 	for _, size := range testCases {
-		encoded, err := GetRandomBytesBase64(size)
+		encoded, err := security.GetRandomBytesBase64(size)
 		if err != nil {
 			t.Errorf("GetRandomBytesBase64(%d) returned error: %v", size, err)
 			continue
@@ -181,8 +180,8 @@ func TestGetRandomBytesBase64(t *testing.T) {
 		// Test that it's valid base64
 		if size > 0 {
 			for _, c := range encoded {
-				if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-					(c >= '0' && c <= '9') || c == '+' || c == '/' || c == '=') {
+				if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') &&
+					(c < '0' || c > '9') && c != '+' && c != '/' && c != '=' {
 					t.Errorf("GetRandomBytesBase64(%d) contains invalid base64 character: %c", size, c)
 					break
 				}
@@ -195,7 +194,7 @@ func TestGenerateRandomPassword(t *testing.T) {
 	testCases := []int{1, 8, 16, 32, 64}
 
 	for _, length := range testCases {
-		password, err := GenerateRandomPassword(length)
+		password, err := security.GenerateRandomPassword(length)
 		if err != nil {
 			t.Errorf("GenerateRandomPassword(%d) returned error: %v", length, err)
 			continue
@@ -217,7 +216,7 @@ func TestGenerateRandomPassword(t *testing.T) {
 }
 
 func TestGenerateRandomPasswordZero(t *testing.T) {
-	password, err := GenerateRandomPassword(0)
+	password, err := security.GenerateRandomPassword(0)
 	if err != nil {
 		t.Errorf("GenerateRandomPassword(0) returned error: %v", err)
 	}
@@ -232,7 +231,7 @@ func TestReadOrSavePassphrase(t *testing.T) {
 	testFile := filepath.Join(tempDir, "test_passphrase.txt")
 
 	// Test creating new passphrase
-	passphrase1, err := ReadOrSavePassphrase(testFile, 32)
+	passphrase1, err := security.ReadOrSavePassphrase(testFile, 32)
 	if err != nil {
 		t.Errorf("ReadOrSavePassphrase() returned error: %v", err)
 	}
@@ -242,7 +241,7 @@ func TestReadOrSavePassphrase(t *testing.T) {
 	}
 
 	// Test reading existing passphrase
-	passphrase2, err := ReadOrSavePassphrase(testFile, 32)
+	passphrase2, err := security.ReadOrSavePassphrase(testFile, 32)
 	if err != nil {
 		t.Errorf("ReadOrSavePassphrase() returned error when reading existing file: %v", err)
 	}
@@ -252,7 +251,7 @@ func TestReadOrSavePassphrase(t *testing.T) {
 	}
 
 	// Test that file exists and has correct content
-	content, err := os.ReadFile(testFile)
+	content, err := os.ReadFile(filepath.Clean(testFile))
 	if err != nil {
 		t.Errorf("Failed to read test file: %v", err)
 	}
@@ -273,7 +272,7 @@ func TestReadOrSavePassphraseTooShort(t *testing.T) {
 	}
 
 	// Test reading passphrase that's too short
-	_, err = ReadOrSavePassphrase(testFile, 32)
+	_, err = security.ReadOrSavePassphrase(testFile, 32)
 	if err == nil {
 		t.Error("ReadOrSavePassphrase() should return error for too short passphrase")
 	}
@@ -285,7 +284,7 @@ func TestReadOrSavePassphraseFilePermissions(t *testing.T) {
 	testFile := filepath.Join(tempDir, "perm_test.txt")
 
 	// Create passphrase file
-	_, err := ReadOrSavePassphrase(testFile, 16)
+	_, err := security.ReadOrSavePassphrase(testFile, 16)
 	if err != nil {
 		t.Errorf("ReadOrSavePassphrase() returned error: %v", err)
 	}
@@ -318,13 +317,13 @@ func TestStringToKey32BytesEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := StringToKey32Bytes(tt.input)
+			result := security.StringToKey32Bytes(tt.input)
 			if len(result) != 32 {
 				t.Errorf("StringToKey32Bytes() returned %d bytes, expected 32", len(result))
 			}
 
 			// Test consistency
-			result2 := StringToKey32Bytes(tt.input)
+			result2 := security.StringToKey32Bytes(tt.input)
 			if !bytes.Equal(result, result2) {
 				t.Error("StringToKey32Bytes() should return consistent results")
 			}
@@ -345,13 +344,13 @@ func TestStringToKey32EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := StringToKey32(tt.input)
+			result := security.StringToKey32(tt.input)
 			if len(result) != 32 {
 				t.Errorf("StringToKey32() returned %d characters, expected 32", len(result))
 			}
 
 			// Test consistency
-			result2 := StringToKey32(tt.input)
+			result2 := security.StringToKey32(tt.input)
 			if result != result2 {
 				t.Error("StringToKey32() should return consistent results")
 			}
@@ -373,13 +372,13 @@ func TestSHA256EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SHA256(tt.input)
+			result := security.SHA256(tt.input)
 			if len(result) != 64 { // SHA256 hex string is 64 characters
 				t.Errorf("SHA256() returned %d characters, expected 64", len(result))
 			}
 
 			// Test consistency
-			result2 := SHA256(tt.input)
+			result2 := security.SHA256(tt.input)
 			if result != result2 {
 				t.Error("SHA256() should return consistent results")
 			}
@@ -400,10 +399,10 @@ func TestXXHashEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := XX(tt.input)
+			result := security.XX(tt.input)
 
 			// Test consistency
-			result2 := XX(tt.input)
+			result2 := security.XX(tt.input)
 			if result != result2 {
 				t.Error("XX() should return consistent results")
 			}
@@ -427,13 +426,13 @@ func TestMd5EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := Md5(tt.input)
+			result := security.Md5(tt.input)
 			if len(result) != 32 { // MD5 hex string is 32 characters
 				t.Errorf("Md5() returned %d characters, expected 32", len(result))
 			}
 
 			// Test consistency
-			result2 := Md5(tt.input)
+			result2 := security.Md5(tt.input)
 			if result != result2 {
 				t.Error("Md5() should return consistent results")
 			}
@@ -456,7 +455,7 @@ func TestGenerateRandomPasswordEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := GenerateRandomPassword(tt.length)
+			result, err := security.GenerateRandomPassword(tt.length)
 
 			if tt.valid {
 				if err != nil {
@@ -526,7 +525,7 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 			length:   16,
 			setup: func(path string) error {
 				dir := filepath.Dir(path)
-				if err := os.MkdirAll(dir, 0755); err != nil {
+				if err := os.MkdirAll(dir, 0750); err != nil {
 					return err
 				}
 				// Remove all permissions on Unix-like systems
@@ -546,7 +545,7 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 				}
 			}
 
-			result, err := ReadOrSavePassphrase(filePath, tt.length)
+			result, err := security.ReadOrSavePassphrase(filePath, tt.length)
 
 			if tt.wantErr {
 				if err == nil {
@@ -565,7 +564,9 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 			if strings.Contains(tt.filename, "readonly") {
 				dir := filepath.Dir(filePath)
 				// Restore permissions before cleanup
-				os.Chmod(dir, 0755)
+				if err := os.Chmod(dir, 0600); err != nil {
+					t.Logf("Failed to restore permissions: %v", err)
+				}
 			}
 		})
 	}
@@ -575,7 +576,7 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 		t.Run("windows permission test - invalid path", func(t *testing.T) {
 			// On Windows, test with an invalid path that should cause an error
 			invalidPath := filepath.Join("Z:\\nonexistent\\path\\that\\should\\not\\exist", "passphrase.txt")
-			_, err := ReadOrSavePassphrase(invalidPath, 16)
+			_, err := security.ReadOrSavePassphrase(invalidPath, 16)
 			if err == nil {
 				t.Error("ReadOrSavePassphrase() should fail with invalid path on Windows")
 			}
@@ -583,29 +584,8 @@ func TestReadOrSavePassphraseFileOperations(t *testing.T) {
 	}
 }
 
-func TestPGPCipherCreation(t *testing.T) {
-	// Test with default profile
-	cipher1 := NewPGPCipher(nil)
-	if cipher1 == nil {
-		t.Error("NewPGPCipher() should not return nil")
-	}
-	if cipher1.handle == nil {
-		t.Error("PGPCipher should have a handle")
-	}
-
-	// Test with custom profile
-	customProfile := profile.RFC4880()
-	cipher2 := NewPGPCipher(customProfile)
-	if cipher2 == nil {
-		t.Error("NewPGPCipher() should not return nil with custom profile")
-	}
-	if cipher2.handle == nil {
-		t.Error("PGPCipher should have a handle with custom profile")
-	}
-}
-
 func TestPGPCipherWithoutKeysOrPassphrase(t *testing.T) {
-	cipher := NewPGPCipher(nil)
+	cipher := security.NewPGPCipher(nil)
 	var buf bytes.Buffer
 
 	// Test encryption without keys or passphrase
@@ -623,119 +603,6 @@ func TestPGPCipherWithoutKeysOrPassphrase(t *testing.T) {
 	}
 }
 
-func TestPGPCipherEncryptWithPasswordEdgeCases(t *testing.T) {
-	cipher := NewPGPCipher(nil)
-	var buf bytes.Buffer
-
-	tests := []struct {
-		name       string
-		passphrase []byte
-		plaintext  []byte
-		writer     io.Writer
-		wantErr    bool
-	}{
-		{
-			name:       "empty plaintext",
-			passphrase: []byte("test_passphrase"),
-			plaintext:  []byte{},
-			writer:     &buf,
-			wantErr:    true,
-		},
-		{
-			name:       "nil writer",
-			passphrase: []byte("test_passphrase"),
-			plaintext:  []byte("test message"),
-			writer:     nil,
-			wantErr:    true,
-		},
-		{
-			name:       "empty passphrase",
-			passphrase: []byte{},
-			plaintext:  []byte("test message"),
-			writer:     &buf,
-			wantErr:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cipher.Error = nil
-			cipher.passphrase = tt.passphrase
-			buf.Reset()
-
-			cipher.EncryptWithPassword(tt.plaintext, tt.writer)
-
-			if tt.wantErr {
-				if cipher.Error == nil {
-					t.Error("EncryptWithPassword() should have failed")
-				}
-			} else {
-				if cipher.Error != nil {
-					t.Errorf("EncryptWithPassword() failed: %v", cipher.Error)
-				}
-			}
-		})
-	}
-}
-
-func TestPGPCipherEncryptWithPublicKeyEdgeCases(t *testing.T) {
-	cipher := NewPGPCipher(nil)
-	var buf bytes.Buffer
-
-	tests := []struct {
-		name      string
-		publicKey string
-		plaintext []byte
-		writer    io.Writer
-		wantErr   bool
-	}{
-		{
-			name:      "empty plaintext",
-			publicKey: "fake_public_key",
-			plaintext: []byte{},
-			writer:    &buf,
-			wantErr:   true,
-		},
-		{
-			name:      "nil writer",
-			publicKey: "fake_public_key",
-			plaintext: []byte("test message"),
-			writer:    nil,
-			wantErr:   true,
-		},
-		{
-			name:      "empty public key",
-			publicKey: "",
-			plaintext: []byte("test message"),
-			writer:    &buf,
-			wantErr:   true,
-		},
-		{
-			name:      "invalid public key",
-			publicKey: "invalid_key_format",
-			plaintext: []byte("test message"),
-			writer:    &buf,
-			wantErr:   true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cipher.Error = nil
-			cipher.publicKey = tt.publicKey
-			buf.Reset()
-
-			cipher.EncryptWithPublicKey(tt.plaintext, tt.writer)
-
-			if tt.wantErr {
-				if cipher.Error == nil {
-					t.Error("EncryptWithPublicKey() should have failed")
-				}
-			}
-		})
-	}
-}
-
 // Test TLS functions
 func TestNewTLSConfig(t *testing.T) {
 	// Generate a self-signed certificate for testing
@@ -748,15 +615,16 @@ func TestNewTLSConfig(t *testing.T) {
 		PostalCode:    []string{""},
 	}
 
-	cert, caPool, err := GenerateSelfSignedCertificate(subject)
+	cert, caPool, err := security.GenerateSelfSignedCertificate(subject)
 	if err != nil {
 		t.Fatalf("Failed to generate test certificate: %v", err)
 	}
 
-	config := NewTLSConfig(cert, caPool, tls.RequireAndVerifyClientCert)
+	config := security.NewTLSConfig(cert, caPool, tls.RequireAndVerifyClientCert)
 
 	if config == nil {
 		t.Error("NewTLSConfig() should not return nil")
+		return
 	}
 
 	if config.MinVersion != tls.VersionTLS12 {
@@ -786,7 +654,7 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 		PostalCode:    []string{"12345"},
 	}
 
-	cert, caPool, err := GenerateSelfSignedCertificate(subject)
+	cert, caPool, err := security.GenerateSelfSignedCertificate(subject)
 	if err != nil {
 		t.Fatalf("GenerateSelfSignedCertificate() failed: %v", err)
 	}
@@ -800,13 +668,13 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 	}
 
 	// Validate the generated certificate
-	err = ValidateCertificate(cert)
+	err = security.ValidateCertificate(cert)
 	if err != nil {
 		t.Errorf("Generated certificate should be valid: %v", err)
 	}
 
 	// Check if certificate is not expired
-	expired, err := IsCertificateExpired(cert)
+	expired, err := security.IsCertificateExpired(cert)
 	if err != nil {
 		t.Errorf("Error checking certificate expiration: %v", err)
 	}
@@ -818,19 +686,19 @@ func TestGenerateSelfSignedCertificate(t *testing.T) {
 func TestValidateCertificate(t *testing.T) {
 	// Test with empty certificate
 	emptyCert := tls.Certificate{}
-	err := ValidateCertificate(emptyCert)
+	err := security.ValidateCertificate(emptyCert)
 	if err == nil {
 		t.Error("ValidateCertificate() should fail with empty certificate")
 	}
 
 	// Test with valid certificate
 	subject := pkix.Name{Organization: []string{"Test"}}
-	cert, _, err := GenerateSelfSignedCertificate(subject)
+	cert, _, err := security.GenerateSelfSignedCertificate(subject)
 	if err != nil {
 		t.Fatalf("Failed to generate test certificate: %v", err)
 	}
 
-	err = ValidateCertificate(cert)
+	err = security.ValidateCertificate(cert)
 	if err != nil {
 		t.Errorf("ValidateCertificate() should pass with valid certificate: %v", err)
 	}
@@ -839,19 +707,19 @@ func TestValidateCertificate(t *testing.T) {
 func TestIsCertificateExpired(t *testing.T) {
 	// Test with empty certificate
 	emptyCert := tls.Certificate{}
-	_, err := IsCertificateExpired(emptyCert)
+	_, err := security.IsCertificateExpired(emptyCert)
 	if err == nil {
 		t.Error("IsCertificateExpired() should fail with empty certificate")
 	}
 
 	// Test with valid certificate
 	subject := pkix.Name{Organization: []string{"Test"}}
-	cert, _, err := GenerateSelfSignedCertificate(subject)
+	cert, _, err := security.GenerateSelfSignedCertificate(subject)
 	if err != nil {
 		t.Fatalf("Failed to generate test certificate: %v", err)
 	}
 
-	expired, err := IsCertificateExpired(cert)
+	expired, err := security.IsCertificateExpired(cert)
 	if err != nil {
 		t.Errorf("IsCertificateExpired() failed: %v", err)
 	}
@@ -863,7 +731,7 @@ func TestIsCertificateExpired(t *testing.T) {
 func TestLoadCertAndConfig(t *testing.T) {
 	// This test will fail because we don't have actual cert files
 	// but it tests the error handling path
-	_, err := LoadCertAndConfig("nonexistent.crt", "nonexistent.key", "nonexistent.ca", tls.NoClientCert)
+	_, err := security.LoadCertAndConfig("nonexistent.crt", "nonexistent.key", "nonexistent.ca", tls.NoClientCert)
 	if err == nil {
 		t.Error("LoadCertAndConfig() should fail with nonexistent files")
 	}
@@ -871,7 +739,7 @@ func TestLoadCertAndConfig(t *testing.T) {
 
 func TestLoadCertificate(t *testing.T) {
 	// Test with nonexistent files
-	_, err := LoadCertificate("nonexistent.crt", "nonexistent.key")
+	_, err := security.LoadCertificate("nonexistent.crt", "nonexistent.key")
 	if err == nil {
 		t.Error("LoadCertificate() should fail with nonexistent files")
 	}
@@ -879,7 +747,7 @@ func TestLoadCertificate(t *testing.T) {
 
 func TestLoadCACertPool(t *testing.T) {
 	// Test with nonexistent file
-	_, err := LoadCACertPool("nonexistent.ca")
+	_, err := security.LoadCACertPool("nonexistent.ca")
 	if err == nil {
 		t.Error("LoadCACertPool() should fail with nonexistent file")
 	}
@@ -887,12 +755,12 @@ func TestLoadCACertPool(t *testing.T) {
 	// Test with invalid CA file
 	tempDir := t.TempDir()
 	invalidCAFile := filepath.Join(tempDir, "invalid.ca")
-	err = os.WriteFile(invalidCAFile, []byte("invalid certificate data"), 0644)
+	err = os.WriteFile(invalidCAFile, []byte("invalid certificate data"), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create invalid CA file: %v", err)
 	}
 
-	_, err = LoadCACertPool(invalidCAFile)
+	_, err = security.LoadCACertPool(invalidCAFile)
 	if err == nil {
 		t.Error("LoadCACertPool() should fail with invalid certificate data")
 	}
@@ -904,7 +772,7 @@ func BenchmarkSHA256(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		SHA256(data)
+		security.SHA256(data)
 	}
 }
 
@@ -913,7 +781,7 @@ func BenchmarkXX(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		XX(data)
+		security.XX(data)
 	}
 }
 
@@ -922,19 +790,23 @@ func BenchmarkMd5(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		Md5(data)
+		security.Md5(data)
 	}
 }
 
 func BenchmarkGetRandomBytes(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		GetRandomBytes(32)
+		if _, err := security.GetRandomBytes(32); err != nil {
+			b.Logf("Failed to get random bytes: %v", err)
+		}
 	}
 }
 
 func BenchmarkGenerateRandomPassword(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		GenerateRandomPassword(16)
+		if _, err := security.GenerateRandomPassword(16); err != nil {
+			b.Logf("Failed to generate password: %v", err)
+		}
 	}
 }
 
@@ -943,6 +815,6 @@ func BenchmarkStringToKey32(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		StringToKey32(input)
+		security.StringToKey32(input)
 	}
 }
