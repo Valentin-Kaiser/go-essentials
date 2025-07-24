@@ -97,7 +97,9 @@ func TestTemplateManagerWithFS(t *testing.T) {
 	if result != tm {
 		t.Error("Expected WithFS to return same template manager instance")
 	}
-} // TestTemplateManagerWithFileServer tests the template manager with file server
+}
+
+// TestTemplateManagerWithFileServer tests the template manager with file server
 func TestTemplateManagerWithFileServer(t *testing.T) {
 	// Create a temporary directory with a test template
 	tempDir, err := os.MkdirTemp("", "mail_templates_test")

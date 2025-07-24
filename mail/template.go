@@ -12,6 +12,7 @@ import (
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/text/cases"
 )
 
 // templateManager implements the TemplateManager interface
@@ -266,7 +267,7 @@ func (tm *templateManager) parseTemplate(name, content string) (*template.Templa
 		},
 		"upper": strings.ToUpper,
 		"lower": strings.ToLower,
-		"title": strings.Title,
+		"title": cases.Title,
 		"trim":  strings.TrimSpace,
 		"replace": func(old, new, s string) string {
 			return strings.ReplaceAll(s, old, new)
