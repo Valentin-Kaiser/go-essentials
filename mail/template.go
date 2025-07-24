@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/rs/zerolog/log"
@@ -302,8 +303,33 @@ func (tm *templateManager) parseTemplate(name, content string) (*template.Templa
 			return dict
 		},
 		"formatDate": func(format string, date interface{}) string {
-			// This would need proper date formatting implementation
-			return fmt.Sprintf("%v", date)
+			// Handle different date types and formats
+			switch v := date.(type) {
+			case time.Time:
+				if format == "" {
+					format = "2006-01-02 15:04:05"
+				}
+				return v.Format(format)
+			case *time.Time:
+				if v == nil {
+					return ""
+				}
+				if format == "" {
+					format = "2006-01-02 15:04:05"
+				}
+				return v.Format(format)
+			case string:
+				// Try to parse string as time
+				if t, err := time.Parse(time.RFC3339, v); err == nil {
+					if format == "" {
+						format = "2006-01-02 15:04:05"
+					}
+					return t.Format(format)
+				}
+				return v
+			default:
+				return fmt.Sprintf("%v", date)
+			}
 		},
 	}
 

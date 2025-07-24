@@ -80,6 +80,8 @@ type ServerConfig struct {
 	MaxRecipients int `yaml:"max_recipients" json:"max_recipients"`
 	// AllowInsecureAuth allows authentication over non-TLS connections
 	AllowInsecureAuth bool `yaml:"allow_insecure_auth" json:"allow_insecure_auth"`
+	// MaxConcurrentHandlers limits the number of concurrent notification handlers
+	MaxConcurrentHandlers int `yaml:"max_concurrent_handlers" json:"max_concurrent_handlers"`
 }
 
 // QueueConfig holds the queue configuration for mail processing
@@ -127,17 +129,18 @@ func DefaultConfig() *Config {
 			RetryDelay:                  5 * time.Second,
 		},
 		Server: ServerConfig{
-			Enabled:           false,
-			Host:              "localhost",
-			Port:              2525,
-			Domain:            "localhost",
-			Auth:              false,
-			TLS:               false,
-			ReadTimeout:       10 * time.Second,
-			WriteTimeout:      10 * time.Second,
-			MaxMessageBytes:   10 * 1024 * 1024, // 10MB
-			MaxRecipients:     100,
-			AllowInsecureAuth: false,
+			Enabled:               false,
+			Host:                  "localhost",
+			Port:                  2525,
+			Domain:                "localhost",
+			Auth:                  false,
+			TLS:                   false,
+			ReadTimeout:           10 * time.Second,
+			WriteTimeout:          10 * time.Second,
+			MaxMessageBytes:       10 * 1024 * 1024, // 10MB
+			MaxRecipients:         100,
+			AllowInsecureAuth:     false,
+			MaxConcurrentHandlers: 50, // Limit concurrent notification handlers
 		},
 		Queue: QueueConfig{
 			Enabled:     true,

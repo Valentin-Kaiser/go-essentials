@@ -197,9 +197,46 @@ func (b *MessageBuilder) Attach(attachment Attachment) *MessageBuilder {
 	return b
 }
 
+// AttachInline adds an inline file attachment with Content-ID for embedding in HTML
+func (b *MessageBuilder) AttachInline(filename, contentType, contentID string, content []byte) *MessageBuilder {
+	attachment := Attachment{
+		Filename:    filename,
+		ContentType: contentType,
+		Content:     content,
+		Size:        int64(len(content)),
+		Inline:      true,
+		ContentID:   contentID,
+	}
+	b.message.Attachments = append(b.message.Attachments, attachment)
+	return b
+}
+
+// AttachInlineFromReader adds an inline file attachment from a reader with Content-ID for embedding in HTML
+func (b *MessageBuilder) AttachInlineFromReader(filename, contentType, contentID string, reader io.Reader, size int64) *MessageBuilder {
+	attachment := Attachment{
+		Filename:    filename,
+		ContentType: contentType,
+		Reader:      reader,
+		Size:        size,
+		Inline:      true,
+		ContentID:   contentID,
+	}
+	b.message.Attachments = append(b.message.Attachments, attachment)
+	return b
+}
+
 // AttachFile adds a file attachment from a multipart file header
+// Note: The caller is responsible for ensuring the file remains open during email processing
+// and closing it afterwards if using Reader-based attachment.
 func (b *MessageBuilder) AttachFile(fileHeader *multipart.FileHeader) *MessageBuilder {
 	file, err := fileHeader.Open()
+	if err != nil {
+		return b
+	}
+
+	// Read the file content into memory and close it to prevent resource leaks
+	content, err := io.ReadAll(file)
+	file.Close() // Always close the file
 	if err != nil {
 		return b
 	}
@@ -207,7 +244,7 @@ func (b *MessageBuilder) AttachFile(fileHeader *multipart.FileHeader) *MessageBu
 	attachment := Attachment{
 		Filename:    fileHeader.Filename,
 		ContentType: fileHeader.Header.Get("Content-Type"),
-		Reader:      file,
+		Content:     content, // Use content instead of reader to avoid resource leaks
 		Size:        fileHeader.Size,
 	}
 

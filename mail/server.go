@@ -27,20 +27,27 @@ import (
 
 // smtpServer implements the Server interface
 type smtpServer struct {
-	config   ServerConfig
-	server   *smtp.Server
-	manager  *Manager
-	handlers []NotificationHandler
-	running  int32
-	mutex    sync.RWMutex
+	config           ServerConfig
+	server           *smtp.Server
+	manager          *Manager
+	handlers         []NotificationHandler
+	running          int32
+	mutex            sync.RWMutex
+	handlerSemaphore chan struct{} // Semaphore to limit concurrent handlers
 }
 
 // NewSMTPServer creates a new SMTP server
 func NewSMTPServer(config ServerConfig, manager *Manager) Server {
+	// Set default for MaxConcurrentHandlers if not specified
+	if config.MaxConcurrentHandlers <= 0 {
+		config.MaxConcurrentHandlers = 50
+	}
+
 	return &smtpServer{
-		config:   config,
-		manager:  manager,
-		handlers: make([]NotificationHandler, 0),
+		config:           config,
+		manager:          manager,
+		handlers:         make([]NotificationHandler, 0),
+		handlerSemaphore: make(chan struct{}, config.MaxConcurrentHandlers),
 	}
 }
 
@@ -81,6 +88,7 @@ func (s *smtpServer) Start(ctx context.Context) error {
 	}
 
 	// Start server in goroutine
+	serverReady := make(chan error, 1)
 	go func() {
 		var err error
 		if s.config.TLS {
@@ -93,19 +101,54 @@ func (s *smtpServer) Start(ctx context.Context) error {
 
 		if err != nil && err != smtp.ErrServerClosed {
 			log.Error().Err(err).Msg("[Mail] SMTP server error")
+			select {
+			case serverReady <- err:
+			default:
+			}
 		}
 
 		atomic.StoreInt32(&s.running, 0)
 	}()
 
-	// Wait for server to start
-	time.Sleep(100 * time.Millisecond)
+	// Check if server started successfully by attempting to connect
+	go func() {
+		maxAttempts := 10
+		for i := 0; i < maxAttempts; i++ {
+			time.Sleep(10 * time.Millisecond)
+			
+			// Try to connect to the server
+			conn, err := net.DialTimeout("tcp", s.server.Addr, 100*time.Millisecond)
+			if err == nil {
+				conn.Close()
+				log.Info().
+					Str("addr", s.server.Addr).
+					Msg("[Mail] SMTP server started successfully")
+				select {
+				case serverReady <- nil:
+				default:
+				}
+				return
+			}
+			
+			// Check if we should stop trying
+			if !s.IsRunning() {
+				select {
+				case serverReady <- apperror.NewError("server stopped before becoming ready"):
+				default:
+				}
+				return
+			}
+		}
+		
+		// Timeout waiting for server to be ready
+		select {
+		case serverReady <- apperror.NewError("timeout waiting for server to become ready"):
+		default:
+		}
+	}()
 
-	log.Info().
-		Str("addr", s.server.Addr).
-		Msg("[Mail] SMTP server started successfully")
-
-	return nil
+	// Wait for server to be ready or fail
+	return <-serverReady
 }
 
 // Stop stops the SMTP server
@@ -239,7 +282,7 @@ func (s *smtpServer) generateSelfSignedCert() (tls.Certificate, error) {
 	return cert, nil
 }
 
-// notifyHandlers notifies all registered handlers
+// notifyHandlers notifies all registered handlers with worker pool limiting
 func (s *smtpServer) notifyHandlers(ctx context.Context, from string, to []string, data []byte) {
 	s.mutex.RLock()
 	handlers := make([]NotificationHandler, len(s.handlers))
@@ -247,15 +290,40 @@ func (s *smtpServer) notifyHandlers(ctx context.Context, from string, to []strin
 	s.mutex.RUnlock()
 
 	for _, handler := range handlers {
-		go func(h NotificationHandler) {
-			if err := h(ctx, from, to, data); err != nil {
-				log.Error().
-					Err(err).
-					Str("from", from).
-					Strs("to", to).
-					Msg("[Mail] Notification handler failed")
-			}
-		}(handler)
+		// Use semaphore to limit concurrent handlers
+		select {
+		case s.handlerSemaphore <- struct{}{}:
+			// Got a slot, start the handler
+			go func(h NotificationHandler) {
+				defer func() {
+					// Release the semaphore slot
+					<-s.handlerSemaphore
+				}()
+				
+				if err := h(ctx, from, to, data); err != nil {
+					log.Error().
+						Err(err).
+						Str("from", from).
+						Strs("to", to).
+						Msg("[Mail] Notification handler failed")
+				}
+			}(handler)
+		case <-ctx.Done():
+			// Context cancelled, don't start new handlers
+			log.Warn().
+				Err(ctx.Err()).
+				Str("from", from).
+				Strs("to", to).
+				Msg("[Mail] Notification handler cancelled due to context")
+			return
+		default:
+			// No available slots, log and skip (or could queue for later)
+			log.Warn().
+				Str("from", from).
+				Strs("to", to).
+				Int("max_handlers", s.config.MaxConcurrentHandlers).
+				Msg("[Mail] Too many concurrent notification handlers, skipping")
+		}
 	}
 }
 

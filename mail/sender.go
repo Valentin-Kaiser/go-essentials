@@ -202,10 +202,16 @@ func (s *smtpSender) addAttachment(emailMsg *email.Email, attachment Attachment)
 		return apperror.NewError("attachment has no content or reader")
 	}
 
-	if attachment.Inline {
-		// Inline attachment
-		_, err := emailMsg.Attach(reader, attachment.Filename, attachment.ContentType)
-		return err
+	if attachment.Inline && attachment.ContentID != "" {
+		// Inline attachment with Content-ID for HTML embedding
+		a, err := emailMsg.Attach(reader, attachment.Filename, attachment.ContentType)
+		if err != nil {
+			return err
+		}
+		// Set Content-ID header for inline attachments
+		a.Header.Set("Content-ID", fmt.Sprintf("<%s>", attachment.ContentID))
+		a.Header.Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", attachment.Filename))
+		return nil
 	} else {
 		// Regular attachment
 		_, err := emailMsg.Attach(reader, attachment.Filename, attachment.ContentType)
