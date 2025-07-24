@@ -42,12 +42,12 @@ func NewTemplateManager(config TemplateConfig) TemplateManager {
 func (tm *templateManager) WithFS(filesystem fs.FS) TemplateManager {
 	tm.config.FileSystem = filesystem
 	tm.config.TemplatesPath = ""
-	
+
 	// Reload templates from the new filesystem
 	if err := tm.ReloadTemplates(); err != nil {
 		log.Error().Err(err).Msg("[Mail] Failed to load templates from filesystem")
 	}
-	
+
 	return tm
 }
 
@@ -59,15 +59,15 @@ func (tm *templateManager) WithFileServer(templatesPath string) TemplateManager 
 			return tm
 		}
 	}
-	
+
 	tm.config.TemplatesPath = templatesPath
 	tm.config.FileSystem = nil
-	
+
 	// Reload templates from the new path
 	if err := tm.ReloadTemplates(); err != nil {
 		log.Error().Err(err).Msg("[Mail] Failed to load templates from file path")
 	}
-	
+
 	return tm
 }
 
@@ -125,7 +125,7 @@ func (tm *templateManager) ReloadTemplates() error {
 	} else {
 		log.Warn().Msg("[Mail] No templates loaded - templates will be unavailable")
 	}
-	
+
 	return nil
 }
 

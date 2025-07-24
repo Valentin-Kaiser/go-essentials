@@ -276,9 +276,9 @@ func (m *Manager) IsRunning() bool {
 // SendTestEmail sends a test email
 func (m *Manager) SendTestEmail(ctx context.Context, to string) error {
 	testMessage := &Message{
-		From:    m.config.SMTP.From,
-		To:      []string{to},
-		Subject: "Test Email",
+		From:     m.config.SMTP.From,
+		To:       []string{to},
+		Subject:  "Test Email",
 		TextBody: "This is a test email from the mail manager.",
 		HTMLBody: "<p>This is a test email from the mail manager.</p>",
 	}
