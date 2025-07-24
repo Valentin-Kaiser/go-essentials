@@ -1,0 +1,314 @@
+package mail
+
+import (
+	"bytes"
+	"context"
+	"crypto/md5"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"net/smtp"
+	"strings"
+	"time"
+
+	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/jordan-wright/email"
+	"github.com/rs/zerolog/log"
+)
+
+// smtpSender implements the Sender interface using jordan-wright/email
+type smtpSender struct {
+	config          SMTPConfig
+	templateManager TemplateManager
+}
+
+// NewSMTPSender creates a new SMTP sender
+func NewSMTPSender(config SMTPConfig, templateManager TemplateManager) Sender {
+	return &smtpSender{
+		config:          config,
+		templateManager: templateManager,
+	}
+}
+
+// Send sends an email message via SMTP
+func (s *smtpSender) Send(ctx context.Context, message *Message) error {
+	// Validate message
+	if err := s.validateMessage(message); err != nil {
+		return apperror.Wrap(err)
+	}
+
+	// Process template if specified
+	if err := s.processTemplate(message); err != nil {
+		return apperror.Wrap(err)
+	}
+
+	// Create email using jordan-wright/email
+	emailMsg, err := s.createEmail(message)
+	if err != nil {
+		return apperror.Wrap(err)
+	}
+
+	// Send with retries
+	for attempt := 0; attempt <= s.config.MaxRetries; attempt++ {
+		if attempt > 0 {
+			log.Warn().
+				Int("attempt", attempt).
+				Str("message_id", message.ID).
+				Msg("[Mail] Retrying email send")
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(s.config.RetryDelay):
+				// Continue with retry
+			}
+		}
+
+		err = s.sendEmail(ctx, emailMsg)
+		if err == nil {
+			return nil
+		}
+
+		log.Error().
+			Err(err).
+			Int("attempt", attempt).
+			Str("message_id", message.ID).
+			Msg("[Mail] Failed to send email via SMTP")
+
+		if attempt == s.config.MaxRetries {
+			break
+		}
+	}
+
+	return apperror.NewError("failed to send email after retries").AddError(err)
+}
+
+// SendAsync is not implemented for SMTP sender (handled by manager)
+func (s *smtpSender) SendAsync(ctx context.Context, message *Message) error {
+	return apperror.NewError("async sending not supported by SMTP sender directly")
+}
+
+// validateMessage validates the email message
+func (s *smtpSender) validateMessage(message *Message) error {
+	if message.From == "" && s.config.From == "" {
+		return apperror.NewError("from address is required")
+	}
+
+	if len(message.To) == 0 {
+		return apperror.NewError("at least one recipient is required")
+	}
+
+	if message.Subject == "" {
+		return apperror.NewError("subject is required")
+	}
+
+	if message.TextBody == "" && message.HTMLBody == "" && message.Template == "" {
+		return apperror.NewError("message body or template is required")
+	}
+
+	return nil
+}
+
+// processTemplate processes the email template if specified
+func (s *smtpSender) processTemplate(message *Message) error {
+	if message.Template == "" {
+		return nil
+	}
+
+	htmlBody, err := s.templateManager.RenderTemplate(message.Template, message.TemplateData)
+	if err != nil {
+		return apperror.Wrap(err)
+	}
+
+	message.HTMLBody = htmlBody
+	return nil
+}
+
+// createEmail creates an email.Email from our Message
+func (s *smtpSender) createEmail(message *Message) (*email.Email, error) {
+	emailMsg := email.NewEmail()
+
+	// Set From address
+	from := message.From
+	if from == "" {
+		from = s.config.From
+	}
+	emailMsg.From = from
+
+	// Set recipients
+	emailMsg.To = message.To
+	emailMsg.Cc = message.CC
+	emailMsg.Bcc = message.BCC
+
+	// Set Reply-To
+	if message.ReplyTo != "" {
+		emailMsg.ReplyTo = []string{message.ReplyTo}
+	}
+
+	// Set subject
+	emailMsg.Subject = message.Subject
+
+	// Set body content
+	if message.TextBody != "" {
+		emailMsg.Text = []byte(message.TextBody)
+	}
+	if message.HTMLBody != "" {
+		emailMsg.HTML = []byte(message.HTMLBody)
+	}
+
+	// Set custom headers
+	if emailMsg.Headers == nil {
+		emailMsg.Headers = make(map[string][]string)
+	}
+
+	// Add Message-ID if available
+	if message.ID != "" {
+		emailMsg.Headers["Message-ID"] = []string{fmt.Sprintf("<%s@%s>", message.ID, s.config.Host)}
+	}
+
+	// Add priority header
+	if message.Priority != PriorityNormal {
+		priority := s.getPriorityHeader(message.Priority)
+		emailMsg.Headers["X-Priority"] = []string{priority}
+	}
+
+	// Add custom headers
+	for key, value := range message.Headers {
+		emailMsg.Headers[key] = []string{value}
+	}
+
+	// Add attachments
+	for _, attachment := range message.Attachments {
+		if err := s.addAttachment(emailMsg, attachment); err != nil {
+			log.Warn().
+				Err(err).
+				Str("filename", attachment.Filename).
+				Msg("[Mail] Failed to add attachment")
+		}
+	}
+
+	return emailMsg, nil
+}
+
+// addAttachment adds an attachment to the email
+func (s *smtpSender) addAttachment(emailMsg *email.Email, attachment Attachment) error {
+	var reader io.Reader
+
+	if attachment.Content != nil {
+		reader = bytes.NewReader(attachment.Content)
+	} else if attachment.Reader != nil {
+		reader = attachment.Reader
+	} else {
+		return apperror.NewError("attachment has no content or reader")
+	}
+
+	if attachment.Inline {
+		// Inline attachment
+		_, err := emailMsg.Attach(reader, attachment.Filename, attachment.ContentType)
+		return err
+	} else {
+		// Regular attachment
+		_, err := emailMsg.Attach(reader, attachment.Filename, attachment.ContentType)
+		return err
+	}
+}
+
+// sendEmail sends the email using the appropriate method
+func (s *smtpSender) sendEmail(ctx context.Context, emailMsg *email.Email) error {
+	// Prepare authentication
+	var auth smtp.Auth
+	if s.config.Auth {
+		auth = s.createAuth()
+	}
+
+	// Get server address
+	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
+
+	// Send based on encryption method
+	switch strings.ToUpper(s.config.Encryption) {
+	case "TLS":
+		return s.sendWithTLS(emailMsg, addr, auth)
+	case "STARTTLS":
+		return s.sendWithStartTLS(emailMsg, addr, auth)
+	default:
+		return s.sendPlain(emailMsg, addr, auth)
+	}
+}
+
+// createAuth creates SMTP authentication
+func (s *smtpSender) createAuth() smtp.Auth {
+	switch strings.ToUpper(s.config.AuthMethod) {
+	case "CRAMMD5":
+		hasher := md5.New()
+		hasher.Write([]byte(s.config.Password))
+		md5Hash := hex.EncodeToString(hasher.Sum(nil))
+		return smtp.CRAMMD5Auth(s.config.Username, md5Hash)
+	case "LOGIN":
+		return NewLoginAuth(s.config.Username, s.config.Password)
+	default:
+		return smtp.PlainAuth("", s.config.Username, s.config.Password, s.config.Host)
+	}
+}
+
+// sendWithTLS sends email with TLS encryption
+func (s *smtpSender) sendWithTLS(emailMsg *email.Email, addr string, auth smtp.Auth) error {
+	tlsConfig := s.config.TLSConfig()
+	return emailMsg.SendWithTLS(addr, auth, tlsConfig)
+}
+
+// sendWithStartTLS sends email with STARTTLS encryption
+func (s *smtpSender) sendWithStartTLS(emailMsg *email.Email, addr string, auth smtp.Auth) error {
+	tlsConfig := s.config.TLSConfig()
+	return emailMsg.SendWithStartTLS(addr, auth, tlsConfig)
+}
+
+// sendPlain sends email without encryption
+func (s *smtpSender) sendPlain(emailMsg *email.Email, addr string, auth smtp.Auth) error {
+	return emailMsg.Send(addr, auth)
+}
+
+// getPriorityHeader converts priority to email header value
+func (s *smtpSender) getPriorityHeader(priority Priority) string {
+	switch priority {
+	case PriorityCritical:
+		return "1 (Highest)"
+	case PriorityHigh:
+		return "2 (High)"
+	case PriorityNormal:
+		return "3 (Normal)"
+	case PriorityLow:
+		return "4 (Low)"
+	default:
+		return "3 (Normal)"
+	}
+}
+
+// LoginAuth implements LOGIN authentication for SMTP
+type LoginAuth struct {
+	username, password string
+}
+
+// NewLoginAuth creates a new LOGIN authenticator
+func NewLoginAuth(username, password string) smtp.Auth {
+	return &LoginAuth{username, password}
+}
+
+// Start begins the LOGIN authentication
+func (a *LoginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	return "LOGIN", []byte(a.username), nil
+}
+
+// Next handles the LOGIN authentication process
+func (a *LoginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if more {
+		switch string(fromServer) {
+		case "Username:", "VXNlcm5hbWU6": // "Username:" in base64
+			return []byte(a.username), nil
+		case "Password:", "UGFzc3dvcmQ6": // "Password:" in base64
+			return []byte(a.password), nil
+		default:
+			return nil, apperror.NewError("unexpected server challenge: " + string(fromServer))
+		}
+	}
+	return nil, nil
+}
