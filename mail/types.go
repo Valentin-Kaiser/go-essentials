@@ -13,52 +13,36 @@ import (
 type Message struct {
 	// ID is a unique identifier for the message
 	ID string `json:"id"`
-
 	// From is the sender's email address
 	From string `json:"from"`
-
 	// To is a list of recipient email addresses
 	To []string `json:"to"`
-
 	// CC is a list of carbon copy recipient email addresses
 	CC []string `json:"cc,omitempty"`
-
 	// BCC is a list of blind carbon copy recipient email addresses
 	BCC []string `json:"bcc,omitempty"`
-
 	// ReplyTo is the reply-to email address
 	ReplyTo string `json:"reply_to,omitempty"`
-
 	// Subject is the email subject
 	Subject string `json:"subject"`
-
 	// TextBody is the plain text body of the email
 	TextBody string `json:"text_body,omitempty"`
-
 	// HTMLBody is the HTML body of the email
 	HTMLBody string `json:"html_body,omitempty"`
-
 	// Template is the name of the template to use
 	Template string `json:"template,omitempty"`
-
 	// TemplateData is the data to pass to the template
 	TemplateData interface{} `json:"template_data,omitempty"`
-
 	// Attachments is a list of file attachments
 	Attachments []Attachment `json:"attachments,omitempty"`
-
 	// Headers contains additional email headers
 	Headers map[string]string `json:"headers,omitempty"`
-
 	// Priority is the message priority
 	Priority Priority `json:"priority"`
-
 	// CreatedAt is when the message was created
 	CreatedAt time.Time `json:"created_at"`
-
 	// ScheduleAt is when the message should be sent (optional)
 	ScheduleAt *time.Time `json:"schedule_at,omitempty"`
-
 	// Metadata contains additional metadata
 	Metadata map[string]string `json:"metadata,omitempty"`
 }
@@ -67,22 +51,16 @@ type Message struct {
 type Attachment struct {
 	// Filename is the name of the file
 	Filename string `json:"filename"`
-
 	// ContentType is the MIME content type
 	ContentType string `json:"content_type"`
-
 	// Content is the file content
 	Content []byte `json:"content,omitempty"`
-
 	// Reader is an alternative to Content for streaming large files
 	Reader io.Reader `json:"-"`
-
 	// Size is the size of the attachment in bytes
 	Size int64 `json:"size"`
-
 	// Inline indicates if the attachment should be displayed inline
 	Inline bool `json:"inline"`
-
 	// ContentID is used for inline attachments
 	ContentID string `json:"content_id,omitempty"`
 }
@@ -272,16 +250,12 @@ type NotificationHandler func(ctx context.Context, from string, to []string, dat
 type TemplateManager interface {
 	// LoadTemplate loads a template by name
 	LoadTemplate(name string) (*template.Template, error)
-
 	// RenderTemplate renders a template with the given data
 	RenderTemplate(name string, data interface{}) (string, error)
-
 	// ReloadTemplates reloads all templates
 	ReloadTemplates() error
-
 	// WithFS configures the template manager to load templates from a filesystem
 	WithFS(filesystem fs.FS) TemplateManager
-
 	// WithFileServer configures the template manager to load templates from a file path
 	WithFileServer(templatesPath string) TemplateManager
 }
@@ -290,7 +264,6 @@ type TemplateManager interface {
 type Sender interface {
 	// Send sends an email message
 	Send(ctx context.Context, message *Message) error
-
 	// SendAsync sends an email message asynchronously using the queue
 	SendAsync(ctx context.Context, message *Message) error
 }
@@ -299,13 +272,10 @@ type Sender interface {
 type Server interface {
 	// Start starts the SMTP server
 	Start(ctx context.Context) error
-
 	// Stop stops the SMTP server
 	Stop(ctx context.Context) error
-
 	// AddHandler adds a notification handler
 	AddHandler(handler NotificationHandler)
-
 	// IsRunning returns true if the server is running
 	IsRunning() bool
 }
