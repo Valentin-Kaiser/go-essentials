@@ -751,6 +751,25 @@ func (s *Server) SetBlacklist(list []string) *Server {
 	return s
 }
 
+// WithVaryHeader adds a Vary header to the server
+// The Vary header indicates which request headers a server uses when selecting the representation of a resource
+// This is important for caching behavior and content negotiation
+func (s *Server) WithVaryHeader(header string) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.router.Use(MiddlewareOrderDefault, varyHeaderMiddleware(header))
+	return s
+}
+
+// WithVaryHeaders adds multiple Vary headers to the server
+// The headers will be properly combined with any existing Vary headers
+func (s *Server) WithVaryHeaders(headers []string) *Server {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.router.Use(MiddlewareOrderDefault, varyHeaderMiddleware(headers...))
+	return s
+}
+
 // WithCustomMiddleware adds a custom middleware to the server
 func (s *Server) WithCustomMiddleware(middleware Middleware) *Server {
 	s.mutex.Lock()

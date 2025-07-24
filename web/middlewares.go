@@ -101,6 +101,36 @@ func corsHeaderMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// varyHeaderMiddleware creates a middleware that adds Vary headers to the response
+// It properly handles comma-separated values when multiple headers are specified
+func varyHeaderMiddleware(headers ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Execute the handler first
+			next.ServeHTTP(w, r)
+			
+			// Get existing Vary header after the handler has run
+			existing := w.Header().Get("Vary")
+			
+			// If we have headers to add
+			if len(headers) > 0 {
+				// Combine with new headers
+				var allHeaders []string
+				if existing != "" {
+					allHeaders = append(allHeaders, existing)
+				}
+				allHeaders = append(allHeaders, headers...)
+				
+				// Set the combined Vary header
+				w.Header().Set("Vary", allHeaders[0])
+				for _, header := range allHeaders[1:] {
+					w.Header().Add("Vary", header)
+				}
+			}
+		})
+	}
+}
+
 // logMiddleware is a middleware that logs the request and response
 // Must be used before the gzip middleware to ensure the response is logged correctly
 func logMiddleware(next http.Handler) http.Handler {
