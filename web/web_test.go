@@ -6,11 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/security"
 	"github.com/Valentin-Kaiser/go-core/web"
+	"github.com/gorilla/websocket"
 )
 
 func TestServerInstance(t *testing.T) {
@@ -180,5 +183,183 @@ func BenchmarkServerWithHandlerFunc(b *testing.B) {
 		server.WithHandlerFunc(fmt.Sprintf("/bench%d", i), func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
+	}
+}
+
+func TestServerConfiguration(t *testing.T) {
+	server := web.New()
+
+	// Test chainable configuration
+	result := server.
+		WithHost("0.0.0.0").
+		WithPort(8080).
+		WithReadTimeout(30 * time.Second).
+		WithWriteTimeout(30 * time.Second).
+		WithIdleTimeout(60 * time.Second)
+
+	if result != server {
+		t.Error("Configuration methods should return the same server instance")
+	}
+}
+
+func TestServerHandlers(t *testing.T) {
+	server := web.New()
+
+	// Test handler registration
+	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "test response")
+	})
+
+	result := server.WithHandlerFunc("/test", testHandler)
+	if result != server {
+		t.Error("WithHandlerFunc should return the same server instance")
+	}
+
+	result = server.WithHandler("/handler", testHandler)
+	if result != server {
+		t.Error("WithHandler should return the same server instance")
+	}
+}
+
+func TestServerFileServing(t *testing.T) {
+	server := web.New()
+
+	// Create a temporary directory with a test file
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "test.txt")
+	if err := os.WriteFile(testFile, []byte("test content"), 0600); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Test file server
+	result := server.WithFileServer([]string{"/static"}, tempDir)
+	if result != server {
+		t.Error("WithFileServer should return the same server instance")
+	}
+}
+
+func TestServerHeaders(t *testing.T) {
+	server := web.New()
+
+	// Test header configuration
+	result := server.
+		WithSecurityHeaders().
+		WithCORSHeaders().
+		WithHeader("X-Custom", "test").
+		WithCacheControl("max-age=3600")
+
+	if result != server {
+		t.Error("Header methods should return the same server instance")
+	}
+
+	// Test multiple headers
+	headers := map[string]string{
+		"X-Test":    "value1",
+		"X-Another": "value2",
+	}
+	result = server.WithHeaders(headers)
+	if result != server {
+		t.Error("WithHeaders should return the same server instance")
+	}
+}
+
+func TestServerTLS(t *testing.T) {
+	server := web.New()
+
+	// Test self-signed TLS
+	result := server.WithSelfSignedTLS()
+	if result != server {
+		t.Error("WithSelfSignedTLS should return the same server instance")
+	}
+
+	// Test custom TLS config
+	subject := pkix.Name{Organization: []string{"Test"}}
+	cert, caPool, err := security.GenerateSelfSignedCertificate(subject)
+	if err != nil {
+		t.Fatalf("Failed to generate test certificate: %v", err)
+	}
+
+	tlsConfig := security.NewTLSConfig(cert, caPool, tls.NoClientCert)
+	result = server.WithTLS(tlsConfig)
+	if result != server {
+		t.Error("WithTLS should return the same server instance")
+	}
+}
+
+func TestServerWebsocket(t *testing.T) {
+	server := web.New()
+
+	wsHandler := func(w http.ResponseWriter, r *http.Request, conn *websocket.Conn) {
+		// Simple echo websocket handler
+		for {
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				break
+			}
+			if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				break
+			}
+		}
+	}
+
+	result := server.WithWebsocket("/ws", wsHandler)
+	if result != server {
+		t.Error("WithWebsocket should return the same server instance")
+	}
+}
+
+func TestServerPortValidation(t *testing.T) {
+	server := web.New()
+
+	// Test invalid port should set error
+	server.WithPort(0) // Port 0 is valid (any available port)
+	if server.Error != nil {
+		t.Errorf("Port 0 should be valid, got error: %v", server.Error)
+	}
+
+	// Test maximum valid port
+	server = web.New()
+	server.WithPort(65535)
+	if server.Error != nil {
+		t.Errorf("Port 65535 should be valid, got error: %v", server.Error)
+	}
+}
+
+func TestServerMiddleware(t *testing.T) {
+	server := web.New()
+
+	// Test middleware methods
+	result := server.
+		WithLog().
+		WithRateLimit("test", 10, time.Minute).
+		WithGzip()
+
+	if result != server {
+		t.Error("Middleware methods should return the same server instance")
+	}
+
+	// Test Vary headers
+	result = server.WithVaryHeaders([]string{"Accept-Encoding", "Origin"})
+	if result != server {
+		t.Error("WithVaryHeaders should return the same server instance")
+	}
+}
+
+func TestResponseWriter(t *testing.T) {
+	// Test the custom ResponseWriter functionality
+	server := web.New()
+	
+	// Create a simple handler to test ResponseWriter
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Test", "true")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("test response"))
+	}
+
+	server.WithHandlerFunc("/test", handler)
+
+	// This tests that the server can handle basic requests
+	if server.Error != nil {
+		t.Errorf("Unexpected error setting up server: %v", server.Error)
 	}
 }

@@ -179,3 +179,110 @@ func BenchmarkAesCipherEncrypt(b *testing.B) {
 		}
 	}
 }
+
+func TestAesCipherInvalidKey(t *testing.T) {
+	testCases := []struct {
+		name    string
+		keySize int
+		valid   bool
+	}{
+		{"Valid AES128", 16, true},
+		{"Valid AES192", 24, true},
+		{"Valid AES256", 32, true},
+		{"Invalid too short", 8, false},
+		{"Invalid too long", 48, false},
+		{"Invalid odd size", 17, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := make([]byte, tc.keySize)
+			cipher := security.NewAesCipher().WithPassphrase(key)
+
+			// Try to encrypt something
+			var output bytes.Buffer
+			cipher.Encrypt("test", &output)
+
+			hasError := cipher.Error != nil
+			if tc.valid && hasError {
+				t.Errorf("Expected no error for valid key size %d, got: %v", tc.keySize, cipher.Error)
+			}
+			if !tc.valid && !hasError {
+				t.Errorf("Expected error for invalid key size %d, got none", tc.keySize)
+			}
+		})
+	}
+}
+
+func TestAesCipherWithAES256Key(t *testing.T) {
+	cipher := security.NewAesCipher().WithAES256()
+	
+	if cipher.Error != nil {
+		t.Errorf("WithAES256() set error: %v", cipher.Error)
+		return
+	}
+
+	plaintext := "Test message with AES256 key"
+	var encrypted bytes.Buffer
+	cipher.Encrypt(plaintext, &encrypted)
+
+	if cipher.Error != nil {
+		t.Errorf("Encrypt() with AES256 key returned error: %v", cipher.Error)
+		return
+	}
+
+	// Should be able to decrypt with same cipher
+	var decrypted bytes.Buffer
+	cipher.Decrypt(encrypted.String(), &decrypted)
+
+	if cipher.Error != nil {
+		t.Errorf("Decrypt() with AES256 key returned error: %v", cipher.Error)
+		return
+	}
+
+	if decrypted.String() != plaintext {
+		t.Errorf("Decrypt() = %q, want %q", decrypted.String(), plaintext)
+	}
+}
+
+func TestAesCipherErrorHandling(t *testing.T) {
+	// Test with invalid encrypted data
+	cipher := security.NewAesCipher().WithAES256()
+	
+	var output bytes.Buffer
+	cipher.Decrypt("invalid-encrypted-data", &output)
+	
+	if cipher.Error == nil {
+		t.Error("Expected error when decrypting invalid data")
+	}
+}
+
+func TestAesCipherMultipleOperations(t *testing.T) {
+	// Test method chaining
+	cipher := security.NewAesCipher().WithAES256()
+
+	if cipher.Error != nil {
+		t.Errorf("Method chaining failed: %v", cipher.Error)
+	}
+
+	// Test multiple operations
+	plaintext1 := "First message"
+	plaintext2 := "Second message"
+
+	var encrypted1, encrypted2 bytes.Buffer
+	
+	cipher.Encrypt(plaintext1, &encrypted1)
+	if cipher.Error != nil {
+		t.Errorf("First encrypt failed: %v", cipher.Error)
+	}
+
+	cipher.Encrypt(plaintext2, &encrypted2)
+	if cipher.Error != nil {
+		t.Errorf("Second encrypt failed: %v", cipher.Error)
+	}
+
+	// Verify they're different
+	if encrypted1.String() == encrypted2.String() {
+		t.Error("Same encrypted output for different inputs")
+	}
+}

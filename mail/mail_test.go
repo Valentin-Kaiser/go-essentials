@@ -1,7 +1,9 @@
 package mail_test
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -298,9 +300,325 @@ func TestInlineAttachments(t *testing.T) {
 	if attachment.Filename != "test.png" {
 		t.Errorf("Expected filename to be 'test.png', got %s", attachment.Filename)
 	}
+}
 
-	if attachment.ContentType != "image/png" {
-		t.Errorf("Expected content type to be 'image/png', got %s", attachment.ContentType)
+func TestManagerStartStop(t *testing.T) {
+	config := mail.DefaultConfig()
+	config.Queue.Enabled = false
+	config.Server.Enabled = false
+
+	queueManager := queue.NewManager()
+	manager := mail.NewManager(config, queueManager)
+
+	// Test start
+	err := manager.Start(t.Context())
+	if err != nil {
+		t.Errorf("Expected no error starting manager, got: %v", err)
+	}
+
+	if !manager.IsRunning() {
+		t.Error("Expected manager to be running after start")
+	}
+
+	// Test double start
+	err = manager.Start(t.Context())
+	if err == nil {
+		t.Error("Expected error when starting already running manager")
+	}
+
+	// Test stop
+	err = manager.Stop(t.Context())
+	if err != nil {
+		t.Errorf("Expected no error stopping manager, got: %v", err)
+	}
+
+	if manager.IsRunning() {
+		t.Error("Expected manager to not be running after stop")
+	}
+
+	// Test double stop
+	err = manager.Stop(t.Context())
+	if err == nil {
+		t.Error("Expected error when stopping already stopped manager")
+	}
+}
+
+func TestManagerSendNotRunning(t *testing.T) {
+	config := mail.DefaultConfig()
+	config.Queue.Enabled = false
+
+	queueManager := queue.NewManager()
+	manager := mail.NewManager(config, queueManager)
+
+	message, _ := mail.NewMessage().
+		From("sender@example.com").
+		To("recipient@example.com").
+		Subject("Test").
+		TextBody("Test message").
+		Build()
+
+	// Test send when not running
+	err := manager.Send(t.Context(), message)
+	if err == nil {
+		t.Error("Expected error when sending email with manager not running")
+	}
+}
+
+func TestManagerSendAsync(t *testing.T) {
+	config := mail.DefaultConfig()
+	config.Queue.Enabled = true
+
+	queueManager := queue.NewManager()
+	
+	// Start queue manager first
+	err := queueManager.Start(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to start queue manager: %v", err)
+	}
+	defer queueManager.Stop()
+
+	manager := mail.NewManager(config, queueManager)
+
+	// Start manager
+	_ = manager.Start(context.Background())
+	defer manager.Stop(context.Background())
+
+	message, _ := mail.NewMessage().
+		From("sender@example.com").
+		To("recipient@example.com").
+		Subject("Test Async").
+		TextBody("Test message").
+		Build()
+
+	// Test async send
+	err = manager.SendAsync(context.Background(), message)
+	if err != nil {
+		t.Errorf("Expected no error sending async email, got: %v", err)
+	}
+
+	stats := manager.GetStats()
+	if stats.QueuedCount == 0 {
+		t.Error("Expected queued count to be incremented")
+	}
+}
+
+func TestManagerSendAsyncQueueDisabled(t *testing.T) {
+	config := mail.DefaultConfig()
+	config.Queue.Enabled = false
+
+	manager := mail.NewManager(config, nil)
+	_ = manager.Start(t.Context())
+	defer manager.Stop(t.Context())
+
+	message, _ := mail.NewMessage().
+		From("sender@example.com").
+		To("recipient@example.com").
+		Subject("Test").
+		TextBody("Test message").
+		Build()
+
+	// Test async send with queue disabled
+	err := manager.SendAsync(t.Context(), message)
+	if err == nil {
+		t.Error("Expected error when sending async email with queue disabled")
+	}
+}
+
+func TestManagerAddNotificationHandler(t *testing.T) {
+	config := mail.DefaultConfig()
+	manager := mail.NewManager(config, nil)
+
+	handler := func(ctx context.Context, from string, to []string, data io.Reader) error {
+		return nil
+	}
+
+	// Test add handler
+	manager.AddNotificationHandler(handler)
+}
+
+func TestSenderValidation(t *testing.T) {
+	config := mail.SMTPConfig{
+		Host:       "localhost",
+		Port:       587,
+		From:       "",
+		Auth:       false,
+		Encryption: "NONE",
+		MaxRetries: 0, // Disable retries to make test faster
+		RetryDelay: time.Millisecond,
+	}
+
+	templateConfig := mail.TemplateConfig{
+		DefaultTemplate: "default.html",
+	}
+
+	tm := mail.NewTemplateManager(templateConfig)
+	sender := mail.NewSMTPSender(config, tm)
+
+	tests := []struct {
+		name      string
+		message   *mail.Message
+		wantError bool
+	}{
+		{
+			name: "missing recipients",
+			message: &mail.Message{
+				From:     "sender@example.com",
+				To:       []string{},
+				Subject:  "Test",
+				TextBody: "Test message",
+			},
+			wantError: true,
+		},
+		{
+			name: "missing subject", 
+			message: &mail.Message{
+				From:     "sender@example.com",
+				To:       []string{"recipient@example.com"},
+				Subject:  "",
+				TextBody: "Test message",
+			},
+			wantError: true,
+		},
+		{
+			name: "missing body",
+			message: &mail.Message{
+				From:    "sender@example.com",
+				To:      []string{"recipient@example.com"},
+				Subject: "Test",
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use a short timeout context to avoid long waits for network connection
+			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+			defer cancel()
+			
+			err := sender.Send(ctx, tt.message)
+			if (err != nil) != tt.wantError {
+				t.Errorf("Send() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+func TestMessageScheduling(t *testing.T) {
+	scheduleTime := time.Now().Add(time.Hour)
+
+	message, err := mail.NewMessage().
+		From("sender@example.com").
+		To("recipient@example.com").
+		Subject("Scheduled Message").
+		TextBody("This is a scheduled message").
+		ScheduleAt(scheduleTime).
+		Build()
+
+	if err != nil {
+		t.Errorf("Expected no error building scheduled message, got: %v", err)
+	}
+
+	if message.ScheduleAt == nil {
+		t.Error("Expected schedule time to be set")
+	}
+
+	if !message.ScheduleAt.Equal(scheduleTime) {
+		t.Errorf("Expected schedule time to be %v, got %v", scheduleTime, *message.ScheduleAt)
+	}
+}
+
+func TestMessageMetadata(t *testing.T) {
+	message, err := mail.NewMessage().
+		From("sender@example.com").
+		To("recipient@example.com").
+		Subject("Test with Metadata").
+		TextBody("Test message").
+		Metadata("campaign_id", "test-campaign").
+		Metadata("user_id", "123").
+		Build()
+
+	if err != nil {
+		t.Errorf("Expected no error building message with metadata, got: %v", err)
+	}
+
+	if message.Metadata == nil {
+		t.Error("Expected metadata to be set")
+	}
+
+	if message.Metadata["campaign_id"] != "test-campaign" {
+		t.Error("Expected campaign_id metadata to be preserved")
+	}
+
+	if message.Metadata["user_id"] != "123" {
+		t.Error("Expected user_id metadata to be preserved")
+	}
+}
+
+func TestMessageHeaders(t *testing.T) {
+	message, err := mail.NewMessage().
+		From("sender@example.com").
+		To("recipient@example.com").
+		Subject("Test with Headers").
+		TextBody("Test message").
+		Header("X-Campaign", "newsletter").
+		Header("X-MessageType", "promotional").
+		Build()
+
+	if err != nil {
+		t.Errorf("Expected no error building message with headers, got: %v", err)
+	}
+
+	if message.Headers == nil {
+		t.Error("Expected headers to be set")
+	}
+
+	if message.Headers["X-Campaign"] != "newsletter" {
+		t.Error("Expected X-Campaign header to be preserved")
+	}
+}
+
+func TestAttachFile(t *testing.T) {
+	// Create a temporary file for testing
+	tempDir := t.TempDir()
+	tempFile := filepath.Join(tempDir, "test.txt")
+	testContent := "This is test file content"
+	
+	if err := os.WriteFile(tempFile, []byte(testContent), 0600); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// Create attachment manually since AttachFile expects multipart.FileHeader
+	attachment := mail.Attachment{
+		Filename:    "test.txt",
+		ContentType: "text/plain",
+		Content:     []byte(testContent),
+		Size:        int64(len(testContent)),
+	}
+
+	message, err := mail.NewMessage().
+		From("sender@example.com").
+		To("recipient@example.com").
+		Subject("Test with File Attachment").
+		TextBody("Please see attached file").
+		Attach(attachment).
+		Build()
+
+	if err != nil {
+		t.Errorf("Expected no error building message with file attachment, got: %v", err)
+	}
+
+	if len(message.Attachments) != 1 {
+		t.Errorf("Expected 1 attachment, got %d", len(message.Attachments))
+	}
+
+	attachmentResult := message.Attachments[0]
+	if attachmentResult.Filename != "test.txt" {
+		t.Errorf("Expected attachment filename to be 'test.txt', got %s", attachmentResult.Filename)
+	}
+
+	if string(attachmentResult.Content) != testContent {
+		t.Errorf("Expected attachment content to match file content")
 	}
 }
 

@@ -742,3 +742,46 @@ func BenchmarkJobBuilder(b *testing.B) {
 			Build()
 	}
 }
+
+func TestJobScheduling(t *testing.T) {
+	scheduleTime := time.Now().Add(time.Hour)
+	
+	job := queue.NewJob("scheduled").
+		WithScheduleAt(scheduleTime).
+		Build()
+
+	if job.ScheduleAt.IsZero() {
+		t.Error("Expected ScheduleAt to be set")
+	}
+
+	if !job.ScheduleAt.Equal(scheduleTime) {
+		t.Errorf("Expected ScheduleAt to be %v, got %v", scheduleTime, job.ScheduleAt)
+	}
+}
+
+func TestJobMetadataAndBasics(t *testing.T) {
+	job := queue.NewJob("test").
+		WithMetadata("key1", "value1").
+		WithMetadata("key2", "value2").
+		Build()
+
+	if job.Metadata["key1"] != "value1" {
+		t.Errorf("Expected metadata key1 to be 'value1', got '%s'", job.Metadata["key1"])
+	}
+
+	if job.Metadata["key2"] != "value2" {
+		t.Errorf("Expected metadata key2 to be 'value2', got '%s'", job.Metadata["key2"])
+	}
+}
+
+func TestManagerBasics(t *testing.T) {
+	manager := queue.NewManager()
+	if manager == nil {
+		t.Error("Expected manager to be created")
+	}
+
+	stats := manager.GetStats()
+	if stats == nil {
+		t.Error("Expected stats to be available")
+	}
+}
