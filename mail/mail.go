@@ -462,29 +462,14 @@ func (m *Manager) jobDataToMessage(jobData map[string]interface{}) *Message {
 	if from, ok := jobData["from"].(string); ok {
 		message.From = from
 	}
-	if to, ok := jobData["to"].([]interface{}); ok {
-		message.To = make([]string, len(to))
-		for i, v := range to {
-			if s, ok := v.(string); ok {
-				message.To[i] = s
-			}
-		}
+	if to := jobData["to"]; to != nil {
+		message.To = convertToStringSlice(to)
 	}
-	if cc, ok := jobData["cc"].([]interface{}); ok {
-		message.CC = make([]string, len(cc))
-		for i, v := range cc {
-			if s, ok := v.(string); ok {
-				message.CC[i] = s
-			}
-		}
+	if cc := jobData["cc"]; cc != nil {
+		message.CC = convertToStringSlice(cc)
 	}
-	if bcc, ok := jobData["bcc"].([]interface{}); ok {
-		message.BCC = make([]string, len(bcc))
-		for i, v := range bcc {
-			if s, ok := v.(string); ok {
-				message.BCC[i] = s
-			}
-		}
+	if bcc := jobData["bcc"]; bcc != nil {
+		message.BCC = convertToStringSlice(bcc)
 	}
 	if replyTo, ok := jobData["reply_to"].(string); ok {
 		message.ReplyTo = replyTo
@@ -564,4 +549,47 @@ func (m *Manager) ReloadTemplates() error {
 // GetTemplateManager returns the template manager for advanced configuration
 func (m *Manager) GetTemplateManager() TemplateManager {
 	return m.templateManager
+}
+
+// convertToStringSlice safely converts various types to []string
+// This handles different JSON unmarshaling scenarios for string slice fields
+func convertToStringSlice(value interface{}) []string {
+	switch v := value.(type) {
+	case []string:
+		// Direct string slice (ideal case)
+		return v
+	case []interface{}:
+		// JSON unmarshaled as interface slice
+		result := make([]string, 0, len(v))
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				result = append(result, str)
+			}
+		}
+		return result
+	case string:
+		// Single string value
+		return []string{v}
+	case nil:
+		// Nil value
+		return nil
+	default:
+		// Fallback: try to convert to string and return as single-item slice
+		if str := convertToString(value); str != "" {
+			return []string{str}
+		}
+		return nil
+	}
+}
+
+// convertToString safely converts various types to string
+func convertToString(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case []byte:
+		return string(v)
+	default:
+		return ""
+	}
 }
