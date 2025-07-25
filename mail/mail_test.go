@@ -18,12 +18,12 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	config := mail.DefaultConfig()
 
-	if config.SMTP.Host != "localhost" {
-		t.Errorf("Expected SMTP host to be localhost, got %s", config.SMTP.Host)
+	if config.Client.Host != "localhost" {
+		t.Errorf("Expected SMTP host to be localhost, got %s", config.Client.Host)
 	}
 
-	if config.SMTP.Port != 587 {
-		t.Errorf("Expected SMTP port to be 587, got %d", config.SMTP.Port)
+	if config.Client.Port != 587 {
+		t.Errorf("Expected SMTP port to be 587, got %d", config.Client.Port)
 	}
 
 	if config.Queue.Enabled != true {
@@ -166,7 +166,7 @@ func TestTemplateManagerWithFileServer(t *testing.T) {
 }
 
 func TestSMTPSender(t *testing.T) {
-	config := mail.SMTPConfig{
+	config := mail.ClientConfig{
 		Host:       "localhost",
 		Port:       587,
 		From:       "sender@example.com",
@@ -437,7 +437,7 @@ func TestManagerAddNotificationHandler(t *testing.T) {
 }
 
 func TestSenderValidation(t *testing.T) {
-	config := mail.SMTPConfig{
+	config := mail.ClientConfig{
 		Host:       "localhost",
 		Port:       587,
 		From:       "",
@@ -707,7 +707,7 @@ func TestManagerTemplateConfiguration(t *testing.T) {
 	}
 
 	// Test GetTemplateManager method
-	tm := manager.GetTemplateManager()
+	tm := manager.TemplateManager
 	if tm == nil {
 		t.Error("Expected GetTemplateManager to return template manager")
 	}
