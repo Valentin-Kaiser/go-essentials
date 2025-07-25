@@ -1,4 +1,4 @@
-// Package core provides a simple, structured, and extensible way to manage
+// Package config provides a simple, structured, and extensible way to manage
 // application configuration in Go.
 //
 // It builds upon the Viper library and adds
@@ -27,7 +27,7 @@
 //
 //	import (
 //	    "fmt"
-//	    "github.com/Valentin-Kaiser/go-core/config/core"
+//	    "github.com/Valentin-Kaiser/go-core/config"
 //	    "github.com/fsnotify/fsnotify"
 //	)
 //
@@ -47,7 +47,7 @@
 //	}
 //
 //	func Get() *ServerConfig {
-//	    c, ok := core.Get().(*ServerConfig)
+//	    c, ok := config.Get().(*ServerConfig)
 //	    if !ok {
 //	        return &ServerConfig{}
 //	    }
@@ -60,27 +60,27 @@
 //	        Port: 8080,
 //	    }
 //
-//	    if err := core.RegisterConfig("server", cfg); err != nil {
+//	    if err := config.Register("server", cfg); err != nil {
 //	        fmt.Println("Error registering config:", err)
 //	        return
 //	    }
 //
-//	    if err := core.Read(); err != nil {
+//	    if err := config.Read(); err != nil {
 //	        fmt.Println("Error reading config:", err)
 //	        return
 //	    }
 //
-//	    core.Watch(func(e fsnotify.Event) {
-//	        if err := core.Read(); err != nil {
+//	    config.Watch(func(e fsnotify.Event) {
+//	        if err := config.Read(); err != nil {
 //	            fmt.Println("Error reloading config:", err)
 //	        }
 //	    })
 //
-//	    if err := core.Write(cfg); err != nil {
+//	    if err := config.Write(cfg); err != nil {
 //	        fmt.Println("Error writing config:", err)
 //	    }
 //	}
-package core
+package config
 
 import (
 	"os"
@@ -115,9 +115,9 @@ type Config interface {
 	Validate() error
 }
 
-// RegisterConfig registers a configuration struct and parses its tags
+// Register registers a configuration struct and parses its tags
 // The name is used as the name of the configuration file and the prefix for the environment variables
-func RegisterConfig(name string, c Config) error {
+func Register(name string, c Config) error {
 	if c == nil {
 		return apperror.NewError("the configuration provided is nil")
 	}
