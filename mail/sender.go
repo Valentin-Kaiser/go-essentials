@@ -16,12 +16,12 @@ import (
 
 // smtpSender implements the Sender interface using jordan-wright/email
 type smtpSender struct {
-	config          SMTPConfig
-	templateManager TemplateManager
+	config          ClientConfig
+	templateManager *TemplateManager
 }
 
 // NewSMTPSender creates a new SMTP sender
-func NewSMTPSender(config SMTPConfig, templateManager TemplateManager) Sender {
+func NewSMTPSender(config ClientConfig, templateManager *TemplateManager) Sender {
 	return &smtpSender{
 		config:          config,
 		templateManager: templateManager,

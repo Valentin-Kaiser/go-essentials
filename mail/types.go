@@ -2,9 +2,7 @@ package mail
 
 import (
 	"context"
-	"html/template"
 	"io"
-	"io/fs"
 	"mime/multipart"
 	"strings"
 	"time"
@@ -351,20 +349,6 @@ func (b *MessageBuilder) Build() (*Message, error) {
 
 // NotificationHandler is a function that handles incoming SMTP messages
 type NotificationHandler func(ctx context.Context, from string, to []string, data io.Reader) error
-
-// TemplateManager manages email templates
-type TemplateManager interface {
-	// LoadTemplate loads a template by name
-	LoadTemplate(name string) (*template.Template, error)
-	// RenderTemplate renders a template with the given data
-	RenderTemplate(name string, data interface{}) (string, error)
-	// ReloadTemplates reloads all templates
-	ReloadTemplates() error
-	// WithFS configures the template manager to load templates from a filesystem
-	WithFS(filesystem fs.FS) TemplateManager
-	// WithFileServer configures the template manager to load templates from a file path
-	WithFileServer(templatesPath string) TemplateManager
-}
 
 // Sender is the interface for sending emails
 type Sender interface {

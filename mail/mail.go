@@ -116,7 +116,7 @@ type Manager struct {
 	config          *Config
 	sender          Sender
 	server          Server
-	templateManager TemplateManager
+	TemplateManager *TemplateManager
 	queueManager    *queue.Manager
 	stats           *Stats
 	statsMutex      sync.RWMutex
@@ -138,8 +138,8 @@ func NewManager(config *Config, queueManager *queue.Manager) *Manager {
 		cancel:       cancel,
 	}
 
-	manager.templateManager = NewTemplateManager(config.Templates)
-	manager.sender = NewSMTPSender(config.SMTP, manager.templateManager)
+	manager.TemplateManager = NewTemplateManager(config.Templates)
+	manager.sender = NewSMTPSender(config.Client, manager.TemplateManager)
 
 	if config.Server.Enabled {
 		manager.server = NewSMTPServer(config.Server, manager)
@@ -348,7 +348,7 @@ func (m *Manager) IsRunning() bool {
 // SendTestEmail sends a test email
 func (m *Manager) SendTestEmail(ctx context.Context, to string) error {
 	testMessage := &Message{
-		From:     m.config.SMTP.From,
+		From:     m.config.Client.From,
 		To:       []string{to},
 		Subject:  "Test Email",
 		TextBody: "This is a test email from the mail manager.",
@@ -524,31 +524,26 @@ func (m *Manager) jobDataToMessage(jobData map[string]interface{}) *Message {
 
 // WithFS configures the template manager to load templates from a filesystem
 func (m *Manager) WithFS(filesystem fs.FS) *Manager {
-	if m.templateManager != nil {
-		m.templateManager.WithFS(filesystem)
+	if m.TemplateManager != nil {
+		m.TemplateManager.WithFS(filesystem)
 	}
 	return m
 }
 
 // WithFileServer configures the template manager to load templates from a file path
 func (m *Manager) WithFileServer(templatesPath string) *Manager {
-	if m.templateManager != nil {
-		m.templateManager.WithFileServer(templatesPath)
+	if m.TemplateManager != nil {
+		m.TemplateManager.WithFileServer(templatesPath)
 	}
 	return m
 }
 
 // ReloadTemplates reloads all templates
 func (m *Manager) ReloadTemplates() error {
-	if m.templateManager != nil {
-		return m.templateManager.ReloadTemplates()
+	if m.TemplateManager != nil {
+		return m.TemplateManager.ReloadTemplates()
 	}
 	return apperror.NewError("template manager is not initialized")
-}
-
-// GetTemplateManager returns the template manager for advanced configuration
-func (m *Manager) GetTemplateManager() TemplateManager {
-	return m.templateManager
 }
 
 // convertToStringSlice safely converts various types to []string

@@ -4,12 +4,14 @@ import (
 	"crypto/tls"
 	"io/fs"
 	"time"
+
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 // Config holds the configuration for the mail package
 type Config struct {
 	// SMTP Client Configuration
-	SMTP SMTPConfig `yaml:"smtp" json:"smtp"`
+	Client ClientConfig `yaml:"smtp" json:"smtp"`
 	// SMTP Server Configuration
 	Server ServerConfig `yaml:"server" json:"server"`
 	// Queue Configuration
@@ -18,8 +20,8 @@ type Config struct {
 	Templates TemplateConfig `yaml:"templates" json:"templates"`
 }
 
-// SMTPConfig holds the SMTP client configuration for sending emails
-type SMTPConfig struct {
+// ClientConfig holds the SMTP client configuration for sending emails
+type ClientConfig struct {
 	// Host is the SMTP server hostname
 	Host string `yaml:"host" json:"host"`
 	// Port is the SMTP server port
@@ -115,7 +117,7 @@ type TemplateConfig struct {
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		SMTP: SMTPConfig{
+		Client: ClientConfig{
 			Host:                        "localhost",
 			Port:                        587,
 			From:                        "noreply@example.com",
@@ -158,7 +160,7 @@ func DefaultConfig() *Config {
 }
 
 // TLSConfig returns a TLS configuration for the SMTP client
-func (c *SMTPConfig) TLSConfig() *tls.Config {
+func (c *ClientConfig) TLSConfig() *tls.Config {
 	return &tls.Config{
 		ServerName:         c.Host,
 		InsecureSkipVerify: c.SkipCertificateVerification,
@@ -166,9 +168,85 @@ func (c *SMTPConfig) TLSConfig() *tls.Config {
 	}
 }
 
+func (c *ClientConfig) Validate() error {
+	if c.Host == "" {
+		return apperror.NewError("SMTP host is required")
+	}
+	if c.Port <= 0 || c.Port > 65535 {
+		return apperror.NewError("SMTP port must be between 1 and 65535")
+	}
+	if c.Auth {
+		if c.Username == "" {
+			return apperror.NewError("SMTP username is required")
+		}
+		if c.Password == "" {
+			return apperror.NewError("SMTP password is required")
+		}
+	}
+	if c.From == "" {
+		return apperror.NewError("SMTP from address is required")
+	}
+	if c.FQDN == "" {
+		return apperror.NewError("SMTP FQDN is required")
+	}
+	return nil
+}
+
 // TLSConfig returns a TLS configuration for the SMTP server
 func (c *ServerConfig) TLSConfig() *tls.Config {
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
+}
+
+func (c *ServerConfig) Validate() error {
+	if c.Host == "" {
+		return apperror.NewError("SMTP server host is required")
+	}
+	if c.Port <= 0 || c.Port > 65535 {
+		return apperror.NewError("SMTP server port must be between 1 and 65535")
+	}
+	if c.Domain == "" {
+		return apperror.NewError("SMTP server domain is required")
+	}
+	if c.TLS && (c.CertFile == "" || c.KeyFile == "") {
+		return apperror.NewError("TLS is enabled but certificate or key file is missing")
+	}
+	return nil
+}
+
+func (c *QueueConfig) Validate() error {
+	if c.QueueName == "" {
+		return apperror.NewError("Queue name is required")
+	}
+	if c.MaxAttempts <= 0 {
+		return apperror.NewError("Max attempts must be greater than 0")
+	}
+	if c.JobTimeout <= 0 {
+		return apperror.NewError("Job timeout must be greater than 0")
+	}
+	return nil
+}
+
+func (c *TemplateConfig) Validate() error {
+	if c.DefaultTemplate == "" {
+		return apperror.NewError("Default template is required")
+	}
+	return nil
+}
+
+func (c *Config) Validate() error {
+	if err := c.Client.Validate(); err != nil {
+		return apperror.Wrap(err)
+	}
+	if err := c.Server.Validate(); err != nil {
+		return apperror.Wrap(err)
+	}
+	if err := c.Queue.Validate(); err != nil {
+		return apperror.Wrap(err)
+	}
+	if err := c.Templates.Validate(); err != nil {
+		return apperror.Wrap(err)
+	}
+	return nil
 }

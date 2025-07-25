@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
 
-// templateManager implements the TemplateManager interface
-type templateManager struct {
+// TemplateManager implements the TemplateManager interface
+type TemplateManager struct {
 	config    TemplateConfig
 	templates map[string]*template.Template
 	funcs     template.FuncMap
@@ -26,8 +27,8 @@ type templateManager struct {
 }
 
 // NewTemplateManager creates a new template manager
-func NewTemplateManager(config TemplateConfig) TemplateManager {
-	tm := &templateManager{
+func NewTemplateManager(config TemplateConfig) *TemplateManager {
+	tm := &TemplateManager{
 		config:    config,
 		templates: make(map[string]*template.Template),
 	}
@@ -43,7 +44,7 @@ func NewTemplateManager(config TemplateConfig) TemplateManager {
 }
 
 // WithFS configures the template manager to load templates from a filesystem
-func (tm *templateManager) WithFS(filesystem fs.FS) TemplateManager {
+func (tm *TemplateManager) WithFS(filesystem fs.FS) *TemplateManager {
 	if tm.Error != nil {
 		return tm
 	}
@@ -60,7 +61,7 @@ func (tm *templateManager) WithFS(filesystem fs.FS) TemplateManager {
 }
 
 // WithFileServer configures the template manager to load templates from a file path
-func (tm *templateManager) WithFileServer(templatesPath string) TemplateManager {
+func (tm *TemplateManager) WithFileServer(templatesPath string) *TemplateManager {
 	if tm.Error != nil {
 		return tm
 	}
@@ -83,7 +84,7 @@ func (tm *templateManager) WithFileServer(templatesPath string) TemplateManager 
 	return tm
 }
 
-func (tm *templateManager) WithTemplateFunc(key string, fn interface{}) TemplateManager {
+func (tm *TemplateManager) WithTemplateFunc(key string, fn interface{}) *TemplateManager {
 	if tm.Error != nil {
 		return tm
 	}
@@ -105,7 +106,7 @@ func (tm *templateManager) WithTemplateFunc(key string, fn interface{}) Template
 }
 
 // LoadTemplate loads a template by name
-func (tm *templateManager) LoadTemplate(name string) (*template.Template, error) {
+func (tm *TemplateManager) LoadTemplate(name string) (*template.Template, error) {
 	if tm.Error != nil {
 		return nil, tm.Error
 	}
@@ -127,7 +128,7 @@ func (tm *templateManager) LoadTemplate(name string) (*template.Template, error)
 }
 
 // RenderTemplate renders a template with the given data
-func (tm *templateManager) RenderTemplate(name string, data interface{}) (string, error) {
+func (tm *TemplateManager) RenderTemplate(name string, data interface{}) (string, error) {
 	if tm.Error != nil {
 		return "", tm.Error
 	}
@@ -146,7 +147,7 @@ func (tm *templateManager) RenderTemplate(name string, data interface{}) (string
 }
 
 // ReloadTemplates reloads all templates
-func (tm *templateManager) ReloadTemplates() error {
+func (tm *TemplateManager) ReloadTemplates() error {
 	if tm.Error != nil {
 		return tm.Error
 	}
@@ -171,7 +172,7 @@ func (tm *templateManager) ReloadTemplates() error {
 }
 
 // loadTemplatesFromFS loads templates from a filesystem
-func (tm *templateManager) loadTemplatesFromFS(filesystem fs.FS) error {
+func (tm *TemplateManager) loadTemplatesFromFS(filesystem fs.FS) error {
 	if tm.Error != nil {
 		return tm.Error
 	}
@@ -197,13 +198,14 @@ func (tm *templateManager) loadTemplatesFromFS(filesystem fs.FS) error {
 			return apperror.Wrap(err)
 		}
 
+		log.Trace().Str("template", path).Msg("loaded template from filesystem")
 		tm.templates[path] = tmpl
 		return nil
 	})
 }
 
 // loadTemplatesFromPath loads templates from the specified file path
-func (tm *templateManager) loadTemplatesFromPath(templatesPath string) error {
+func (tm *TemplateManager) loadTemplatesFromPath(templatesPath string) error {
 	if tm.Error != nil {
 		return tm.Error
 	}
@@ -239,13 +241,14 @@ func (tm *templateManager) loadTemplatesFromPath(templatesPath string) error {
 			return apperror.Wrap(err)
 		}
 
+		log.Trace().Str("template", relPath).Msg("loaded template from path")
 		tm.templates[relPath] = tmpl
 		return nil
 	})
 }
 
 // loadTemplateFromDisk loads a single template from the configured source
-func (tm *templateManager) loadTemplateFromDisk(name string) (*template.Template, error) {
+func (tm *TemplateManager) loadTemplateFromDisk(name string) (*template.Template, error) {
 	if tm.Error != nil {
 		return nil, tm.Error
 	}
@@ -290,7 +293,7 @@ func (tm *templateManager) loadTemplateFromDisk(name string) (*template.Template
 }
 
 // parseTemplate parses a template with common functions
-func (tm *templateManager) parseTemplate(name, content string) (*template.Template, error) {
+func (tm *TemplateManager) parseTemplate(name, content string) (*template.Template, error) {
 	if tm.funcs == nil {
 		tm.funcs = make(template.FuncMap)
 	}
@@ -304,7 +307,7 @@ func (tm *templateManager) parseTemplate(name, content string) (*template.Templa
 	return tmpl, nil
 }
 
-func (tm *templateManager) WithDefaultFuncs() TemplateManager {
+func (tm *TemplateManager) WithDefaultFuncs() *TemplateManager {
 	if tm.Error != nil {
 		return tm
 	}
