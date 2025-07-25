@@ -3,8 +3,6 @@ package mail
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net/smtp"
@@ -245,10 +243,8 @@ func (s *smtpSender) sendEmail(ctx context.Context, emailMsg *email.Email) error
 func (s *smtpSender) createAuth() smtp.Auth {
 	switch strings.ToUpper(s.config.AuthMethod) {
 	case "CRAMMD5":
-		hasher := md5.New()
-		hasher.Write([]byte(s.config.Password))
-		md5Hash := hex.EncodeToString(hasher.Sum(nil))
-		return smtp.CRAMMD5Auth(s.config.Username, md5Hash)
+		// Use the proper CRAM-MD5 implementation from net/smtp
+		return smtp.CRAMMD5Auth(s.config.Username, s.config.Password)
 	case "LOGIN":
 		return NewLoginAuth(s.config.Username, s.config.Password)
 	default:
