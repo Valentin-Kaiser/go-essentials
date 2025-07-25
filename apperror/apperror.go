@@ -71,9 +71,6 @@ var (
 
 	// ErrorHandler is a function that handles deferred error checks
 	ErrorHandler = func(err error, msg string) {
-		if err == nil {
-			return
-		}
 		if flag.Debug {
 			panic(fmt.Sprintf(FullFormat, strings.Join(trace(Error{Message: msg}), TraceDelimiter), msg, err.Error()))
 		}
@@ -302,6 +299,9 @@ func Parse(str string) Error {
 // It takes an error and a message, and if the error is not nil,
 // it formats the message and panics with the error details.
 func Handle(err error, msg string) {
+	if err == nil {
+		return
+	}
 	if ErrorHandler != nil {
 		ErrorHandler(err, msg)
 	}
@@ -310,6 +310,9 @@ func Handle(err error, msg string) {
 // HandleCustom is a utility function to handle error checks with a custom handler
 // It takes an error, a message, and a custom handler.
 func HandleCustom(err error, msg string, handler func(error, string)) {
+	if err == nil {
+		return
+	}
 	if handler != nil {
 		handler(err, msg)
 		return
@@ -325,7 +328,9 @@ func HandleCustom(err error, msg string, handler func(error, string)) {
 // defer apperror.Catch(funcWithError(), "an error occurred")
 func Catch(f func() error, msg string) {
 	if ErrorHandler != nil {
-		ErrorHandler(f(), msg)
+		if err := f(); err != nil {
+			ErrorHandler(err, msg)
+		}
 	}
 }
 
@@ -333,11 +338,17 @@ func Catch(f func() error, msg string) {
 // It takes a function that returns an error, a message, and a custom handler.
 func CatchCustom(f func() error, msg string, handler func(error, string)) {
 	if handler != nil {
-		handler(f(), msg)
-		return
+		// handler(f(), msg)
+		// return
+		if err := f(); err != nil {
+			handler(err, msg)
+			return
+		}
 	}
 	if ErrorHandler != nil {
-		ErrorHandler(f(), msg)
+		if err := f(); err != nil {
+			ErrorHandler(err, msg)
+		}
 	}
 }
 
