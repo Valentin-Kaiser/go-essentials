@@ -350,7 +350,7 @@ func (b *MessageBuilder) Build() (*Message, error) {
 }
 
 // NotificationHandler is a function that handles incoming SMTP messages
-type NotificationHandler func(ctx context.Context, from string, to []string, data []byte) error
+type NotificationHandler func(ctx context.Context, from string, to []string, data io.Reader) error
 
 // TemplateManager manages email templates
 type TemplateManager interface {

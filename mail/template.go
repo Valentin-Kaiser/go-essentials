@@ -338,7 +338,13 @@ func (tm *templateManager) WithDefaultFuncs() TemplateManager {
 		},
 		"upper": strings.ToUpper,
 		"lower": strings.ToLower,
-		"title": func(s string, lang language.Tag) string {
+		"title": func(s string, langCode string) string {
+			lang, err := language.Parse(langCode)
+			if err != nil {
+				// Default to English if parsing fails
+				lang = language.English
+			}
+
 			return cases.Title(lang, cases.NoLower).String(s)
 		},
 		"trim": strings.TrimSpace,

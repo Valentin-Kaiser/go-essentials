@@ -45,7 +45,7 @@ type handlerTask struct {
 	ctx     context.Context
 	from    string
 	to      []string
-	data    []byte
+	data    io.Reader
 }
 
 // NewSMTPServer creates a new SMTP server
@@ -307,7 +307,7 @@ func (s *smtpServer) notifyHandlers(ctx context.Context, from string, to []strin
 			ctx:     ctx,
 			from:    from,
 			to:      to,
-			data:    data,
+			data:    bytes.NewReader(data),
 		}
 
 		// Try to queue the task, with timeout to avoid blocking

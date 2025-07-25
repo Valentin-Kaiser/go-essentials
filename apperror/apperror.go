@@ -220,14 +220,12 @@ func (e Error) Error() string {
 		}
 
 		switch {
-		case errors == "" && details == "":
-			return fmt.Sprintf(ErrorTraceFormat, trace, e.Message)
 		case errors == "" && details != "":
 			return fmt.Sprintf("%s | %s", trace, details)
 		case errors != "" && details == "":
-			return fmt.Sprintf(ErrorTraceFormat, trace, e.Message, errors)
-		case errors != "" && details != "":
 			return fmt.Sprintf(FullFormat, trace, e.Message, errors)
+		case errors != "" && details != "":
+			return fmt.Sprintf(FullFormat, trace, e.Message, errors) + details
 		default:
 			return fmt.Sprintf(ErrorTraceFormat, trace, e.Message)
 		}
@@ -247,8 +245,6 @@ func (e Error) Error() string {
 	}
 
 	switch {
-	case errors == "" && details == "":
-		return e.Message
 	case errors == "" && details != "":
 		return fmt.Sprintf("%s | %s", e.Message, details)
 	case errors != "" && details == "":
@@ -256,7 +252,7 @@ func (e Error) Error() string {
 	case errors != "" && details != "":
 		return fmt.Sprintf(FullFormat, e.Message, errors, details)
 	default:
-		return fmt.Sprintf(ErrorFormat, e.Message)
+		return e.Message
 	}
 }
 
