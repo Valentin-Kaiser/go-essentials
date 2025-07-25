@@ -52,6 +52,22 @@ var (
 	ErrorTraceFormat = "%s | %s"
 	// FullFormat is the format for displaying the error message with a stack trace and additional errors
 	FullFormat = "%s | %s [%s]"
+	// WithDetails is a flag to control whether additional details should be included in the error output
+	WithDetails = false
+	// FormatDetails is a function that formats additional details for the error
+	FormatDetails = func(details map[string]interface{}) string {
+		if len(details) == 0 {
+			return ""
+		}
+		var sb strings.Builder
+		for key, value := range details {
+			if sb.Len() > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(fmt.Sprintf("%s: %v", key, value))
+		}
+		return sb.String()
+	}
 
 	// ErrorHandler is a function that handles deferred error checks
 	ErrorHandler = func(err error, msg string) {
@@ -70,6 +86,7 @@ var (
 type Error struct {
 	Trace   []string
 	Errors  []error
+	Context map[string]interface{} // Additional context for the error
 	Message string
 }
 
@@ -132,6 +149,51 @@ func (e Error) AddErrors(errs []error) Error {
 	return e
 }
 
+// AddDetail adds a key-value pair to the error context
+// This can be used to provide additional information about the error
+// For example, you can add user IDs, request IDs, or any other relevant data
+func (e Error) AddDetail(key string, value interface{}) Error {
+	if e.Context == nil {
+		e.Context = make(map[string]interface{})
+	}
+	e.Context[key] = value
+	return e
+}
+
+// AddDetails adds multiple key-value pairs to the error context
+// This can be used to provide additional information about the error
+func (e Error) AddDetails(details map[string]interface{}) Error {
+	if e.Context == nil {
+		e.Context = make(map[string]interface{})
+	}
+	for key, value := range details {
+		e.Context[key] = value
+	}
+	return e
+}
+
+// GetDetail retrieves a value from the error context by key
+// If the key does not exist, it returns nil
+func (e Error) GetDetail(key string) interface{} {
+	if e.Context == nil {
+		return nil
+	}
+	value, exists := e.Context[key]
+	if !exists {
+		return nil
+	}
+	return value
+}
+
+// GetContext returns the context map of the error
+// This can be used to retrieve additional information that was added to the error
+func (e Error) GetContext() map[string]interface{} {
+	if e.Context == nil {
+		return nil
+	}
+	return e.Context
+}
+
 // Error implements the error interface and returns the error message
 // If debug mode is enabled, it includes the stack trace and additional errors
 func (e Error) Error() string {
@@ -152,10 +214,21 @@ func (e Error) Error() string {
 			errors += d.Error()
 		}
 
-		if errors == "" {
+		details := ""
+		if WithDetails && e.Context != nil {
+			details = FormatDetails(e.Context)
+		}
+
+		switch {
+		case errors == "" && details != "":
+			return fmt.Sprintf("%s | %s", trace, details)
+		case errors != "" && details == "":
+			return fmt.Sprintf(FullFormat, trace, e.Message, errors)
+		case errors != "" && details != "":
+			return fmt.Sprintf(FullFormat, trace, e.Message, errors) + details
+		default:
 			return fmt.Sprintf(ErrorTraceFormat, trace, e.Message)
 		}
-		return fmt.Sprintf(FullFormat, trace, e.Message, errors)
 	}
 
 	errors := ""
@@ -166,10 +239,21 @@ func (e Error) Error() string {
 		errors += d.Error()
 	}
 
-	if errors == "" {
+	details := ""
+	if WithDetails && e.Context != nil {
+		details = FormatDetails(e.Context)
+	}
+
+	switch {
+	case errors == "" && details != "":
+		return fmt.Sprintf("%s | %s", e.Message, details)
+	case errors != "" && details == "":
+		return fmt.Sprintf(ErrorFormat, e.Message, errors)
+	case errors != "" && details != "":
+		return fmt.Sprintf(FullFormat, e.Message, errors, details)
+	default:
 		return e.Message
 	}
-	return fmt.Sprintf(ErrorFormat, e.Message, errors)
 }
 
 // Split separates the error into its components: message, trace, and additional errors

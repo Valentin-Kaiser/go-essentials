@@ -287,3 +287,154 @@ func BenchmarkErrorString(b *testing.B) {
 		_ = err.Error()
 	}
 }
+
+func TestErrorWithContext(t *testing.T) {
+	err := apperror.NewError("context error").
+		AddDetail("user_id", "12345").
+		AddDetail("operation", "delete").
+		AddDetail("timestamp", "2023-01-01T00:00:00Z")
+
+	// Test that all details are preserved
+	context := err.GetContext()
+	if len(context) != 3 {
+		t.Errorf("Expected 3 details, got %d", len(context))
+	}
+
+	// Test individual detail retrieval
+	userID := err.GetDetail("user_id")
+	if userID != "12345" {
+		t.Errorf("Expected user_id to be '12345', got %v", userID)
+	}
+
+	operation := err.GetDetail("operation")
+	if operation != "delete" {
+		t.Errorf("Expected operation to be 'delete', got %v", operation)
+	}
+
+	// Test non-existent detail
+	nonExistent := err.GetDetail("non_existent")
+	if nonExistent != nil {
+		t.Errorf("Expected non-existent detail to be nil, got %v", nonExistent)
+	}
+}
+
+func TestErrorChaining(t *testing.T) {
+	originalErr := errors.New("original error")
+	wrappedErr := apperror.Wrap(originalErr)
+
+	// Test that wrapping preserves the original message
+	if !strings.Contains(wrappedErr.Error(), "original error") {
+		t.Error("Expected wrapped error to contain original message")
+	}
+
+	// Test error chaining
+	err1 := apperror.NewError("error1")
+	err2 := apperror.NewError("error2").AddError(err1)
+
+	errorString := err2.Error()
+	if !strings.Contains(errorString, "error1") {
+		t.Error("Expected chained error to contain nested error message")
+	}
+}
+
+func TestCatchFunction(t *testing.T) {
+	// Test normal error handling (Catch expects to panic)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected Catch to panic on error")
+		}
+	}()
+
+	// This should panic
+	apperror.Catch(func() error {
+		return errors.New("test error")
+	}, "operation failed")
+}
+
+func TestCatchFunctionSuccess(t *testing.T) {
+	// Test successful operation (should not panic)
+	apperror.Catch(func() error {
+		return nil
+	}, "should not fail")
+	// If we reach here, the test passed
+}
+
+func TestHandle(t *testing.T) {
+	// Test Handle with nil error (should not panic)
+	apperror.Handle(nil, "no error")
+
+	// Test Handle with error (should panic)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected Handle to panic on error")
+		}
+	}()
+
+	apperror.Handle(errors.New("test error"), "handle test")
+}
+
+func TestSplitFunction(t *testing.T) {
+	err := apperror.NewError("test message").
+		AddError(errors.New("nested error"))
+
+	message, trace, errs := apperror.Split(err)
+
+	if message != "test message" {
+		t.Errorf("Expected message 'test message', got '%s'", message)
+	}
+
+	if len(trace) == 0 {
+		t.Error("Expected non-empty trace")
+	}
+
+	if len(errs) != 1 {
+		t.Errorf("Expected 1 nested error, got %d", len(errs))
+	}
+
+	if errs[0].Error() != "nested error" {
+		t.Errorf("Expected nested error 'nested error', got '%s'", errs[0].Error())
+	}
+
+	// Test with standard error
+	stdErr := errors.New("standard error")
+	message2, trace2, errs2 := apperror.Split(stdErr)
+
+	if message2 != "standard error" {
+		t.Errorf("Expected message 'standard error', got '%s'", message2)
+	}
+
+	if trace2 != nil {
+		t.Error("Expected nil trace for standard error")
+	}
+
+	if errs2 != nil {
+		t.Error("Expected nil errors for standard error")
+	}
+}
+
+func TestParseFunction(t *testing.T) {
+	// Test parsing simple error
+	err := apperror.Parse("simple error")
+	if err.Message != "simple error" {
+		t.Errorf("Expected message 'simple error', got '%s'", err.Message)
+	}
+
+	// Test parsing with trace
+	complexStr := "func1+10 -> func2+20 -> error message"
+	err2 := apperror.Parse(complexStr)
+	if err2.Message != "error message" {
+		t.Errorf("Expected message 'error message', got '%s'", err2.Message)
+	}
+}
+
+func TestWhereFunction(t *testing.T) {
+	location := apperror.Where(2)
+	if location == "" || location == "unknown" {
+		t.Error("Expected valid location information")
+	}
+
+	// Should contain file and line information
+	if !strings.Contains(location, ":") {
+		t.Error("Expected location to contain file:line format")
+	}
+}

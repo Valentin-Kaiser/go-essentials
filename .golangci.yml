@@ -61,6 +61,10 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - wastedassign
+
+    - paralleltest
+    - funcorder
+    - dupword
   
   settings:
     gosec:
