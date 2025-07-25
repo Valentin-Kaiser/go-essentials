@@ -72,7 +72,7 @@ func NewSMTPServer(config ServerConfig, manager *Manager) Server {
 }
 
 // Start starts the SMTP server
-func (s *smtpServer) Start(ctx context.Context) error {
+func (s *smtpServer) Start(_ context.Context) error {
 	if !atomic.CompareAndSwapInt32(&s.running, 0, 1) {
 		return apperror.NewError("SMTP server is already running")
 	}
@@ -128,7 +128,7 @@ func (s *smtpServer) Start(ctx context.Context) error {
 			// Try to connect to the server
 			conn, err := net.DialTimeout("tcp", s.server.Addr, 100*time.Millisecond)
 			if err == nil {
-				conn.Close()
+				apperror.Catch(conn.Close, "failed to close connection")
 				select {
 				case serverReady <- nil:
 				default:
@@ -272,10 +272,10 @@ func (s *smtpServer) generateSelfSignedCert() (tls.Certificate, error) {
 
 	// Save certificates if paths are specified
 	if s.config.CertFile != "" && s.config.KeyFile != "" {
-		if err := os.MkdirAll(filepath.Dir(s.config.CertFile), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(s.config.CertFile), 0750); err != nil {
 			log.Warn().Err(err).Msg("[Mail] Failed to create certificate directory")
 		} else {
-			if err := os.WriteFile(s.config.CertFile, certPEM.Bytes(), 0644); err != nil {
+			if err := os.WriteFile(s.config.CertFile, certPEM.Bytes(), 0600); err != nil {
 				log.Warn().Err(err).Msg("[Mail] Failed to save certificate file")
 			}
 
@@ -419,7 +419,7 @@ func (s *smtpSession) AuthPlain(username, password string) error {
 }
 
 // Mail handles the MAIL FROM command
-func (s *smtpSession) Mail(from string, opts *smtp.MailOptions) error {
+func (s *smtpSession) Mail(from string, _ *smtp.MailOptions) error {
 	if s.server.config.Auth && !s.authenticated {
 		log.Warn().Str("from", from).Msg("[Mail] Unauthenticated MAIL command rejected")
 		return smtp.ErrAuthRequired
@@ -431,7 +431,7 @@ func (s *smtpSession) Mail(from string, opts *smtp.MailOptions) error {
 }
 
 // Rcpt handles the RCPT TO command
-func (s *smtpSession) Rcpt(to string, opts *smtp.RcptOptions) error {
+func (s *smtpSession) Rcpt(to string, _ *smtp.RcptOptions) error {
 	if s.server.config.Auth && !s.authenticated {
 		log.Warn().Str("to", to).Msg("[Mail] Unauthenticated RCPT command rejected")
 		return smtp.ErrAuthRequired

@@ -304,7 +304,7 @@ func (b *MessageBuilder) AttachFile(fileHeader *multipart.FileHeader) *MessageBu
 
 	// Read the file content into memory and close it to prevent resource leaks
 	content, err := io.ReadAll(file)
-	file.Close() // Always close the file
+	apperror.Catch(file.Close, "failed to close attachment file")
 	if err != nil {
 		b.Error = apperror.NewError("failed to read attachment file").AddError(err)
 		return b

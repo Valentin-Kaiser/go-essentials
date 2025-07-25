@@ -149,7 +149,7 @@ func NewManager(config *Config, queueManager *queue.Manager) *Manager {
 }
 
 // Start starts the mail manager
-func (m *Manager) Start(ctx context.Context) error {
+func (m *Manager) Start(_ context.Context) error {
 	if !atomic.CompareAndSwapInt32(&m.running, 0, 1) {
 		return apperror.NewError("mail manager is already running")
 	}
@@ -371,13 +371,10 @@ func (m *Manager) handleMailJob(ctx context.Context, job *queue.Job) error {
 	}
 
 	// Convert job data back to message
-	message, err := m.jobDataToMessage(jobData)
-	if err != nil {
-		return apperror.Wrap(err)
-	}
+	message := m.jobDataToMessage(jobData)
 
 	// Send the message
-	if err = m.sender.Send(ctx, message); err != nil {
+	if err := m.sender.Send(ctx, message); err != nil {
 		m.incrementFailedCount()
 		return apperror.Wrap(err)
 	}
@@ -456,7 +453,7 @@ func (m *Manager) updateLastReceived() {
 }
 
 // jobDataToMessage converts job data back to a Message
-func (m *Manager) jobDataToMessage(jobData map[string]interface{}) (*Message, error) {
+func (m *Manager) jobDataToMessage(jobData map[string]interface{}) *Message {
 	message := &Message{}
 
 	if id, ok := jobData["id"].(string); ok {
@@ -537,7 +534,7 @@ func (m *Manager) jobDataToMessage(jobData map[string]interface{}) (*Message, er
 		}
 	}
 
-	return message, nil
+	return message
 }
 
 // WithFS configures the template manager to load templates from a filesystem

@@ -82,7 +82,7 @@ func (s *smtpSender) Send(ctx context.Context, message *Message) error {
 }
 
 // SendAsync is not implemented for SMTP sender (handled by manager)
-func (s *smtpSender) SendAsync(ctx context.Context, message *Message) error {
+func (s *smtpSender) SendAsync(_ context.Context, _ *Message) error {
 	return apperror.NewError("async sending not supported by SMTP sender directly")
 }
 
@@ -178,10 +178,7 @@ func (s *smtpSender) createEmail(message *Message) (*email.Email, error) {
 	// Add attachments
 	for _, attachment := range message.Attachments {
 		if err := s.addAttachment(emailMsg, attachment); err != nil {
-			log.Warn().
-				Err(err).
-				Str("filename", attachment.Filename).
-				Msg("[Mail] Failed to add attachment")
+			return nil, apperror.Wrap(err)
 		}
 	}
 
@@ -192,11 +189,12 @@ func (s *smtpSender) createEmail(message *Message) (*email.Email, error) {
 func (s *smtpSender) addAttachment(emailMsg *email.Email, attachment Attachment) error {
 	var reader io.Reader
 
-	if attachment.Content != nil {
+	switch {
+	case attachment.Content != nil:
 		reader = bytes.NewReader(attachment.Content)
-	} else if attachment.Reader != nil {
+	case attachment.Reader != nil:
 		reader = attachment.Reader
-	} else {
+	default:
 		return apperror.NewError("attachment has no content or reader")
 	}
 
@@ -210,15 +208,14 @@ func (s *smtpSender) addAttachment(emailMsg *email.Email, attachment Attachment)
 		a.Header.Set("Content-ID", fmt.Sprintf("<%s>", attachment.ContentID))
 		a.Header.Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", attachment.Filename))
 		return nil
-	} else {
-		// Regular attachment
-		_, err := emailMsg.Attach(reader, attachment.Filename, attachment.ContentType)
-		return err
 	}
+
+	_, err := emailMsg.Attach(reader, attachment.Filename, attachment.ContentType)
+	return err
 }
 
 // sendEmail sends the email using the appropriate method
-func (s *smtpSender) sendEmail(ctx context.Context, emailMsg *email.Email) error {
+func (s *smtpSender) sendEmail(_ context.Context, emailMsg *email.Email) error {
 	// Prepare authentication
 	var auth smtp.Auth
 	if s.config.Auth {
@@ -296,7 +293,7 @@ func NewLoginAuth(username, password string) smtp.Auth {
 }
 
 // Start begins the LOGIN authentication
-func (a *LoginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+func (a *LoginAuth) Start(_ *smtp.ServerInfo) (string, []byte, error) {
 	return "LOGIN", []byte(a.username), nil
 }
 

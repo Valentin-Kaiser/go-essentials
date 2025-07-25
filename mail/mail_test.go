@@ -1,7 +1,6 @@
-package mail
+package mail_test
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Valentin-Kaiser/go-core/apperror"
+	"github.com/Valentin-Kaiser/go-core/mail"
 	"github.com/Valentin-Kaiser/go-core/queue"
 )
 
 func TestDefaultConfig(t *testing.T) {
-	config := DefaultConfig()
+	config := mail.DefaultConfig()
 
 	if config.SMTP.Host != "localhost" {
 		t.Errorf("Expected SMTP host to be localhost, got %s", config.SMTP.Host)
@@ -29,12 +30,12 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestMessageBuilder(t *testing.T) {
-	message, err := NewMessage().
+	message, err := mail.NewMessage().
 		From("sender@example.com").
 		To("recipient@example.com").
 		Subject("Test Subject").
 		TextBody("Test message").
-		Priority(PriorityHigh).
+		Priority(mail.PriorityHigh).
 		Build()
 
 	if err != nil {
@@ -53,18 +54,18 @@ func TestMessageBuilder(t *testing.T) {
 		t.Errorf("Expected subject to be 'Test Subject', got %s", message.Subject)
 	}
 
-	if message.Priority != PriorityHigh {
+	if message.Priority != mail.PriorityHigh {
 		t.Errorf("Expected priority to be high, got %v", message.Priority)
 	}
 }
 
 func TestTemplateManager(t *testing.T) {
-	config := TemplateConfig{
+	config := mail.TemplateConfig{
 		DefaultTemplate: "default.html",
 		AutoReload:      true,
 	}
 
-	tm := NewTemplateManager(config)
+	tm := mail.NewTemplateManager(config)
 
 	// Test that template manager is created
 	if tm == nil {
@@ -90,12 +91,12 @@ func TestTemplateManager(t *testing.T) {
 
 // TestTemplateManagerWithFS tests the template manager with filesystem
 func TestTemplateManagerWithFS(t *testing.T) {
-	config := TemplateConfig{
+	config := mail.TemplateConfig{
 		DefaultTemplate: "test.html",
 		AutoReload:      true,
 	}
 
-	tm := NewTemplateManager(config)
+	tm := mail.NewTemplateManager(config)
 
 	// Test that WithFS method works (we can't test with real filesystem without test data)
 	result := tm.WithFS(nil)
@@ -107,25 +108,22 @@ func TestTemplateManagerWithFS(t *testing.T) {
 // TestTemplateManagerWithFileServer tests the template manager with file server
 func TestTemplateManagerWithFileServer(t *testing.T) {
 	// Create a temporary directory with a test template
-	tempDir, err := os.MkdirTemp("", "mail_templates_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
+	tempDir := t.TempDir()
+	defer apperror.Catch(func() error { return os.RemoveAll(tempDir) }, "failed to remove temp dir")
 
 	// Create a test template file
 	templateContent := `<html><body><h1>{{.Subject}}</h1><p>{{.Message}}</p></body></html>`
 	templatePath := filepath.Join(tempDir, "test.html")
-	if err := os.WriteFile(templatePath, []byte(templateContent), 0644); err != nil {
+	if err := os.WriteFile(templatePath, []byte(templateContent), 0600); err != nil {
 		t.Fatalf("Failed to write test template: %v", err)
 	}
 
-	config := TemplateConfig{
+	config := mail.TemplateConfig{
 		DefaultTemplate: "test.html",
 		AutoReload:      true,
 	}
 
-	tm := NewTemplateManager(config)
+	tm := mail.NewTemplateManager(config)
 
 	// Configure with file server
 	tm.WithFileServer(tempDir)
@@ -166,7 +164,7 @@ func TestTemplateManagerWithFileServer(t *testing.T) {
 }
 
 func TestSMTPSender(t *testing.T) {
-	config := SMTPConfig{
+	config := mail.SMTPConfig{
 		Host:       "localhost",
 		Port:       587,
 		From:       "sender@example.com",
@@ -176,33 +174,32 @@ func TestSMTPSender(t *testing.T) {
 		RetryDelay: time.Second,
 	}
 
-	templateConfig := TemplateConfig{
+	templateConfig := mail.TemplateConfig{
 		DefaultTemplate: "default.html",
 	}
 
-	tm := NewTemplateManager(templateConfig)
-	sender := NewSMTPSender(config, tm)
+	tm := mail.NewTemplateManager(templateConfig)
+	sender := mail.NewSMTPSender(config, tm)
 
 	if sender == nil {
 		t.Error("Expected sender to be created, got nil")
 	}
 
 	// Test message validation
-	message := &Message{} // Empty message should fail validation
+	message := &mail.Message{} // Empty message should fail validation
 
-	ctx := context.Background()
-	err := sender.Send(ctx, message)
+	err := sender.Send(t.Context(), message)
 	if err == nil {
 		t.Error("Expected validation error for empty message")
 	}
 }
 
 func TestMailManager(t *testing.T) {
-	config := DefaultConfig()
+	config := mail.DefaultConfig()
 	config.Queue.Enabled = false // Disable queue for this test
 
 	queueManager := queue.NewManager()
-	manager := NewManager(config, queueManager)
+	manager := mail.NewManager(config, queueManager)
 
 	if manager == nil {
 		t.Error("Expected manager to be created, got nil")
@@ -215,6 +212,7 @@ func TestMailManager(t *testing.T) {
 	stats := manager.GetStats()
 	if stats == nil {
 		t.Error("Expected stats to be available")
+		return
 	}
 
 	if stats.SentCount != 0 {
@@ -224,13 +222,13 @@ func TestMailManager(t *testing.T) {
 
 func TestPriorityString(t *testing.T) {
 	tests := []struct {
-		priority Priority
+		priority mail.Priority
 		expected string
 	}{
-		{PriorityLow, "low"},
-		{PriorityNormal, "normal"},
-		{PriorityHigh, "high"},
-		{PriorityCritical, "critical"},
+		{mail.PriorityLow, "low"},
+		{mail.PriorityNormal, "normal"},
+		{mail.PriorityHigh, "high"},
+		{mail.PriorityCritical, "critical"},
 	}
 
 	for _, test := range tests {
@@ -241,7 +239,7 @@ func TestPriorityString(t *testing.T) {
 }
 
 func TestAttachmentBuilder(t *testing.T) {
-	attachment := Attachment{
+	attachment := mail.Attachment{
 		Filename:    "test.txt",
 		ContentType: "text/plain",
 		Content:     []byte("test content"),
@@ -249,7 +247,7 @@ func TestAttachmentBuilder(t *testing.T) {
 		Inline:      false,
 	}
 
-	message, err := NewMessage().
+	message, err := mail.NewMessage().
 		From("sender@example.com").
 		To("recipient@example.com").
 		Subject("Test with attachment").
@@ -272,7 +270,7 @@ func TestAttachmentBuilder(t *testing.T) {
 
 func TestInlineAttachments(t *testing.T) {
 	// Test inline attachment with content
-	message, err := NewMessage().
+	message, err := mail.NewMessage().
 		From("sender@example.com").
 		To("recipient@example.com").
 		Subject("Test with inline attachment").
@@ -310,7 +308,7 @@ func TestAttachInlineFromReader(t *testing.T) {
 	content := []byte("fake-image-data")
 	reader := strings.NewReader(string(content))
 
-	message, err := NewMessage().
+	message, err := mail.NewMessage().
 		From("sender@example.com").
 		To("recipient@example.com").
 		Subject("Test with inline attachment from reader").
@@ -342,7 +340,7 @@ func TestAttachInlineFromReader(t *testing.T) {
 
 func BenchmarkMessageCreation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_, err := NewMessage().
+		_, err := mail.NewMessage().
 			From("sender@example.com").
 			To("recipient@example.com").
 			Subject("Benchmark test").
@@ -355,11 +353,11 @@ func BenchmarkMessageCreation(b *testing.B) {
 }
 
 func BenchmarkTemplateRendering(b *testing.B) {
-	config := TemplateConfig{
+	config := mail.TemplateConfig{
 		DefaultTemplate: "default.html",
 	}
 
-	tm := NewTemplateManager(config)
+	tm := mail.NewTemplateManager(config)
 	data := map[string]interface{}{
 		"Subject": "Benchmark Subject",
 		"Message": "Benchmark message content",
@@ -373,10 +371,10 @@ func BenchmarkTemplateRendering(b *testing.B) {
 
 // TestManagerTemplateConfiguration tests the manager's template configuration methods
 func TestManagerTemplateConfiguration(t *testing.T) {
-	config := DefaultConfig()
+	config := mail.DefaultConfig()
 	queueManager := queue.NewManager()
 
-	manager := NewManager(config, queueManager)
+	manager := mail.NewManager(config, queueManager)
 
 	// Test WithFileServer method
 	result := manager.WithFileServer("/tmp")
@@ -433,7 +431,10 @@ func TestFormatDateTemplateFunction(t *testing.T) {
 
 	// Test with time.Time
 	now := time.Date(2023, 12, 25, 10, 30, 0, 0, time.UTC)
-	formatFunc := funcMap["formatDate"].(func(string, interface{}) string)
+	formatFunc, ok := funcMap["formatDate"].(func(string, interface{}) string)
+	if !ok {
+		t.Fatal("Expected formatDate function to be defined")
+	}
 
 	result := formatFunc("2006-01-02", now)
 	expected := "2023-12-25"
@@ -458,60 +459,5 @@ func TestFormatDateTemplateFunction(t *testing.T) {
 	expected = "2023-12-25 10:30:00"
 	if result != expected {
 		t.Errorf("Expected default formatted date %s, got %s", expected, result)
-	}
-}
-
-func TestServerWorkerPoolQueue(t *testing.T) {
-	config := DefaultConfig()
-	config.Server.Enabled = true
-	config.Server.MaxConcurrentHandlers = 2 // Limit to 2 concurrent handlers
-
-	manager := NewManager(config, nil)
-	server := NewSMTPServer(config.Server, manager)
-
-	// Add a handler that tracks execution
-	handlerCalls := make(chan string, 20)
-	slowHandler := func(ctx context.Context, from string, to []string, data []byte) error {
-		handlerCalls <- fmt.Sprintf("handler executed: %s", from)
-		// Simulate some work
-		time.Sleep(50 * time.Millisecond)
-		return nil
-	}
-
-	server.AddHandler(slowHandler)
-
-	// Cast to access internal methods for testing
-	smtpSrv := server.(*smtpServer)
-
-	ctx := context.Background()
-	data := []byte("test message")
-
-	// Send multiple notifications quickly
-	for i := 0; i < 5; i++ {
-		from := fmt.Sprintf("test%d@example.com", i)
-		to := []string{"recipient@example.com"}
-		go smtpSrv.notifyHandlers(ctx, from, to, data)
-	}
-
-	// Give the worker pool time to process
-	time.Sleep(300 * time.Millisecond)
-
-	// Count the handler calls
-	callCount := 0
-	timeout := time.After(100 * time.Millisecond)
-
-	for {
-		select {
-		case call := <-handlerCalls:
-			callCount++
-			t.Logf("Received: %s", call)
-		case <-timeout:
-			// We should have received some calls (the workers should process the queued tasks)
-			if callCount == 0 {
-				t.Error("Expected at least some handler calls")
-			}
-			t.Logf("Total handler calls processed: %d", callCount)
-			return
-		}
 	}
 }

@@ -228,7 +228,7 @@ func (tm *templateManager) loadTemplatesFromPath(templatesPath string) error {
 		}
 
 		// Load template content
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(filepath.Clean(path))
 		if err != nil {
 			return apperror.NewError("failed to read template file").AddError(err)
 		}
@@ -254,14 +254,15 @@ func (tm *templateManager) loadTemplateFromDisk(name string) (*template.Template
 	var err error
 
 	// Try to load from filesystem first
-	if tm.config.FileSystem != nil {
+	switch {
+	case tm.config.FileSystem != nil:
 		content, err = fs.ReadFile(tm.config.FileSystem, name)
 		if err != nil {
 			return nil, apperror.NewError("template not found in filesystem").AddError(err)
 		}
-	} else if tm.config.TemplatesPath != "" {
+	case tm.config.TemplatesPath != "":
 		// Try to load from custom path
-		customPath := filepath.Join(tm.config.TemplatesPath, name)
+		customPath := filepath.Clean(filepath.Join(tm.config.TemplatesPath, name))
 		if _, err := os.Stat(customPath); err == nil {
 			content, err = os.ReadFile(customPath)
 			if err != nil {
@@ -270,7 +271,7 @@ func (tm *templateManager) loadTemplateFromDisk(name string) (*template.Template
 		} else {
 			return nil, apperror.NewError("template not found in templates path").AddError(err)
 		}
-	} else {
+	default:
 		return nil, apperror.NewError("no template source configured - use WithFS or WithFileServer")
 	}
 
@@ -290,7 +291,6 @@ func (tm *templateManager) loadTemplateFromDisk(name string) (*template.Template
 
 // parseTemplate parses a template with common functions
 func (tm *templateManager) parseTemplate(name, content string) (*template.Template, error) {
-
 	if tm.funcs == nil {
 		tm.funcs = make(template.FuncMap)
 	}
@@ -342,8 +342,8 @@ func (tm *templateManager) WithDefaultFuncs() TemplateManager {
 			return cases.Title(lang, cases.NoLower).String(s)
 		},
 		"trim": strings.TrimSpace,
-		"replace": func(old, new, s string) string {
-			return strings.ReplaceAll(s, old, new)
+		"replace": func(old, replacement, s string) string {
+			return strings.ReplaceAll(s, old, replacement)
 		},
 		"contains":  strings.Contains,
 		"hasPrefix": strings.HasPrefix,

@@ -52,8 +52,9 @@ var (
 	ErrorTraceFormat = "%s | %s"
 	// FullFormat is the format for displaying the error message with a stack trace and additional errors
 	FullFormat = "%s | %s [%s]"
-
-	WithDetails   = false // Flag to indicate if additional details should be included in the error output
+	// WithDetails is a flag to control whether additional details should be included in the error output
+	WithDetails = false
+	// FormatDetails is a function that formats additional details for the error
 	FormatDetails = func(details map[string]interface{}) string {
 		if len(details) == 0 {
 			return ""
