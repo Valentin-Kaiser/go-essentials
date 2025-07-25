@@ -338,8 +338,6 @@ func Catch(f func() error, msg string) {
 // It takes a function that returns an error, a message, and a custom handler.
 func CatchCustom(f func() error, msg string, handler func(error, string)) {
 	if handler != nil {
-		// handler(f(), msg)
-		// return
 		if err := f(); err != nil {
 			handler(err, msg)
 			return
