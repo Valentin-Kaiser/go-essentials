@@ -14,13 +14,16 @@ import (
 	"github.com/Valentin-Kaiser/go-core/apperror"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // templateManager implements the TemplateManager interface
 type templateManager struct {
 	config    TemplateConfig
 	templates map[string]*template.Template
+	funcs     template.FuncMap
 	mutex     sync.RWMutex
+	Error     error
 }
 
 // NewTemplateManager creates a new template manager
@@ -33,7 +36,7 @@ func NewTemplateManager(config TemplateConfig) TemplateManager {
 	// Load templates on initialization if filesystem is configured
 	if config.FileSystem != nil || config.TemplatesPath != "" {
 		if err := tm.ReloadTemplates(); err != nil {
-			log.Error().Err(err).Msg("[Mail] Failed to load templates during initialization")
+			tm.Error = apperror.Wrap(err)
 		}
 	}
 
@@ -42,12 +45,16 @@ func NewTemplateManager(config TemplateConfig) TemplateManager {
 
 // WithFS configures the template manager to load templates from a filesystem
 func (tm *templateManager) WithFS(filesystem fs.FS) TemplateManager {
+	if tm.Error != nil {
+		return tm
+	}
+
 	tm.config.FileSystem = filesystem
 	tm.config.TemplatesPath = ""
 
 	// Reload templates from the new filesystem
 	if err := tm.ReloadTemplates(); err != nil {
-		log.Error().Err(err).Msg("[Mail] Failed to load templates from filesystem")
+		tm.Error = apperror.Wrap(err)
 	}
 
 	return tm
@@ -55,9 +62,13 @@ func (tm *templateManager) WithFS(filesystem fs.FS) TemplateManager {
 
 // WithFileServer configures the template manager to load templates from a file path
 func (tm *templateManager) WithFileServer(templatesPath string) TemplateManager {
+	if tm.Error != nil {
+		return tm
+	}
+
 	if templatesPath != "" {
 		if _, err := os.Stat(templatesPath); os.IsNotExist(err) {
-			log.Error().Err(err).Str("path", templatesPath).Msg("[Mail] Templates path does not exist")
+			tm.Error = apperror.NewError("templates path does not exist").AddDetail("path", templatesPath).AddError(err)
 			return tm
 		}
 	}
@@ -67,14 +78,39 @@ func (tm *templateManager) WithFileServer(templatesPath string) TemplateManager 
 
 	// Reload templates from the new path
 	if err := tm.ReloadTemplates(); err != nil {
-		log.Error().Err(err).Msg("[Mail] Failed to load templates from file path")
+		tm.Error = apperror.Wrap(err)
 	}
 
 	return tm
 }
 
+func (tm *templateManager) WithTemplateFunc(key string, fn interface{}) TemplateManager {
+	if tm.Error != nil {
+		return tm
+	}
+
+	tm.mutex.Lock()
+	defer tm.mutex.Unlock()
+	if tm.funcs == nil {
+		tm.funcs = make(template.FuncMap)
+	}
+
+	_, exists := tm.funcs[key]
+	if exists {
+		tm.Error = apperror.NewError("template function already exists").AddDetail("key", key)
+		return tm
+	}
+
+	tm.funcs[key] = fn
+	return tm
+}
+
 // LoadTemplate loads a template by name
 func (tm *templateManager) LoadTemplate(name string) (*template.Template, error) {
+	if tm.Error != nil {
+		return nil, tm.Error
+	}
+
 	tm.mutex.RLock()
 	tmpl, exists := tm.templates[name]
 	tm.mutex.RUnlock()
@@ -83,12 +119,20 @@ func (tm *templateManager) LoadTemplate(name string) (*template.Template, error)
 		return tmpl, nil
 	}
 
-	// Template not found in cache, try to load it
-	return tm.loadTemplateFromDisk(name)
+	tmpl, err := tm.loadTemplateFromDisk(name)
+	if err != nil {
+		return nil, apperror.Wrap(err)
+	}
+
+	return tmpl, nil
 }
 
 // RenderTemplate renders a template with the given data
 func (tm *templateManager) RenderTemplate(name string, data interface{}) (string, error) {
+	if tm.Error != nil {
+		return "", tm.Error
+	}
+
 	tmpl, err := tm.LoadTemplate(name)
 	if err != nil {
 		return "", apperror.Wrap(err)
@@ -104,19 +148,21 @@ func (tm *templateManager) RenderTemplate(name string, data interface{}) (string
 
 // ReloadTemplates reloads all templates
 func (tm *templateManager) ReloadTemplates() error {
+	if tm.Error != nil {
+		return tm.Error
+	}
+
 	tm.mutex.Lock()
 	defer tm.mutex.Unlock()
 
-	// Clear existing templates
 	tm.templates = make(map[string]*template.Template)
-
-	// Load templates from filesystem if configured
 	if tm.config.FileSystem != nil {
 		if err := tm.loadTemplatesFromFS(tm.config.FileSystem); err != nil {
 			return apperror.Wrap(err)
 		}
-	} else if tm.config.TemplatesPath != "" {
-		// Load templates from file path
+	}
+
+	if tm.config.TemplatesPath != "" {
 		if err := tm.loadTemplatesFromPath(tm.config.TemplatesPath); err != nil {
 			return apperror.Wrap(err)
 		}
@@ -124,15 +170,19 @@ func (tm *templateManager) ReloadTemplates() error {
 
 	if len(tm.templates) > 0 {
 		log.Info().Int("count", len(tm.templates)).Msg("[Mail] Templates loaded successfully")
-	} else {
-		log.Warn().Msg("[Mail] No templates loaded - templates will be unavailable")
+		return nil
 	}
 
+	log.Warn().Msg("[Mail] No templates loaded - templates will be unavailable")
 	return nil
 }
 
 // loadTemplatesFromFS loads templates from a filesystem
 func (tm *templateManager) loadTemplatesFromFS(filesystem fs.FS) error {
+	if tm.Error != nil {
+		return tm.Error
+	}
+
 	return fs.WalkDir(filesystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -163,6 +213,10 @@ func (tm *templateManager) loadTemplatesFromFS(filesystem fs.FS) error {
 
 // loadTemplatesFromPath loads templates from the specified file path
 func (tm *templateManager) loadTemplatesFromPath(templatesPath string) error {
+	if tm.Error != nil {
+		return tm.Error
+	}
+
 	if _, err := os.Stat(templatesPath); os.IsNotExist(err) {
 		return apperror.NewError("templates path does not exist").AddError(err)
 	}
@@ -203,6 +257,10 @@ func (tm *templateManager) loadTemplatesFromPath(templatesPath string) error {
 
 // loadTemplateFromDisk loads a single template from the configured source
 func (tm *templateManager) loadTemplateFromDisk(name string) (*template.Template, error) {
+	if tm.Error != nil {
+		return nil, tm.Error
+	}
+
 	var content []byte
 	var err error
 
@@ -243,8 +301,31 @@ func (tm *templateManager) loadTemplateFromDisk(name string) (*template.Template
 
 // parseTemplate parses a template with common functions
 func (tm *templateManager) parseTemplate(name, content string) (*template.Template, error) {
-	// Define template functions
-	funcMap := template.FuncMap{
+
+	if tm.funcs == nil {
+		tm.funcs = make(template.FuncMap)
+	}
+
+	// Parse template with functions
+	tmpl, err := template.New(name).Funcs(tm.funcs).Parse(content)
+	if err != nil {
+		return nil, apperror.NewError("failed to parse template").AddError(err)
+	}
+
+	return tmpl, nil
+}
+
+func (tm *templateManager) WithDefaultFuncs() TemplateManager {
+	if tm.Error != nil {
+		return tm
+	}
+
+	// Add default functions if not already set
+	if tm.funcs == nil {
+		tm.funcs = make(template.FuncMap)
+	}
+
+	funcs := template.FuncMap{
 		"add": func(a, b int) int {
 			return a + b
 		},
@@ -268,8 +349,10 @@ func (tm *templateManager) parseTemplate(name, content string) (*template.Templa
 		},
 		"upper": strings.ToUpper,
 		"lower": strings.ToLower,
-		"title": cases.Title,
-		"trim":  strings.TrimSpace,
+		"title": func(s string, lang language.Tag) string {
+			return cases.Title(lang, cases.NoLower).String(s)
+		},
+		"trim": strings.TrimSpace,
 		"replace": func(old, new, s string) string {
 			return strings.ReplaceAll(s, old, new)
 		},
@@ -333,11 +416,13 @@ func (tm *templateManager) parseTemplate(name, content string) (*template.Templa
 		},
 	}
 
-	// Parse template with functions
-	tmpl, err := template.New(name).Funcs(funcMap).Parse(content)
-	if err != nil {
-		return nil, apperror.NewError("failed to parse template").AddError(err)
+	tm.mutex.Lock()
+	defer tm.mutex.Unlock()
+	for key, fn := range funcs {
+		if _, exists := tm.funcs[key]; !exists {
+			tm.funcs[key] = fn
+		}
 	}
 
-	return tmpl, nil
+	return tm
 }
