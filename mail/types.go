@@ -6,7 +6,10 @@ import (
 	"io"
 	"io/fs"
 	"mime/multipart"
+	"strings"
 	"time"
+
+	"github.com/Valentin-Kaiser/go-core/apperror"
 )
 
 // Message represents an email message
@@ -122,6 +125,7 @@ type TemplateData struct {
 // MessageBuilder provides a fluent interface for building messages
 type MessageBuilder struct {
 	message *Message
+	Error   error // Error is used to capture any errors during building
 }
 
 // NewMessage creates a new message builder
@@ -138,12 +142,28 @@ func NewMessage() *MessageBuilder {
 
 // From sets the sender's email address
 func (b *MessageBuilder) From(from string) *MessageBuilder {
+	if b.Error != nil {
+		return b
+	}
+
+	if from == "" {
+		b.Error = apperror.NewError("from address cannot be empty")
+		return b
+	}
+
 	b.message.From = from
 	return b
 }
 
 // To sets the recipient email addresses
 func (b *MessageBuilder) To(to ...string) *MessageBuilder {
+	if b.Error != nil {
+		return b
+	}
+	if len(to) == 0 {
+		b.Error = apperror.NewError("at least one recipient is required")
+		return b
+	}
 	b.message.To = to
 	return b
 }
@@ -193,12 +213,36 @@ func (b *MessageBuilder) Template(name string, data interface{}) *MessageBuilder
 
 // Attach adds a file attachment
 func (b *MessageBuilder) Attach(attachment Attachment) *MessageBuilder {
+	if b.Error != nil {
+		return b
+	}
+	// Ensure the attachment has a valid filename and content type
+	if attachment.Filename == "" || attachment.ContentType == "" {
+		b.Error = apperror.NewError("attachment must have a valid filename and content type").AddDetail("filename", attachment.Filename).AddDetail("content_type", attachment.ContentType)
+		return b
+	}
 	b.message.Attachments = append(b.message.Attachments, attachment)
 	return b
 }
 
 // AttachInline adds an inline file attachment with Content-ID for embedding in HTML
 func (b *MessageBuilder) AttachInline(filename, contentType, contentID string, content []byte) *MessageBuilder {
+	if b.Error != nil {
+		return b
+	}
+	// Ensure the attachment has a valid filename and content type
+	if strings.TrimSpace(filename) == "" || strings.TrimSpace(contentType) == "" {
+		b.Error = apperror.NewError("inline attachment must have a valid filename and content type").AddDetail("filename", filename).AddDetail("content_type", contentType)
+		return b
+	}
+	if len(content) == 0 {
+		b.Error = apperror.NewError("inline attachment content cannot be empty").AddDetail("filename", filename)
+		return b
+	}
+	if strings.TrimSpace(contentID) == "" {
+		b.Error = apperror.NewError("inline attachment must have a Content-ID").AddDetail("filename", filename).AddDetail("content_type", contentType)
+		return b
+	}
 	attachment := Attachment{
 		Filename:    filename,
 		ContentType: contentType,
@@ -213,6 +257,25 @@ func (b *MessageBuilder) AttachInline(filename, contentType, contentID string, c
 
 // AttachInlineFromReader adds an inline file attachment from a reader with Content-ID for embedding in HTML
 func (b *MessageBuilder) AttachInlineFromReader(filename, contentType, contentID string, reader io.Reader, size int64) *MessageBuilder {
+	if b.Error != nil {
+		return b
+	}
+	if strings.TrimSpace(filename) == "" || strings.TrimSpace(contentType) == "" {
+		b.Error = apperror.NewError("inline attachment must have a valid filename and content type").AddDetail("filename", filename).AddDetail("content_type", contentType)
+		return b
+	}
+	if size <= 0 {
+		b.Error = apperror.NewError("inline attachment size must be greater than zero").AddDetail("filename", filename)
+		return b
+	}
+	if strings.TrimSpace(contentID) == "" {
+		b.Error = apperror.NewError("inline attachment must have a Content-ID").AddDetail("filename", filename).AddDetail("content_type", contentType)
+		return b
+	}
+	if reader == nil {
+		b.Error = apperror.NewError("inline attachment reader cannot be nil").AddDetail("filename", filename).AddDetail("content_type", contentType)
+		return b
+	}
 	attachment := Attachment{
 		Filename:    filename,
 		ContentType: contentType,
@@ -226,11 +289,16 @@ func (b *MessageBuilder) AttachInlineFromReader(filename, contentType, contentID
 }
 
 // AttachFile adds a file attachment from a multipart file header
-// Note: The caller is responsible for ensuring the file remains open during email processing
-// and closing it afterwards if using Reader-based attachment.
+// Returns the builder for chaining. If an error occurs, it logs the error
+// and continues without adding the attachment.
 func (b *MessageBuilder) AttachFile(fileHeader *multipart.FileHeader) *MessageBuilder {
+	if b.Error != nil {
+		return b
+	}
+
 	file, err := fileHeader.Open()
 	if err != nil {
+		b.Error = apperror.NewError("failed to open attachment file").AddError(err)
 		return b
 	}
 
@@ -238,6 +306,7 @@ func (b *MessageBuilder) AttachFile(fileHeader *multipart.FileHeader) *MessageBu
 	content, err := io.ReadAll(file)
 	file.Close() // Always close the file
 	if err != nil {
+		b.Error = apperror.NewError("failed to read attachment file").AddError(err)
 		return b
 	}
 
@@ -276,8 +345,8 @@ func (b *MessageBuilder) Metadata(key, value string) *MessageBuilder {
 }
 
 // Build returns the built message
-func (b *MessageBuilder) Build() *Message {
-	return b.message
+func (b *MessageBuilder) Build() (*Message, error) {
+	return b.message, b.Error
 }
 
 // NotificationHandler is a function that handles incoming SMTP messages
