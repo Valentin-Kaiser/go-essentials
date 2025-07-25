@@ -216,7 +216,7 @@ func TestAesCipherInvalidKey(t *testing.T) {
 
 func TestAesCipherWithAES256Key(t *testing.T) {
 	cipher := security.NewAesCipher().WithAES256()
-	
+
 	if cipher.Error != nil {
 		t.Errorf("WithAES256() set error: %v", cipher.Error)
 		return
@@ -248,10 +248,10 @@ func TestAesCipherWithAES256Key(t *testing.T) {
 func TestAesCipherErrorHandling(t *testing.T) {
 	// Test with invalid encrypted data
 	cipher := security.NewAesCipher().WithAES256()
-	
+
 	var output bytes.Buffer
 	cipher.Decrypt("invalid-encrypted-data", &output)
-	
+
 	if cipher.Error == nil {
 		t.Error("Expected error when decrypting invalid data")
 	}
@@ -270,7 +270,7 @@ func TestAesCipherMultipleOperations(t *testing.T) {
 	plaintext2 := "Second message"
 
 	var encrypted1, encrypted2 bytes.Buffer
-	
+
 	cipher.Encrypt(plaintext1, &encrypted1)
 	if cipher.Error != nil {
 		t.Errorf("First encrypt failed: %v", cipher.Error)

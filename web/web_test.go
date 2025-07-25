@@ -348,7 +348,7 @@ func TestServerMiddleware(t *testing.T) {
 func TestResponseWriter(t *testing.T) {
 	// Test the custom ResponseWriter functionality
 	server := web.New()
-	
+
 	// Create a simple handler to test ResponseWriter
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Test", "true")

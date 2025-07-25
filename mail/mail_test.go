@@ -369,7 +369,7 @@ func TestManagerSendAsync(t *testing.T) {
 	config.Queue.Enabled = true
 
 	queueManager := queue.NewManager()
-	
+
 	// Start queue manager first
 	err := queueManager.Start(context.Background())
 	if err != nil {
@@ -470,7 +470,7 @@ func TestSenderValidation(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name: "missing subject", 
+			name: "missing subject",
 			message: &mail.Message{
 				From:     "sender@example.com",
 				To:       []string{"recipient@example.com"},
@@ -495,7 +495,7 @@ func TestSenderValidation(t *testing.T) {
 			// Use a short timeout context to avoid long waits for network connection
 			ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 			defer cancel()
-			
+
 			err := sender.Send(ctx, tt.message)
 			if (err != nil) != tt.wantError {
 				t.Errorf("Send() error = %v, wantError %v", err, tt.wantError)
@@ -583,7 +583,7 @@ func TestAttachFile(t *testing.T) {
 	tempDir := t.TempDir()
 	tempFile := filepath.Join(tempDir, "test.txt")
 	testContent := "This is test file content"
-	
+
 	if err := os.WriteFile(tempFile, []byte(testContent), 0600); err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}

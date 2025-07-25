@@ -745,7 +745,7 @@ func BenchmarkJobBuilder(b *testing.B) {
 
 func TestJobScheduling(t *testing.T) {
 	scheduleTime := time.Now().Add(time.Hour)
-	
+
 	job := queue.NewJob("scheduled").
 		WithScheduleAt(scheduleTime).
 		Build()
