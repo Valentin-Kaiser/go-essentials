@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/Valentin-Kaiser/go-core/apperror"
-	"github.com/rs/zerolog/log"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -168,12 +167,6 @@ func (tm *templateManager) ReloadTemplates() error {
 		}
 	}
 
-	if len(tm.templates) > 0 {
-		log.Info().Int("count", len(tm.templates)).Msg("[Mail] Templates loaded successfully")
-		return nil
-	}
-
-	log.Warn().Msg("[Mail] No templates loaded - templates will be unavailable")
 	return nil
 }
 
@@ -205,8 +198,6 @@ func (tm *templateManager) loadTemplatesFromFS(filesystem fs.FS) error {
 		}
 
 		tm.templates[path] = tmpl
-		log.Debug().Str("template", path).Msg("[Mail] Loaded template from filesystem")
-
 		return nil
 	})
 }
@@ -249,8 +240,6 @@ func (tm *templateManager) loadTemplatesFromPath(templatesPath string) error {
 		}
 
 		tm.templates[relPath] = tmpl
-		log.Debug().Str("template", relPath).Str("path", path).Msg("[Mail] Loaded custom template")
-
 		return nil
 	})
 }

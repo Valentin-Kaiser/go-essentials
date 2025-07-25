@@ -138,7 +138,6 @@ func NewManager(config *Config, queueManager *queue.Manager) *Manager {
 		cancel:       cancel,
 	}
 
-	// Initialize components
 	manager.templateManager = NewTemplateManager(config.Templates)
 	manager.sender = NewSMTPSender(config.SMTP, manager.templateManager)
 
@@ -155,15 +154,10 @@ func (m *Manager) Start(ctx context.Context) error {
 		return apperror.NewError("mail manager is already running")
 	}
 
-	log.Info().Msg("[Mail] Starting mail manager")
-
-	// Register mail job handler with queue manager if queue is enabled
 	if m.config.Queue.Enabled && m.queueManager != nil {
 		m.queueManager.RegisterHandler("mail", m.handleMailJob)
-		log.Info().Str("queue", m.config.Queue.QueueName).Msg("[Mail] Registered mail job handler")
 	}
 
-	// Start SMTP server if enabled
 	if m.config.Server.Enabled && m.server != nil {
 		m.wg.Add(1)
 		go func() {
@@ -174,7 +168,6 @@ func (m *Manager) Start(ctx context.Context) error {
 		}()
 	}
 
-	log.Info().Msg("[Mail] Mail manager started successfully")
 	return nil
 }
 
@@ -184,19 +177,13 @@ func (m *Manager) Stop(ctx context.Context) error {
 		return apperror.NewError("mail manager is not running")
 	}
 
-	log.Info().Msg("[Mail] Stopping mail manager")
-
-	// Cancel context to signal shutdown
 	m.cancel()
-
-	// Stop SMTP server if running
 	if m.server != nil && m.server.IsRunning() {
 		if err := m.server.Stop(ctx); err != nil {
 			log.Error().Err(err).Msg("[Mail] Failed to stop SMTP server")
 		}
 	}
 
-	// Wait for all goroutines to finish
 	done := make(chan struct{})
 	go func() {
 		m.wg.Wait()
@@ -205,7 +192,6 @@ func (m *Manager) Stop(ctx context.Context) error {
 
 	select {
 	case <-done:
-		log.Info().Msg("[Mail] Mail manager stopped successfully")
 		return nil
 	case <-ctx.Done():
 		log.Warn().Msg("[Mail] Mail manager stop timed out")
@@ -234,11 +220,6 @@ func (m *Manager) Send(ctx context.Context, message *Message) error {
 	err := m.sender.Send(ctx, message)
 	if err != nil {
 		m.incrementFailedCount()
-		log.Error().
-			Err(err).
-			Str("id", message.ID).
-			Str("subject", message.Subject).
-			Msg("[Mail] Failed to send email")
 		return apperror.Wrap(err)
 	}
 
@@ -309,11 +290,6 @@ func (m *Manager) SendAsync(ctx context.Context, message *Message) error {
 	// Enqueue the job
 	err := m.queueManager.Enqueue(ctx, job.Build())
 	if err != nil {
-		log.Error().
-			Err(err).
-			Str("id", message.ID).
-			Str("subject", message.Subject).
-			Msg("[Mail] Failed to queue email")
 		return apperror.Wrap(err)
 	}
 
@@ -335,7 +311,6 @@ func (m *Manager) AddNotificationHandler(handler NotificationHandler) error {
 	}
 
 	m.server.AddHandler(handler)
-	log.Info().Msg("[Mail] Added notification handler to SMTP server")
 	return nil
 }
 
@@ -392,32 +367,18 @@ func (m *Manager) handleMailJob(ctx context.Context, job *queue.Job) error {
 	// Decode the message from job payload
 	var jobData map[string]interface{}
 	if err := json.Unmarshal(job.Payload, &jobData); err != nil {
-		log.Error().
-			Err(err).
-			Str("job_id", job.ID).
-			Msg("[Mail] Failed to decode mail job payload")
 		return apperror.Wrap(err)
 	}
 
 	// Convert job data back to message
 	message, err := m.jobDataToMessage(jobData)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Str("job_id", job.ID).
-			Msg("[Mail] Failed to convert job data to message")
 		return apperror.Wrap(err)
 	}
 
 	// Send the message
 	if err = m.sender.Send(ctx, message); err != nil {
 		m.incrementFailedCount()
-		log.Error().
-			Err(err).
-			Str("job_id", job.ID).
-			Str("message_id", message.ID).
-			Str("subject", message.Subject).
-			Msg("[Mail] Failed to send queued email")
 		return apperror.Wrap(err)
 	}
 

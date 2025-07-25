@@ -29,13 +29,17 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestMessageBuilder(t *testing.T) {
-	message := NewMessage().
+	message, err := NewMessage().
 		From("sender@example.com").
 		To("recipient@example.com").
 		Subject("Test Subject").
 		TextBody("Test message").
 		Priority(PriorityHigh).
 		Build()
+
+	if err != nil {
+		t.Errorf("Expected no error when building message, got: %v", err)
+	}
 
 	if message.From != "sender@example.com" {
 		t.Errorf("Expected from to be sender@example.com, got %s", message.From)
@@ -245,13 +249,17 @@ func TestAttachmentBuilder(t *testing.T) {
 		Inline:      false,
 	}
 
-	message := NewMessage().
+	message, err := NewMessage().
 		From("sender@example.com").
 		To("recipient@example.com").
 		Subject("Test with attachment").
 		TextBody("Please see attachment").
 		Attach(attachment).
 		Build()
+
+	if err != nil {
+		t.Errorf("Expected no error when building message, got: %v", err)
+	}
 
 	if len(message.Attachments) != 1 {
 		t.Errorf("Expected 1 attachment, got %d", len(message.Attachments))
@@ -264,13 +272,17 @@ func TestAttachmentBuilder(t *testing.T) {
 
 func TestInlineAttachments(t *testing.T) {
 	// Test inline attachment with content
-	message := NewMessage().
+	message, err := NewMessage().
 		From("sender@example.com").
 		To("recipient@example.com").
 		Subject("Test with inline attachment").
 		HTMLBody("<p>Image: <img src=\"cid:test-image\"/></p>").
 		AttachInline("test.png", "image/png", "test-image", []byte("fake-image-data")).
 		Build()
+
+	if err != nil {
+		t.Errorf("Expected no error when building message, got: %v", err)
+	}
 
 	if len(message.Attachments) != 1 {
 		t.Errorf("Expected 1 attachment, got %d", len(message.Attachments))
@@ -298,13 +310,17 @@ func TestAttachInlineFromReader(t *testing.T) {
 	content := []byte("fake-image-data")
 	reader := strings.NewReader(string(content))
 
-	message := NewMessage().
+	message, err := NewMessage().
 		From("sender@example.com").
 		To("recipient@example.com").
 		Subject("Test with inline attachment from reader").
 		HTMLBody("<p>Image: <img src=\"cid:test-image-reader\"/></p>").
 		AttachInlineFromReader("test.jpg", "image/jpeg", "test-image-reader", reader, int64(len(content))).
 		Build()
+
+	if err != nil {
+		t.Errorf("Expected no error when building message, got: %v", err)
+	}
 
 	if len(message.Attachments) != 1 {
 		t.Errorf("Expected 1 attachment, got %d", len(message.Attachments))
@@ -326,12 +342,15 @@ func TestAttachInlineFromReader(t *testing.T) {
 
 func BenchmarkMessageCreation(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		_ = NewMessage().
+		_, err := NewMessage().
 			From("sender@example.com").
 			To("recipient@example.com").
 			Subject("Benchmark test").
 			TextBody("This is a benchmark test").
 			Build()
+		if err != nil {
+			b.Errorf("Expected no error when building message, got: %v", err)
+		}
 	}
 }
 
@@ -442,7 +461,7 @@ func TestFormatDateTemplateFunction(t *testing.T) {
 	}
 }
 
-func TestServerWorkerPoolLimit(t *testing.T) {
+func TestServerWorkerPoolQueue(t *testing.T) {
 	config := DefaultConfig()
 	config.Server.Enabled = true
 	config.Server.MaxConcurrentHandlers = 2 // Limit to 2 concurrent handlers
@@ -450,51 +469,48 @@ func TestServerWorkerPoolLimit(t *testing.T) {
 	manager := NewManager(config, nil)
 	server := NewSMTPServer(config.Server, manager)
 
-	// Add some mock handlers that will block
-	handlerCalls := make(chan bool, 10)
-	blockingHandler := func(ctx context.Context, from string, to []string, data []byte) error {
-		handlerCalls <- true
-		// Simulate a slow handler
-		time.Sleep(100 * time.Millisecond)
+	// Add a handler that tracks execution
+	handlerCalls := make(chan string, 20)
+	slowHandler := func(ctx context.Context, from string, to []string, data []byte) error {
+		handlerCalls <- fmt.Sprintf("handler executed: %s", from)
+		// Simulate some work
+		time.Sleep(50 * time.Millisecond)
 		return nil
 	}
 
-	server.AddHandler(blockingHandler)
-	server.AddHandler(blockingHandler)
-	server.AddHandler(blockingHandler)
+	server.AddHandler(slowHandler)
 
 	// Cast to access internal methods for testing
 	smtpSrv := server.(*smtpServer)
 
 	ctx := context.Background()
-	from := "test@example.com"
-	to := []string{"recipient@example.com"}
 	data := []byte("test message")
 
-	// Call notifyHandlers multiple times quickly
-	for i := 0; i < 6; i++ {
+	// Send multiple notifications quickly
+	for i := 0; i < 5; i++ {
+		from := fmt.Sprintf("test%d@example.com", i)
+		to := []string{"recipient@example.com"}
 		go smtpSrv.notifyHandlers(ctx, from, to, data)
 	}
 
-	// Wait a bit and check that not all handlers ran simultaneously
-	time.Sleep(150 * time.Millisecond)
+	// Give the worker pool time to process
+	time.Sleep(300 * time.Millisecond)
 
-	// We should have received some calls but not necessarily all due to worker pool limit
+	// Count the handler calls
 	callCount := 0
-	timeout := time.After(200 * time.Millisecond)
+	timeout := time.After(100 * time.Millisecond)
 
 	for {
 		select {
-		case <-handlerCalls:
+		case call := <-handlerCalls:
 			callCount++
+			t.Logf("Received: %s", call)
 		case <-timeout:
-			// We expect some handlers to have been limited by the worker pool
-			// With 3 handlers and limit of 2, and 6 invocations, we should get some calls
-			// but not necessarily all 18 (6 * 3 handlers) due to the limiting
+			// We should have received some calls (the workers should process the queued tasks)
 			if callCount == 0 {
 				t.Error("Expected at least some handler calls")
 			}
-			t.Logf("Handler calls: %d (some may have been limited by worker pool)", callCount)
+			t.Logf("Total handler calls processed: %d", callCount)
 			return
 		}
 	}
