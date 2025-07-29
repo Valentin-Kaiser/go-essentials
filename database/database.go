@@ -137,13 +137,15 @@ func Reconnect() {
 func Disconnect() error {
 	log.Trace().Msg("[Database] closing connection...")
 	cancel.Store(true)
-	sdb, err := db.DB()
-	if err != nil {
-		return apperror.NewErrorf("failed to get database instance").AddError(err)
-	}
-	err = sdb.Close()
-	if err != nil {
-		return apperror.NewErrorf("failed to close database connection").AddError(err)
+	if connected.Load() && db != nil {
+		sdb, err := db.DB()
+		if err != nil {
+			return apperror.NewErrorf("failed to get database instance").AddError(err)
+		}
+		err = sdb.Close()
+		if err != nil {
+			return apperror.NewErrorf("failed to close database connection").AddError(err)
+		}
 	}
 	<-done
 	log.Trace().Msg("[Database] connection closed")
