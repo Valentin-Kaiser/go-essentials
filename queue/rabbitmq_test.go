@@ -10,7 +10,7 @@ import (
 	"github.com/Valentin-Kaiser/go-core/queue"
 )
 
-func TestRabbitMQQueue(t *testing.T) {
+func TestRabbitMQ(t *testing.T) {
 	config := queue.RabbitMQConfig{
 		URL:          "amqp://admin:admin123@localhost:5672/",
 		QueueName:    "test_queue",
@@ -22,7 +22,7 @@ func TestRabbitMQQueue(t *testing.T) {
 		NoWait:       false,
 	}
 
-	q, err := queue.NewRabbitMQQueue(config)
+	q, err := queue.NewRabbitMQ(config)
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ test: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestRabbitMQReconnection(t *testing.T) {
 		AutoDelete:   true,
 	}
 
-	queue, err := queue.NewRabbitMQQueue(config)
+	queue, err := queue.NewRabbitMQ(config)
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ reconnection test: %v", err)
 	}
@@ -274,7 +274,7 @@ func TestRabbitMQWithClosedConnection(t *testing.T) {
 		AutoDelete:   true,
 	}
 
-	q, err := queue.NewRabbitMQQueue(config)
+	q, err := queue.NewRabbitMQ(config)
 	if err != nil {
 		t.Skipf("Skipping RabbitMQ closed connection test: %v", err)
 	}
@@ -328,7 +328,7 @@ func BenchmarkRabbitMQEnqueue(b *testing.B) {
 		AutoDelete:   true,
 	}
 
-	q, err := queue.NewRabbitMQQueue(config)
+	q, err := queue.NewRabbitMQ(config)
 	if err != nil {
 		b.Skipf("Skipping RabbitMQ benchmark: %v", err)
 	}
@@ -364,7 +364,7 @@ func BenchmarkRabbitMQDequeue(b *testing.B) {
 		AutoDelete:   true,
 	}
 
-	q, err := queue.NewRabbitMQQueue(config)
+	q, err := queue.NewRabbitMQ(config)
 	if err != nil {
 		b.Skipf("Skipping RabbitMQ dequeue benchmark: %v", err)
 	}

@@ -224,7 +224,7 @@ type JobProgress struct {
 
 // WithRabbitMQ sets the queue to use RabbitMQ with the given configuration
 func (m *Manager) WithRabbitMQ(config RabbitMQConfig) *Manager {
-	if queue, err := NewRabbitMQQueue(config); err == nil {
+	if queue, err := NewRabbitMQ(config); err == nil {
 		m.queue = queue
 	}
 	return m
@@ -232,7 +232,7 @@ func (m *Manager) WithRabbitMQ(config RabbitMQConfig) *Manager {
 
 // WithRabbitMQFromURL sets the queue to use RabbitMQ with the given URL
 func (m *Manager) WithRabbitMQFromURL(url string) *Manager {
-	if queue, err := NewRabbitMQQueueFromURL(url); err == nil {
+	if queue, err := NewRabbitMQFromURL(url); err == nil {
 		m.queue = queue
 	}
 	return m
