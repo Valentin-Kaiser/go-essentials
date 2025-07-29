@@ -208,6 +208,9 @@ func (e Error) Error() string {
 			if errors != "" {
 				errors += ErrorDelimiter
 			}
+			if d == nil {
+				continue
+			}
 			errors += d.Error()
 		}
 
