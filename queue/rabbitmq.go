@@ -15,8 +15,8 @@ import (
 // ErrNoJobAvailable is returned when no job is available in the queue
 var ErrNoJobAvailable = apperror.NewError("no job available")
 
-// RabbitMQQueue implements a RabbitMQ-backed job queue
-type RabbitMQQueue struct {
+// RabbitMQ implements a RabbitMQ-backed job queue
+type RabbitMQ struct {
 	conn         *amqp.Connection
 	channel      *amqp.Channel
 	queueName    string
@@ -41,7 +41,7 @@ type RabbitMQConfig struct {
 	MaxPriority  int // Maximum priority level for the queue (0-255)
 }
 
-// NewRabbitMQQueue creates a new RabbitMQ-backed queue.
+// NewRabbitMQ creates a new RabbitMQ-backed queue.
 //
 // Configuration Parameters:
 // - URL: The RabbitMQ server URL. This is required for establishing a connection.
@@ -62,7 +62,7 @@ type RabbitMQConfig struct {
 // - Missing or empty URL, QueueName, ExchangeName, or RoutingKey will result in an error.
 // - Connection failures (e.g., network issues, invalid URL) will return a wrapped error.
 // - Invalid MaxPriority values (outside the range 0-255) may cause unexpected behavior.
-func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
+func NewRabbitMQ(config RabbitMQConfig) (*RabbitMQ, error) {
 	if strings.TrimSpace(config.URL) == "" {
 		return nil, apperror.NewError("RabbitMQ URL is required")
 	}
@@ -156,7 +156,7 @@ func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 		return nil, apperror.Wrap(err)
 	}
 
-	rq := &RabbitMQQueue{
+	rq := &RabbitMQ{
 		conn:         conn,
 		channel:      channel,
 		queueName:    config.QueueName,
@@ -168,8 +168,8 @@ func NewRabbitMQQueue(config RabbitMQConfig) (*RabbitMQQueue, error) {
 	return rq, nil
 }
 
-// NewRabbitMQQueueFromURL creates a new RabbitMQ queue with a simple URL
-func NewRabbitMQQueueFromURL(url string) (*RabbitMQQueue, error) {
+// NewRabbitMQFromURL creates a new RabbitMQ queue with a simple URL
+func NewRabbitMQFromURL(url string) (*RabbitMQ, error) {
 	config := RabbitMQConfig{
 		URL:          url,
 		QueueName:    "jobs",
@@ -180,11 +180,11 @@ func NewRabbitMQQueueFromURL(url string) (*RabbitMQQueue, error) {
 		Exclusive:    false,
 		NoWait:       false,
 	}
-	return NewRabbitMQQueue(config)
+	return NewRabbitMQ(config)
 }
 
 // Enqueue adds a job to the queue
-func (rq *RabbitMQQueue) Enqueue(ctx context.Context, job *Job) error {
+func (rq *RabbitMQ) Enqueue(ctx context.Context, job *Job) error {
 	rq.closeMutex.RLock()
 	defer rq.closeMutex.RUnlock()
 
@@ -239,7 +239,7 @@ func (rq *RabbitMQQueue) Enqueue(ctx context.Context, job *Job) error {
 }
 
 // scheduleJob handles scheduled job publishing
-func (rq *RabbitMQQueue) scheduleJob(ctx context.Context, message amqp.Publishing) error {
+func (rq *RabbitMQ) scheduleJob(ctx context.Context, message amqp.Publishing) error {
 	return rq.channel.PublishWithContext(
 		ctx,
 		rq.exchangeName,
@@ -251,7 +251,7 @@ func (rq *RabbitMQQueue) scheduleJob(ctx context.Context, message amqp.Publishin
 }
 
 // Dequeue retrieves a job from the queue
-func (rq *RabbitMQQueue) Dequeue(ctx context.Context, timeout time.Duration) (*Job, error) {
+func (rq *RabbitMQ) Dequeue(ctx context.Context, timeout time.Duration) (*Job, error) {
 	rq.closeMutex.RLock()
 	defer rq.closeMutex.RUnlock()
 
@@ -305,13 +305,13 @@ func (rq *RabbitMQQueue) Dequeue(ctx context.Context, timeout time.Duration) (*J
 }
 
 // Schedule adds a job to be processed at a specific time
-func (rq *RabbitMQQueue) Schedule(ctx context.Context, job *Job) error {
+func (rq *RabbitMQ) Schedule(ctx context.Context, job *Job) error {
 	job.Status = StatusScheduled
 	return rq.Enqueue(ctx, job)
 }
 
 // UpdateJob updates a job's status
-func (rq *RabbitMQQueue) UpdateJob(_ context.Context, job *Job) error {
+func (rq *RabbitMQ) UpdateJob(_ context.Context, job *Job) error {
 	rq.jobsMutex.Lock()
 	defer rq.jobsMutex.Unlock()
 
@@ -343,7 +343,7 @@ func (rq *RabbitMQQueue) UpdateJob(_ context.Context, job *Job) error {
 }
 
 // GetJob retrieves a job by ID
-func (rq *RabbitMQQueue) GetJob(_ context.Context, id string) (*Job, error) {
+func (rq *RabbitMQ) GetJob(_ context.Context, id string) (*Job, error) {
 	rq.jobsMutex.RLock()
 	defer rq.jobsMutex.RUnlock()
 
@@ -360,7 +360,7 @@ func (rq *RabbitMQQueue) GetJob(_ context.Context, id string) (*Job, error) {
 }
 
 // GetJobs retrieves jobs by status
-func (rq *RabbitMQQueue) GetJobs(_ context.Context, status Status, limit int) ([]*Job, error) {
+func (rq *RabbitMQ) GetJobs(_ context.Context, status Status, limit int) ([]*Job, error) {
 	rq.jobsMutex.RLock()
 	defer rq.jobsMutex.RUnlock()
 
@@ -385,7 +385,7 @@ func (rq *RabbitMQQueue) GetJobs(_ context.Context, status Status, limit int) ([
 }
 
 // GetStats returns queue statistics
-func (rq *RabbitMQQueue) GetStats(_ context.Context) (*Stats, error) {
+func (rq *RabbitMQ) GetStats(_ context.Context) (*Stats, error) {
 	rq.jobsMutex.RLock()
 	defer rq.jobsMutex.RUnlock()
 
@@ -423,7 +423,7 @@ func (rq *RabbitMQQueue) GetStats(_ context.Context) (*Stats, error) {
 }
 
 // DeleteJob removes a job from the queue
-func (rq *RabbitMQQueue) DeleteJob(_ context.Context, id string) error {
+func (rq *RabbitMQ) DeleteJob(_ context.Context, id string) error {
 	rq.jobsMutex.Lock()
 	defer rq.jobsMutex.Unlock()
 
@@ -436,7 +436,7 @@ func (rq *RabbitMQQueue) DeleteJob(_ context.Context, id string) error {
 }
 
 // Close closes the RabbitMQ connection
-func (rq *RabbitMQQueue) Close() error {
+func (rq *RabbitMQ) Close() error {
 	rq.closeMutex.Lock()
 	defer rq.closeMutex.Unlock()
 
@@ -458,7 +458,7 @@ func (rq *RabbitMQQueue) Close() error {
 }
 
 // IsConnectionOpen checks if the RabbitMQ connection is open
-func (rq *RabbitMQQueue) IsConnectionOpen() bool {
+func (rq *RabbitMQ) IsConnectionOpen() bool {
 	rq.closeMutex.RLock()
 	defer rq.closeMutex.RUnlock()
 
@@ -466,7 +466,7 @@ func (rq *RabbitMQQueue) IsConnectionOpen() bool {
 }
 
 // Reconnect attempts to reconnect to RabbitMQ
-func (rq *RabbitMQQueue) Reconnect(config RabbitMQConfig) error {
+func (rq *RabbitMQ) Reconnect(config RabbitMQConfig) error {
 	rq.closeMutex.Lock()
 	defer rq.closeMutex.Unlock()
 
@@ -496,7 +496,7 @@ func (rq *RabbitMQQueue) Reconnect(config RabbitMQConfig) error {
 }
 
 // PurgeQueue removes all messages from the queue
-func (rq *RabbitMQQueue) PurgeQueue(_ context.Context) error {
+func (rq *RabbitMQ) PurgeQueue(_ context.Context) error {
 	rq.closeMutex.RLock()
 	defer rq.closeMutex.RUnlock()
 
