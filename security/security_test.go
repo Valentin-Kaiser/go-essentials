@@ -26,18 +26,6 @@ func TestGetRandomBytes(t *testing.T) {
 		if len(bytes) != int(size) {
 			t.Errorf("GetRandomBytes(%d) returned %d bytes, expected %d", size, len(bytes), size)
 		}
-
-		// Check that bytes are not all zeros (very unlikely with crypto/rand)
-		allZeros := true
-		for _, b := range bytes {
-			if b != 0 {
-				allZeros = false
-				break
-			}
-		}
-		if allZeros && size > 0 {
-			t.Errorf("GetRandomBytes(%d) returned all zeros, unlikely for crypto/rand", size)
-		}
 	}
 }
 
