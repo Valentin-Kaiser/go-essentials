@@ -134,11 +134,20 @@ func Reconnect() {
 }
 
 // Disconnect will stop the database connection and wait for the connection to be closed
-func Disconnect() {
+func Disconnect() error {
 	log.Trace().Msg("[Database] closing connection...")
 	cancel.Store(true)
+	sdb, err := db.DB()
+	if err != nil {
+		return apperror.NewErrorf("failed to get database instance").AddError(err)
+	}
+	err = sdb.Close()
+	if err != nil {
+		return apperror.NewErrorf("failed to close database connection").AddError(err)
+	}
 	<-done
 	log.Trace().Msg("[Database] connection closed")
+	return nil
 }
 
 // AwaitConnection will block until the database is connected
