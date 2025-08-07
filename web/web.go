@@ -455,27 +455,8 @@ func (s *Server) WithWebsocket(path string, handler func(http.ResponseWriter, *h
 	return s
 }
 
-// Unregister removes a handler or websocket from the server
-// It will return an error in the Error field if the path is not registered
-func (s *Server) Unregister(path string) *Server {
-	if s.Error != nil {
-		return s
-	}
-
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
-	// Remove from our tracking maps
-	delete(s.handler, path)
-	delete(s.websockets, path)
-	delete(s.onHTTPCode, path)
-
-	s.router.Unregister(path)
-	return s
-}
-
 // UnregisterMultiple removes multiple handlers and websockets from the server
-func (s *Server) UnregisterMultiple(paths []string) *Server {
+func (s *Server) UnregisterHandlerMultiple(paths []string) *Server {
 	if s.Error != nil {
 		return s
 	}
@@ -485,9 +466,8 @@ func (s *Server) UnregisterMultiple(paths []string) *Server {
 
 	var notFound []string
 	for _, path := range paths {
-		_, isHandler := s.handler[path]
-		_, isWebsocket := s.websockets[path]
-		if !isHandler && !isWebsocket {
+		_, ok := s.handler[path]
+		if !ok {
 			notFound = append(notFound, path)
 		}
 	}
@@ -499,17 +479,15 @@ func (s *Server) UnregisterMultiple(paths []string) *Server {
 
 	for _, path := range paths {
 		delete(s.handler, path)
-		delete(s.websockets, path)
-		delete(s.onHTTPCode, path)
 	}
 
-	s.router.UnregisterMultiple(paths)
+	s.router.UnregisterHandler(paths)
 	return s
 }
 
 // UnregisterAll removes all handlers and websockets from the server
 // This includes all registered paths, websockets, and status callbacks
-func (s *Server) UnregisterAll() *Server {
+func (s *Server) UnregisterAllHandler() *Server {
 	if s.Error != nil {
 		return s
 	}
@@ -518,10 +496,7 @@ func (s *Server) UnregisterAll() *Server {
 	defer s.mutex.Unlock()
 
 	s.handler = make(map[string]http.Handler)
-	s.websockets = make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn))
-	s.onHTTPCode = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
-
-	s.router.UnregisterAll()
+	s.router.UnregisterAllHandler()
 	return s
 }
 

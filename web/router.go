@@ -131,28 +131,9 @@ func (router *Router) OnStatus(pattern string, status int, fn func(http.Response
 	router.onStatusPatterns[pattern] = struct{}{}
 }
 
-// Unregister removes a route from the router
+// UnregisterHandler removes routes from the router
 // It removes the route pattern from all relevant internal maps and recreates the ServeMux
-func (router *Router) Unregister(pattern string) {
-	router.mutex.Lock()
-	defer router.mutex.Unlock()
-
-	if _, exists := router.routes[pattern]; !exists {
-		return
-	}
-
-	delete(router.routes, pattern)
-	delete(router.onStatus, pattern)
-	delete(router.onStatusPatterns, pattern)
-	delete(router.limits, pattern)
-	delete(router.limitedPatterns, pattern)
-
-	router.rebuildMux()
-}
-
-// UnregisterMultiple removes multiple routes from the router
-// It removes all specified route patterns and recreates the ServeMux once
-func (router *Router) UnregisterMultiple(patterns []string) {
+func (router *Router) UnregisterHandler(patterns []string) {
 	router.mutex.Lock()
 	defer router.mutex.Unlock()
 
@@ -169,8 +150,6 @@ func (router *Router) UnregisterMultiple(patterns []string) {
 
 	for _, pattern := range patterns {
 		delete(router.routes, pattern)
-		delete(router.onStatus, pattern)
-		delete(router.onStatusPatterns, pattern)
 		delete(router.limits, pattern)
 		delete(router.limitedPatterns, pattern)
 	}
@@ -180,13 +159,11 @@ func (router *Router) UnregisterMultiple(patterns []string) {
 
 // UnregisterAll removes all routes from the router
 // It clears all route-related maps and creates a new empty ServeMux
-func (router *Router) UnregisterAll() {
+func (router *Router) UnregisterAllHandler() {
 	router.mutex.Lock()
 	defer router.mutex.Unlock()
 
 	router.routes = make(map[string]http.Handler)
-	router.onStatus = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
-	router.onStatusPatterns = make(map[string]struct{})
 	router.limits = make(map[string]*limitStore)
 	router.limitedPatterns = make(map[string]struct{})
 	router.mux = http.NewServeMux()
