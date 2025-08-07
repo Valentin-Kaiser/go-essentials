@@ -455,8 +455,10 @@ func (s *Server) WithWebsocket(path string, handler func(http.ResponseWriter, *h
 	return s
 }
 
-// UnregisterMultiple removes multiple handlers and websockets from the server
-func (s *Server) UnregisterHandlerMultiple(paths []string) *Server {
+// UnregisterHandler removes handlers from the server
+// It removes handlers from internal maps but does not rebuild the router's ServeMux
+// You have to call Rebuild after this method to apply changes
+func (s *Server) UnregisterHandler(paths []string) *Server {
 	if s.Error != nil {
 		return s
 	}
@@ -485,8 +487,8 @@ func (s *Server) UnregisterHandlerMultiple(paths []string) *Server {
 	return s
 }
 
-// UnregisterAll removes all handlers and websockets from the server
-// This includes all registered paths, websockets, and status callbacks
+// UnregisterAllHandler removes all handlers from the server
+// You have to call Rebuild after this method to apply changes
 func (s *Server) UnregisterAllHandler() *Server {
 	if s.Error != nil {
 		return s
@@ -507,6 +509,17 @@ func (s *Server) GetRegisteredRoutes() []string {
 	}
 
 	return s.router.GetRegisteredRoutes()
+}
+
+// Rebuild recreates the ServeMux and re-registers all remaining routes
+// Call this method after multiple unregistration operations for better performance
+func (s *Server) Rebuild() *Server {
+	if s.Error != nil {
+		return s
+	}
+
+	s.router.Rebuild()
+	return s
 }
 
 // WithHost sets the address of the web server

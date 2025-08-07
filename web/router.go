@@ -132,7 +132,7 @@ func (router *Router) OnStatus(pattern string, status int, fn func(http.Response
 }
 
 // UnregisterHandler removes routes from the router
-// It removes the route pattern from all relevant internal maps and recreates the ServeMux
+// You have to call Rebuild after this method to apply changes
 func (router *Router) UnregisterHandler(patterns []string) {
 	router.mutex.Lock()
 	defer router.mutex.Unlock()
@@ -153,12 +153,10 @@ func (router *Router) UnregisterHandler(patterns []string) {
 		delete(router.limits, pattern)
 		delete(router.limitedPatterns, pattern)
 	}
-
-	router.rebuildMux()
 }
 
 // UnregisterAll removes all routes from the router
-// It clears all route-related maps and creates a new empty ServeMux
+// You have to call Rebuild after this method to apply changes
 func (router *Router) UnregisterAllHandler() {
 	router.mutex.Lock()
 	defer router.mutex.Unlock()
@@ -166,7 +164,14 @@ func (router *Router) UnregisterAllHandler() {
 	router.routes = make(map[string]http.Handler)
 	router.limits = make(map[string]*limitStore)
 	router.limitedPatterns = make(map[string]struct{})
-	router.mux = http.NewServeMux()
+}
+
+// Rebuild recreates the ServeMux and re-registers all remaining routes
+// Call this method after unregistering routes to apply changes
+func (router *Router) Rebuild() {
+	router.mutex.Lock()
+	defer router.mutex.Unlock()
+	router.rebuildMux()
 }
 
 // GetRegisteredRoutes returns a slice of all currently registered route patterns
