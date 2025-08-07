@@ -25,7 +25,7 @@
 //
 //	func main() {
 //		done := make(chan error)
-//		web.Server().
+//		web.Instance().
 //			WithHost("localhost").
 //			WithPort(8088).
 //			WithCacheControl("max-age=3600, s-maxage=7200").
@@ -40,7 +40,7 @@
 //			panic(err)
 //		}
 //
-//		err := web.Server().Stop()
+//		err := web.Instance().Stop()
 //		if err != nil {
 //			panic(err)
 //		}
@@ -453,6 +453,92 @@ func (s *Server) WithWebsocket(path string, handler func(http.ResponseWriter, *h
 	})
 
 	return s
+}
+
+// Unregister removes a handler or websocket from the server
+// It will return an error in the Error field if the path is not registered
+func (s *Server) Unregister(path string) *Server {
+	if s.Error != nil {
+		return s
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	// Remove from our tracking maps
+	delete(s.handler, path)
+	delete(s.websockets, path)
+	delete(s.onHTTPCode, path)
+
+	s.router.Unregister(path)
+	return s
+}
+
+// UnregisterMultiple removes multiple handlers and websockets from the server
+// It will return an error in the Error field if any of the paths are not registered
+func (s *Server) UnregisterMultiple(paths []string) *Server {
+	if s.Error != nil {
+		return s
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	// Check if all paths exist in our tracking maps
+	var notFound []string
+	for _, path := range paths {
+		_, isHandler := s.handler[path]
+		_, isWebsocket := s.websockets[path]
+		if !isHandler && !isWebsocket {
+			notFound = append(notFound, path)
+		}
+	}
+
+	if len(notFound) > 0 {
+		s.Error = apperror.NewErrorf("paths not registered: %v", notFound)
+		return s
+	}
+
+	// Remove all paths from our tracking maps
+	for _, path := range paths {
+		delete(s.handler, path)
+		delete(s.websockets, path)
+		delete(s.onHTTPCode, path)
+	}
+
+	// Unregister from router
+	s.router.UnregisterMultiple(paths)
+	return s
+}
+
+// UnregisterAll removes all handlers and websockets from the server
+// This includes all registered paths, websockets, and status callbacks
+func (s *Server) UnregisterAll() *Server {
+	if s.Error != nil {
+		return s
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	// Clear all our tracking maps
+	s.handler = make(map[string]http.Handler)
+	s.websockets = make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn))
+	s.onHTTPCode = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
+
+	// Unregister all from router
+	s.router.UnregisterAll()
+
+	return s
+}
+
+// GetRegisteredRoutes returns a slice of all currently registered route patterns
+func (s *Server) GetRegisteredRoutes() []string {
+	if s.Error != nil {
+		return nil
+	}
+
+	return s.router.GetRegisteredRoutes()
 }
 
 // WithHost sets the address of the web server

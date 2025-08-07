@@ -26,6 +26,8 @@ type Router struct {
 	whitelist        map[string]*net.IPNet
 	blacklist        map[string]*net.IPNet
 	honeypotCallback func(map[string]*net.IPNet)
+	routes           map[string]http.Handler // Track registered routes for unregistration
+	mutex            sync.RWMutex            // Protect concurrent access to routes
 }
 
 type limitStore struct {
@@ -58,6 +60,7 @@ func NewRouter() *Router {
 		limitedPatterns:  make(map[string]struct{}),
 		whitelist:        make(map[string]*net.IPNet),
 		blacklist:        make(map[string]*net.IPNet),
+		routes:           make(map[string]http.Handler),
 	}
 
 	return r
@@ -66,14 +69,26 @@ func NewRouter() *Router {
 // ServeHTTP implements the http.Handler interface for the Router
 // It wraps the request with middlewares and handles the response
 func (router *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	router.mutex.RLock()
+	mux := router.mux
+	onStatusPatterns := make(map[string]struct{})
+	for k, v := range router.onStatusPatterns {
+		onStatusPatterns[k] = v
+	}
+	limitedPatterns := make(map[string]struct{})
+	for k, v := range router.limitedPatterns {
+		limitedPatterns[k] = v
+	}
+	router.mutex.RUnlock()
+
 	rw := newResponseWriter(w, r)
 	blocked := router.block(rw, r)
 	if !blocked {
 		router.canonicalRedirect(rw, r)
-		router.rateLimit(rw, r)
-		router.wrap(router.mux).ServeHTTP(rw, r)
+		router.rateLimit(rw, r, limitedPatterns)
+		router.wrap(mux).ServeHTTP(rw, r)
 	}
-	router.handleStatusHooks(rw, r)
+	router.handleStatusHooks(rw, r, onStatusPatterns)
 	rw.flush()
 }
 
@@ -90,7 +105,11 @@ func (router *Router) Use(order MiddlewareOrder, middleware func(http.Handler) h
 
 // Handle registers a handler for the given pattern
 func (router *Router) Handle(pattern string, handler http.Handler) {
+	router.mutex.Lock()
+	defer router.mutex.Unlock()
+
 	router.mux.Handle(pattern, handler)
+	router.routes[pattern] = handler
 }
 
 // HandleFunc registers a handler function for the given pattern
@@ -102,11 +121,110 @@ func (router *Router) HandleFunc(pattern string, handlerFunc http.HandlerFunc) {
 // This function will be called after the response is written if the status and pattern match
 // It allows you to handle specific status codes, such as logging or a custom response
 func (router *Router) OnStatus(pattern string, status int, fn func(http.ResponseWriter, *http.Request)) {
+	router.mutex.Lock()
+	defer router.mutex.Unlock()
+
 	if _, ok := router.onStatus[pattern]; !ok {
 		router.onStatus[pattern] = make(map[int]func(http.ResponseWriter, *http.Request))
 	}
 	router.onStatus[pattern][status] = fn
 	router.onStatusPatterns[pattern] = struct{}{}
+}
+
+// Unregister removes a route from the router
+// It removes the route pattern from all relevant internal maps and recreates the ServeMux
+func (router *Router) Unregister(pattern string) {
+	router.mutex.Lock()
+	defer router.mutex.Unlock()
+
+	if _, exists := router.routes[pattern]; !exists {
+		return
+	}
+
+	// Remove from routes map
+	delete(router.routes, pattern)
+
+	// Remove from status callbacks if exists
+	delete(router.onStatus, pattern)
+	delete(router.onStatusPatterns, pattern)
+
+	// Remove from rate limits if exists
+	delete(router.limits, pattern)
+	delete(router.limitedPatterns, pattern)
+
+	// Recreate the ServeMux and re-register remaining routes
+	router.rebuildMux()
+}
+
+// UnregisterMultiple removes multiple routes from the router
+// It removes all specified route patterns and recreates the ServeMux once
+func (router *Router) UnregisterMultiple(patterns []string) {
+	router.mutex.Lock()
+	defer router.mutex.Unlock()
+
+	var notFound []string
+	for _, pattern := range patterns {
+		if _, exists := router.routes[pattern]; !exists {
+			notFound = append(notFound, pattern)
+		}
+	}
+
+	if len(notFound) > 0 {
+		return
+	}
+
+	// Remove all specified patterns
+	for _, pattern := range patterns {
+		delete(router.routes, pattern)
+		delete(router.onStatus, pattern)
+		delete(router.onStatusPatterns, pattern)
+		delete(router.limits, pattern)
+		delete(router.limitedPatterns, pattern)
+	}
+
+	// Recreate the ServeMux and re-register remaining routes
+	router.rebuildMux()
+}
+
+// UnregisterAll removes all routes from the router
+// It clears all route-related maps and creates a new empty ServeMux
+func (router *Router) UnregisterAll() {
+	router.mutex.Lock()
+	defer router.mutex.Unlock()
+
+	// Clear all route-related maps
+	router.routes = make(map[string]http.Handler)
+	router.onStatus = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
+	router.onStatusPatterns = make(map[string]struct{})
+	router.limits = make(map[string]*limitStore)
+	router.limitedPatterns = make(map[string]struct{})
+
+	// Create a new empty ServeMux
+	router.mux = http.NewServeMux()
+}
+
+// GetRegisteredRoutes returns a slice of all currently registered route patterns
+func (router *Router) GetRegisteredRoutes() []string {
+	router.mutex.RLock()
+	defer router.mutex.RUnlock()
+
+	patterns := make([]string, 0, len(router.routes))
+	for pattern := range router.routes {
+		patterns = append(patterns, pattern)
+	}
+	return patterns
+}
+
+// rebuildMux recreates the ServeMux and re-registers all remaining routes
+// This method should be called with the mutex already locked
+func (router *Router) rebuildMux() {
+	// Create a new ServeMux
+	router.mux = http.NewServeMux()
+
+	// Re-register all remaining routes
+	for pattern, handler := range router.routes {
+		router.mux.Handle(pattern, handler)
+	}
 }
 
 // registerRateLimit applies a rate limit to the given pattern
@@ -115,6 +233,9 @@ func (router *Router) registerRateLimit(pattern string, limit rate.Limit, burst 
 	if limit <= 0 || burst <= 0 {
 		return apperror.NewErrorf("invalid rate limit or burst value: limit=%v, burst=%d", limit, burst)
 	}
+
+	router.mutex.Lock()
+	defer router.mutex.Unlock()
 
 	if _, exists := router.limits[pattern]; exists {
 		return apperror.NewErrorf("pattern %s is already rate limited", pattern)
@@ -156,17 +277,21 @@ func (router *Router) sort() {
 	}
 }
 
-func (router *Router) handleStatusHooks(rw *ResponseWriter, r *http.Request) {
-	if matched := router.matchPattern(r.URL.Path, router.onStatusPatterns); matched != "" {
-		if fn, ok := router.onStatus[matched][rw.status]; ok {
+func (router *Router) handleStatusHooks(rw *ResponseWriter, r *http.Request, patterns map[string]struct{}) {
+	if matched := router.matchPattern(r.URL.Path, patterns); matched != "" {
+		router.mutex.RLock()
+		fn, ok := router.onStatus[matched][rw.status]
+		router.mutex.RUnlock()
+
+		if ok {
 			rw.clear()
 			fn(rw, r)
 		}
 	}
 }
 
-func (router *Router) rateLimit(w http.ResponseWriter, r *http.Request) {
-	matched := router.matchPattern(r.URL.Path, router.limitedPatterns)
+func (router *Router) rateLimit(w http.ResponseWriter, r *http.Request, patterns map[string]struct{}) {
+	matched := router.matchPattern(r.URL.Path, patterns)
 	if matched != "" {
 		ip := router.clientIP(r)
 		if ip == "" {
@@ -175,7 +300,10 @@ func (router *Router) rateLimit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		router.mutex.RLock()
 		limiter := router.limits[matched].limiter(ip)
+		router.mutex.RUnlock()
+
 		if !limiter.Allow() {
 			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 			return
