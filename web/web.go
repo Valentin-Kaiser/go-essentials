@@ -475,7 +475,6 @@ func (s *Server) Unregister(path string) *Server {
 }
 
 // UnregisterMultiple removes multiple handlers and websockets from the server
-// It will return an error in the Error field if any of the paths are not registered
 func (s *Server) UnregisterMultiple(paths []string) *Server {
 	if s.Error != nil {
 		return s
@@ -484,7 +483,6 @@ func (s *Server) UnregisterMultiple(paths []string) *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	// Check if all paths exist in our tracking maps
 	var notFound []string
 	for _, path := range paths {
 		_, isHandler := s.handler[path]
@@ -499,14 +497,12 @@ func (s *Server) UnregisterMultiple(paths []string) *Server {
 		return s
 	}
 
-	// Remove all paths from our tracking maps
 	for _, path := range paths {
 		delete(s.handler, path)
 		delete(s.websockets, path)
 		delete(s.onHTTPCode, path)
 	}
 
-	// Unregister from router
 	s.router.UnregisterMultiple(paths)
 	return s
 }
@@ -521,14 +517,11 @@ func (s *Server) UnregisterAll() *Server {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	// Clear all our tracking maps
 	s.handler = make(map[string]http.Handler)
 	s.websockets = make(map[string]func(http.ResponseWriter, *http.Request, *websocket.Conn))
 	s.onHTTPCode = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
 
-	// Unregister all from router
 	s.router.UnregisterAll()
-
 	return s
 }
 

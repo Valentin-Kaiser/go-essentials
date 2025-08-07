@@ -141,18 +141,12 @@ func (router *Router) Unregister(pattern string) {
 		return
 	}
 
-	// Remove from routes map
 	delete(router.routes, pattern)
-
-	// Remove from status callbacks if exists
 	delete(router.onStatus, pattern)
 	delete(router.onStatusPatterns, pattern)
-
-	// Remove from rate limits if exists
 	delete(router.limits, pattern)
 	delete(router.limitedPatterns, pattern)
 
-	// Recreate the ServeMux and re-register remaining routes
 	router.rebuildMux()
 }
 
@@ -173,7 +167,6 @@ func (router *Router) UnregisterMultiple(patterns []string) {
 		return
 	}
 
-	// Remove all specified patterns
 	for _, pattern := range patterns {
 		delete(router.routes, pattern)
 		delete(router.onStatus, pattern)
@@ -182,7 +175,6 @@ func (router *Router) UnregisterMultiple(patterns []string) {
 		delete(router.limitedPatterns, pattern)
 	}
 
-	// Recreate the ServeMux and re-register remaining routes
 	router.rebuildMux()
 }
 
@@ -192,14 +184,11 @@ func (router *Router) UnregisterAll() {
 	router.mutex.Lock()
 	defer router.mutex.Unlock()
 
-	// Clear all route-related maps
 	router.routes = make(map[string]http.Handler)
 	router.onStatus = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
 	router.onStatusPatterns = make(map[string]struct{})
 	router.limits = make(map[string]*limitStore)
 	router.limitedPatterns = make(map[string]struct{})
-
-	// Create a new empty ServeMux
 	router.mux = http.NewServeMux()
 }
 
@@ -218,10 +207,8 @@ func (router *Router) GetRegisteredRoutes() []string {
 // rebuildMux recreates the ServeMux and re-registers all remaining routes
 // This method should be called with the mutex already locked
 func (router *Router) rebuildMux() {
-	// Create a new ServeMux
 	router.mux = http.NewServeMux()
 
-	// Re-register all remaining routes
 	for pattern, handler := range router.routes {
 		router.mux.Handle(pattern, handler)
 	}
