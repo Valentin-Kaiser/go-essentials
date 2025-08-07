@@ -169,6 +169,7 @@ func (router *Router) UnregisterHandler(patterns []string) {
 	for _, pattern := range patterns {
 		delete(router.routes, pattern)
 		delete(router.limits, pattern)
+		delete(router.onStatus, pattern)
 	}
 
 	router.updateAtomicLimitedPatterns()
@@ -182,6 +183,7 @@ func (router *Router) UnregisterAllHandler() {
 
 	router.routes = make(map[string]http.Handler)
 	router.limits = make(map[string]*limitStore)
+	router.onStatus = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
 
 	router.updateAtomicLimitedPatterns()
 }
