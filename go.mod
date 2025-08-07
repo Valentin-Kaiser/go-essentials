@@ -18,7 +18,7 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/stoewer/go-strcase v1.3.1
 	golang.org/x/sync v0.16.0
-	golang.org/x/text v0.27.0
+	golang.org/x/text v0.28.0
 	golang.org/x/time v0.12.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v2 v2.4.0
