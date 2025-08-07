@@ -173,6 +173,7 @@ func (router *Router) UnregisterHandler(patterns []string) {
 	}
 
 	router.updateAtomicLimitedPatterns()
+	router.updateAtomicOnStatusPatterns()
 }
 
 // UnregisterAll removes all routes from the router
@@ -186,6 +187,7 @@ func (router *Router) UnregisterAllHandler() {
 	router.onStatus = make(map[string]map[int]func(http.ResponseWriter, *http.Request))
 
 	router.updateAtomicLimitedPatterns()
+	router.updateAtomicOnStatusPatterns()
 }
 
 // Rebuild recreates the ServeMux and re-registers all remaining routes
