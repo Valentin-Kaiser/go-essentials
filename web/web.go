@@ -475,7 +475,6 @@ func (s *Server) UnregisterHandler(paths []string) *Server {
 	}
 
 	if len(notFound) > 0 {
-		s.Error = apperror.NewErrorf("paths not registered: %v", notFound)
 		return s
 	}
 
