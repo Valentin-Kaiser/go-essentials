@@ -25,7 +25,7 @@
 //
 //	func main() {
 //		done := make(chan error)
-//		web.Server().
+//		web.Instance().
 //			WithHost("localhost").
 //			WithPort(8088).
 //			WithCacheControl("max-age=3600, s-maxage=7200").
@@ -40,7 +40,7 @@
 //			panic(err)
 //		}
 //
-//		err := web.Server().Stop()
+//		err := web.Instance().Stop()
 //		if err != nil {
 //			panic(err)
 //		}
@@ -452,6 +452,73 @@ func (s *Server) WithWebsocket(path string, handler func(http.ResponseWriter, *h
 		handler(w, r, conn)
 	})
 
+	return s
+}
+
+// UnregisterHandler removes handlers from the server
+// It removes handlers from internal maps but does not rebuild the router's ServeMux
+// You have to call Rebuild after this method to apply changes
+func (s *Server) UnregisterHandler(paths []string) *Server {
+	if s.Error != nil {
+		return s
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	var notFound []string
+	for _, path := range paths {
+		_, ok := s.handler[path]
+		if !ok {
+			notFound = append(notFound, path)
+		}
+	}
+
+	if len(notFound) > 0 {
+		s.Error = apperror.NewErrorf("paths not registered: %v", notFound)
+		return s
+	}
+
+	for _, path := range paths {
+		delete(s.handler, path)
+	}
+
+	s.router.UnregisterHandler(paths)
+	return s
+}
+
+// UnregisterAllHandler removes all handlers from the server
+// You have to call Rebuild after this method to apply changes
+func (s *Server) UnregisterAllHandler() *Server {
+	if s.Error != nil {
+		return s
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.handler = make(map[string]http.Handler)
+	s.router.UnregisterAllHandler()
+	return s
+}
+
+// GetRegisteredRoutes returns a slice of all currently registered route patterns
+func (s *Server) GetRegisteredRoutes() []string {
+	if s.Error != nil {
+		return nil
+	}
+
+	return s.router.GetRegisteredRoutes()
+}
+
+// Rebuild recreates the ServeMux and re-registers all remaining routes
+// Call this method after multiple unregistration operations for better performance
+func (s *Server) Rebuild() *Server {
+	if s.Error != nil {
+		return s
+	}
+
+	s.router.Rebuild()
 	return s
 }
 
