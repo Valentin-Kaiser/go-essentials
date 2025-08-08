@@ -59,7 +59,6 @@ func TestRouterUnregisterAllHandler(t *testing.T) {
 
 	// Unregister all routes
 	router.UnregisterAllHandler()
-	router.Rebuild() // Rebuild to apply changes
 
 	// Verify all routes are unregistered
 	routes := router.GetRegisteredRoutes()
@@ -108,7 +107,6 @@ func TestRouterConcurrentAccess(t *testing.T) {
 	go func() {
 		for i := 0; i < 10; i++ {
 			router.UnregisterHandler([]string{"/test" + string(rune('0'+i))})
-			router.Rebuild() // Rebuild after unregistration to clear the mux
 			router.Handle("/test"+string(rune('0'+i)), handler)
 		}
 		done <- true
